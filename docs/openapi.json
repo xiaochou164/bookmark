@@ -1,0 +1,288 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Rainboard Cloud API",
+    "version": "0.1.0",
+    "description": "Baseline OpenAPI spec for Rainboard Cloud (Phase 0)."
+  },
+  "servers": [
+    { "url": "http://localhost:3789" }
+  ],
+  "components": {
+    "schemas": {
+      "ApiError": {
+        "type": "object",
+        "properties": {
+          "requestId": { "type": ["string", "null"] },
+          "status": { "type": "integer" },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" },
+              "details": {}
+            },
+            "required": ["code", "message", "details"]
+          }
+        },
+        "required": ["requestId", "status", "error"]
+      },
+      "Folder": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "parentId": { "type": ["string", "null"] },
+          "color": { "type": "string" },
+          "position": { "type": "number" },
+          "createdAt": { "type": "number" },
+          "updatedAt": { "type": "number" }
+        },
+        "required": ["id", "name", "parentId"]
+      },
+      "Bookmark": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "url": { "type": "string" },
+          "note": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "folderId": { "type": "string" },
+          "favorite": { "type": "boolean" },
+          "archived": { "type": "boolean" },
+          "read": { "type": "boolean" },
+          "deletedAt": { "type": ["number", "null"] }
+        },
+        "required": ["id", "title", "url", "folderId"]
+      },
+      "PluginConfig": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "PluginRunResult": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "API error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ApiError" }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/state": {
+      "get": {
+        "summary": "Get aggregated app state",
+        "responses": {
+          "200": { "description": "State payload" },
+          "500": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/folders": {
+      "get": {
+        "summary": "List folders",
+        "responses": { "200": { "description": "Folder list" } }
+      },
+      "post": {
+        "summary": "Create folder",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "parentId": { "type": "string" },
+                  "color": { "type": "string" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Folder" } } } },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/folders/{id}": {
+      "put": {
+        "summary": "Update folder",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Updated" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "summary": "Delete folder",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "400": { "$ref": "#/components/responses/Error" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/bookmarks": {
+      "get": {
+        "summary": "List bookmarks",
+        "parameters": [
+          { "in": "query", "name": "view", "schema": { "type": "string" } },
+          { "in": "query", "name": "folderId", "schema": { "type": "string" } },
+          { "in": "query", "name": "q", "schema": { "type": "string" } },
+          { "in": "query", "name": "tags", "schema": { "type": "string" } },
+          { "in": "query", "name": "sort", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Bookmark list" } }
+      },
+      "post": {
+        "summary": "Create bookmark",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "url": { "type": "string" },
+                  "folderId": { "type": "string" },
+                  "note": { "type": "string" },
+                  "tags": { "type": "array", "items": { "type": "string" } }
+                },
+                "required": ["url"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Bookmark" } } } },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/bookmarks/bulk": {
+      "post": {
+        "summary": "Bulk mutate bookmarks",
+        "responses": {
+          "200": { "description": "Bulk result" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/bookmarks/{id}": {
+      "put": {
+        "summary": "Update bookmark",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Updated" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      },
+      "delete": {
+        "summary": "Delete bookmark (soft)",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "204": { "description": "Deleted" },
+          "404": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/bookmarks/{id}/restore": {
+      "post": {
+        "summary": "Restore bookmark from trash",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Restored" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/bookmarks/{id}/opened": {
+      "post": {
+        "summary": "Mark bookmark as opened/read",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Updated" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/api/tags": {
+      "get": {
+        "summary": "List tag summary",
+        "responses": { "200": { "description": "Tags summary" } }
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "summary": "List plugins",
+        "responses": { "200": { "description": "Plugin list" } }
+      }
+    },
+    "/api/plugins/{id}/config": {
+      "get": {
+        "summary": "Get plugin config",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Plugin config" } }
+      },
+      "put": {
+        "summary": "Set plugin config",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PluginConfig" } } }
+        },
+        "responses": { "200": { "description": "Plugin config saved" } }
+      }
+    },
+    "/api/plugins/{id}/state": {
+      "get": {
+        "summary": "Get plugin state",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Plugin state" } }
+      }
+    },
+    "/api/plugins/{id}/preview": {
+      "post": {
+        "summary": "Preview plugin execution",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Preview result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PluginRunResult" } } } },
+          "500": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/plugins/{id}/run": {
+      "post": {
+        "summary": "Execute plugin",
+        "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Run result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PluginRunResult" } } } },
+          "500": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "Serve API specification",
+        "responses": { "200": { "description": "OpenAPI JSON" } }
+      }
+    }
+  }
+}

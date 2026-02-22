@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Bookmark Raindrop Sync",
+  "version": "0.2.7",
+  "description": "Bidirectional sync between Chrome bookmarks and a Raindrop collection.",
+  "permissions": [
+    "bookmarks",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://api.raindrop.io/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Raindrop Sync",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}

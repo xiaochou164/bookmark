@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Raindrop Sync</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 14px; width: 360px; color: #222; }
+      .btn { width: 100%; padding: 10px; border: 0; border-radius: 8px; background: #0b63f3; color: #fff; cursor: pointer; margin-bottom: 8px; }
+      .btn-lite { background: #eef3ff; color: #1a3f92; }
+      .btn[disabled] { opacity: 0.6; cursor: wait; }
+      .row { margin-top: 10px; font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
+      .error { color: #b00020; }
+      .ok { color: #0f6f38; }
+      a { color: #0b63f3; text-decoration: none; }
+      .muted { color: #666; font-size: 12px; }
+      .section { margin-top: 8px; }
+    </style>
+  </head>
+  <body>
+    <button id="previewBtn" class="btn btn-lite">预览变更（Dry Run）</button>
+    <button id="syncBtn" class="btn">立即同步（Apply）</button>
+    <div class="section"><a href="#" id="openOptions">打开设置</a></div>
+    <div class="section muted" id="hint">提示：先预览，再执行同步。</div>
+    <div class="row" id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>

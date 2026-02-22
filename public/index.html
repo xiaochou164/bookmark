@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Rainboard Cloud</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-dot"></div>
+          <div>
+            <strong>Rainboard</strong>
+            <small>Cloud Bookmarks</small>
+          </div>
+        </div>
+
+        <div class="section-title">Quick Access</div>
+        <nav id="quickNav" class="nav-list"></nav>
+
+        <div class="section-head">
+          <div class="section-title">Collections</div>
+          <button id="newCollectionBtn" class="icon-btn">+</button>
+        </div>
+        <div id="collectionsTree" class="tree"></div>
+
+        <div class="section-head">
+          <div class="section-title">Tags</div>
+          <button id="tagManagerBtn" class="icon-btn">⋯</button>
+        </div>
+        <div id="tagsList" class="tags"></div>
+      </aside>
+
+      <main class="main">
+        <header class="toolbar">
+          <div class="search-wrap">
+            <input id="searchInput" type="search" placeholder="Search titles, links, notes, tags..." />
+          </div>
+          <select id="sortSelect">
+            <option value="newest">Newest</option>
+            <option value="updated">Recently Updated</option>
+            <option value="oldest">Oldest</option>
+            <option value="title">Title</option>
+          </select>
+          <button id="refreshBtn" class="ghost">Refresh</button>
+          <button id="authBtn" class="ghost">Sign In</button>
+          <button id="addBookmarkBtn">+ Add Bookmark</button>
+        </header>
+
+        <div class="view-header">
+          <div>
+            <h1 id="viewTitle">All Bookmarks</h1>
+            <p id="viewMeta" class="muted"></p>
+          </div>
+          <div class="actions">
+            <button id="importExportBtn" class="ghost">Import / Export</button>
+            <button id="pluginPanelBtn" class="ghost">Sync Plugin</button>
+            <button id="bulkFavoriteBtn" class="ghost">Favorite</button>
+            <button id="bulkArchiveBtn" class="ghost">Archive</button>
+            <button id="bulkDeleteBtn" class="ghost danger">Delete</button>
+            <select id="bulkMoveSelect">
+              <option value="">Move To...</option>
+            </select>
+          </div>
+        </div>
+
+        <section id="cards" class="cards"></section>
+        <div class="pager" id="pager">
+          <div class="pager-left muted" id="pagerMeta">0 items</div>
+          <div class="pager-right">
+            <select id="pageSizeSelect">
+              <option value="12">12 / page</option>
+              <option value="24" selected>24 / page</option>
+              <option value="48">48 / page</option>
+              <option value="96">96 / page</option>
+            </select>
+            <button id="prevPageBtn" class="ghost">Prev</button>
+            <span id="pageLabel" class="muted">Page 1 / 1</span>
+            <button id="nextPageBtn" class="ghost">Next</button>
+          </div>
+        </div>
+      </main>
+
+      <aside class="detail" id="detailPanel">
+        <h3>Details</h3>
+        <div id="emptyDetail" class="muted">Select a bookmark card to edit details.</div>
+
+        <form id="detailForm" class="hidden">
+          <label>Title<input id="detailTitle" /></label>
+          <label>URL<input id="detailUrl" /></label>
+          <label>Collection<select id="detailFolder"></select></label>
+          <label>Tags (comma)<input id="detailTags" /></label>
+          <label>Note<textarea id="detailNote" rows="7"></textarea></label>
+          <label>Reminder (timestamp ms, optional)<input id="detailReminder" /></label>
+          <div id="detailReminderInfo" class="muted"></div>
+
+          <div class="detail-row">
+            <label><input type="checkbox" id="detailFavorite" /> Favorite</label>
+            <label><input type="checkbox" id="detailArchived" /> Archived</label>
+            <label><input type="checkbox" id="detailRead" /> Read</label>
+          </div>
+          <div id="detailMetaInfo" class="muted"></div>
+          <div id="detailMetaTaskInfo" class="muted"></div>
+          <div id="detailArticleInfo" class="muted"></div>
+          <div id="detailFetchHistory" class="muted"></div>
+          <div class="detail-section">
+            <div class="detail-section-head">
+              <strong>Highlights</strong>
+              <div class="detail-inline-actions">
+                <button type="button" id="addHighlightBtn" class="ghost">Add Highlight</button>
+                <button type="button" id="refreshHighlightsBtn" class="ghost">Refresh</button>
+              </div>
+            </div>
+            <div id="detailHighlightsInfo" class="muted"></div>
+            <div id="detailHighlightsList" class="highlight-list"></div>
+          </div>
+
+          <div class="detail-actions">
+            <button type="button" id="saveDetailBtn">Save</button>
+            <button type="button" id="openLinkBtn" class="ghost">Open</button>
+            <button type="button" id="openPreviewBtn" class="ghost">Preview</button>
+            <button type="button" id="snoozeReminderBtn" class="ghost">Snooze 1h</button>
+            <button type="button" id="dismissReminderBtn" class="ghost">Dismiss Reminder</button>
+            <button type="button" id="clearReminderBtn" class="ghost">Clear Reminder</button>
+            <button type="button" id="scanRemindersBtn" class="ghost">Scan Reminders</button>
+            <button type="button" id="fetchMetaBtn" class="ghost">Fetch Metadata</button>
+            <button type="button" id="extractArticleBtn" class="ghost">Extract Article</button>
+            <button type="button" id="retryMetaTaskBtn" class="ghost hidden">Retry Metadata Task</button>
+            <button type="button" id="refreshFetchStatusBtn" class="ghost">Refresh Fetch Status</button>
+            <button type="button" id="deleteDetailBtn" class="ghost danger">Delete</button>
+            <button type="button" id="restoreDetailBtn" class="ghost hidden">Restore</button>
+          </div>
+        </form>
+      </aside>
+    </div>
+
+    <dialog id="bookmarkDialog">
+      <form method="dialog" id="bookmarkForm" class="dialog-form">
+        <h3>New Bookmark</h3>
+        <label>Title<input id="newTitle" required /></label>
+        <label>URL<input id="newUrl" type="url" required /></label>
+        <label>Collection<select id="newFolder"></select></label>
+        <label>Tags (comma)<input id="newTags" /></label>
+        <label>Note<textarea id="newNote" rows="5"></textarea></label>
+        <div class="dialog-actions">
+          <button value="cancel" class="ghost">Cancel</button>
+          <button id="createBookmarkBtn" value="default">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="collectionDialog">
+      <form method="dialog" id="collectionForm" class="dialog-form">
+        <h3>New Collection</h3>
+        <label>Name<input id="newCollectionName" required /></label>
+        <label>Parent<select id="newCollectionParent"></select></label>
+        <label>Color<input id="newCollectionColor" value="#8f96a3" /></label>
+        <div class="dialog-actions">
+          <button value="cancel" class="ghost">Cancel</button>
+          <button id="createCollectionBtn" value="default">Create</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="pluginDialog">
+      <form method="dialog" id="pluginForm" class="dialog-form wide">
+        <h3>Raindrop Sync Plugin</h3>
+        <label>Token<input id="pluginToken" /></label>
+        <label><input type="checkbox" id="pluginTopLevel" /> Top-level auto mapping</label>
+        <label>Mappings (JSON array)
+          <textarea id="pluginMappings" rows="8"></textarea>
+        </label>
+        <fieldset style="border:1px solid #e5e8ef;border-radius:10px;padding:10px 12px">
+          <legend class="muted" style="padding:0 6px">Scheduler</legend>
+          <div style="display:grid;gap:10px">
+            <label><input type="checkbox" id="pluginScheduleEnabled" /> Enable scheduler</label>
+            <label><input type="checkbox" id="pluginSchedulePaused" /> Paused</label>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+              <label>Interval (minutes)<input id="pluginScheduleInterval" type="number" min="1" value="15" /></label>
+              <label>Max concurrent<input id="pluginScheduleMaxConcurrent" type="number" min="1" max="10" value="1" /></label>
+            </div>
+            <label><input type="checkbox" id="pluginScheduleWindowEnabled" /> Run window enabled</label>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+              <label>Window start hour<input id="pluginScheduleWindowStart" type="number" min="0" max="24" value="0" /></label>
+              <label>Window end hour<input id="pluginScheduleWindowEnd" type="number" min="0" max="24" value="24" /></label>
+            </div>
+            <div class="dialog-actions" style="justify-content:flex-start">
+              <button id="pluginScheduleLoadBtn" type="button" class="ghost">Load Schedule</button>
+              <button id="pluginScheduleSaveBtn" type="button" class="ghost">Save Schedule</button>
+              <button id="pluginSchedulePauseBtn" type="button" class="ghost">Pause</button>
+              <button id="pluginScheduleResumeBtn" type="button" class="ghost">Resume</button>
+              <button id="pluginScheduleTickBtn" type="button" class="ghost">Tick Now</button>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="dialog-actions">
+          <button value="cancel" class="ghost">Close</button>
+          <button id="savePluginCfgBtn" type="button" class="ghost">Save Config</button>
+          <button id="pluginHistoryBtn" type="button" class="ghost">History</button>
+          <button id="pluginAuditBtn" type="button" class="ghost">Audit</button>
+          <button id="pluginDevicesBtn" type="button" class="ghost">Devices</button>
+          <button id="pluginHealthBtn" type="button" class="ghost">Health</button>
+          <button id="pluginRetryBtn" type="button" class="ghost">Retry Latest Failed</button>
+          <button id="pluginReplayBtn" type="button" class="ghost">Replay Latest Task</button>
+          <button id="previewPluginBtn" type="button" class="ghost">Preview</button>
+          <button id="runPluginBtn" type="button">Run Sync</button>
+        </div>
+        <pre id="pluginOutput"></pre>
+        <pre id="pluginScheduleOutput"></pre>
+        <pre id="pluginAudit"></pre>
+        <pre id="pluginDevices"></pre>
+        <pre id="pluginHealth"></pre>
+        <pre id="pluginHistory"></pre>
+      </form>
+    </dialog>
+
+    <dialog id="previewDialog">
+      <div class="dialog-form wide preview-shell">
+        <div class="preview-toolbar">
+          <div>
+            <h3 id="previewDialogTitle">Preview</h3>
+            <div id="previewDialogMeta" class="muted"></div>
+          </div>
+          <div class="preview-actions">
+            <button type="button" id="previewRefreshBtn" class="ghost">Refresh</button>
+            <button type="button" id="previewExtractArticleBtn" class="ghost">Extract Article</button>
+            <button type="button" id="previewReaderBtn" class="ghost">Reader Mode</button>
+            <button type="button" id="previewAddHighlightBtn" class="ghost">Highlight Selection</button>
+            <button type="button" id="previewOriginalBtn" class="ghost">Open Original</button>
+            <button type="button" id="previewCloseBtn">Close</button>
+          </div>
+        </div>
+        <div id="previewError" class="muted hidden"></div>
+        <div class="preview-surface">
+          <iframe id="previewFrame" class="preview-pane hidden" title="Preview Frame"></iframe>
+          <img id="previewImage" class="preview-pane hidden" alt="Preview Image" />
+          <video id="previewVideo" class="preview-pane hidden" controls></video>
+          <div id="previewFallback" class="preview-pane hidden muted">Preview unavailable. Use Open Original.</div>
+        </div>
+        <pre id="previewPayload" class="preview-json hidden"></pre>
+      </div>
+    </dialog>
+
+    <dialog id="tagManagerDialog">
+      <form method="dialog" id="tagManagerForm" class="dialog-form">
+        <h3>Tag Manager</h3>
+        <div class="tag-admin-grid">
+          <div>
+            <div class="muted" style="margin-bottom:8px">Current Tags</div>
+            <div id="tagManagerList" class="tag-admin-list"></div>
+          </div>
+          <div class="tag-admin-actions">
+            <label>Rename / Merge (single source)
+              <select id="tagRenameFrom"></select>
+            </label>
+            <label>Target tag
+              <input id="tagRenameTo" placeholder="new-tag" />
+            </label>
+            <button id="renameTagBtn" type="button" class="ghost">Apply Rename / Merge</button>
+
+            <label>Merge multiple tags (comma separated)
+              <input id="tagMergeSources" placeholder="design, ux, ui" />
+            </label>
+            <label>Target tag
+              <input id="tagMergeTarget" placeholder="design" />
+            </label>
+            <button id="mergeTagsBtn" type="button" class="ghost">Merge Tags</button>
+            <pre id="tagManagerOutput">Ready</pre>
+          </div>
+        </div>
+        <div class="dialog-actions">
+          <button value="cancel" class="ghost">Close</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="ioDialog">
+      <div class="dialog-form wide io-grid">
+        <div class="io-panel">
+          <h3>Import</h3>
+          <label>Format
+            <select id="ioImportFormat">
+              <option value="import_html">Bookmarks HTML</option>
+              <option value="import_json">JSON</option>
+              <option value="import_csv">CSV</option>
+            </select>
+          </label>
+          <label>Target Collection
+            <select id="ioImportTargetFolder"></select>
+          </label>
+          <label>Conflict Strategy
+            <select id="ioImportConflict">
+              <option value="skip">Skip duplicate URL in same folder</option>
+              <option value="update">Update duplicate URL in same folder</option>
+              <option value="duplicate">Always duplicate</option>
+            </select>
+          </label>
+          <label>Load File
+            <input id="ioImportFile" type="file" />
+          </label>
+          <label>CSV Mapping (JSON, optional)
+            <textarea id="ioImportCsvMapping" rows="4" placeholder='{"title":"Name","url":"Link","folderPath":"Folder"}'></textarea>
+          </label>
+          <label>Payload Content
+            <textarea id="ioImportContent" rows="10" placeholder="Paste bookmarks HTML / JSON / CSV here"></textarea>
+          </label>
+          <div class="dialog-actions" style="justify-content:flex-start">
+            <button type="button" id="ioQueueImportBtn">Queue Import</button>
+            <button type="button" id="ioClearImportBtn" class="ghost">Clear</button>
+          </div>
+        </div>
+
+        <div class="io-panel">
+          <h3>Export</h3>
+          <label>Format
+            <select id="ioExportFormat">
+              <option value="export_json">JSON</option>
+              <option value="export_csv">CSV</option>
+              <option value="export_html">Bookmarks HTML</option>
+            </select>
+          </label>
+          <label>Scope
+            <select id="ioExportScope">
+              <option value="all">All (current dataset)</option>
+              <option value="currentFolder">Current folder only</option>
+              <option value="selected">Selected bookmarks only</option>
+            </select>
+          </label>
+          <label><input id="ioExportIncludeTrash" type="checkbox" /> Include trash</label>
+          <div class="dialog-actions" style="justify-content:flex-start">
+            <button type="button" id="ioQueueExportBtn">Queue Export</button>
+            <button type="button" id="ioRefreshTasksBtn" class="ghost">Refresh Tasks</button>
+          </div>
+
+          <div class="io-task-head">
+            <strong>Import / Export Tasks</strong>
+            <div class="detail-inline-actions">
+              <button type="button" id="ioRetryTaskBtn" class="ghost">Retry Latest Failed</button>
+            </div>
+          </div>
+          <div id="ioTaskList" class="io-task-list"></div>
+          <pre id="ioTaskOutput">Ready</pre>
+        </div>
+
+        <div class="dialog-actions io-dialog-actions">
+          <button type="button" id="ioCloseBtn" class="ghost">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="authDialog">
+      <div class="dialog-form auth-grid">
+        <div class="auth-panel">
+          <h3 id="authDialogTitle">Account</h3>
+          <div id="authStatusText" class="muted">Not signed in.</div>
+
+          <div id="authGuestPanel" class="auth-section">
+            <label>Email<input id="authEmail" type="email" autocomplete="username" /></label>
+            <label>Password<input id="authPassword" type="password" autocomplete="current-password" /></label>
+            <div class="dialog-actions" style="justify-content:flex-start">
+              <button type="button" id="authLoginBtn">Login</button>
+            </div>
+            <hr />
+            <label>Display Name<input id="authRegisterName" autocomplete="name" /></label>
+            <label>Email<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
+            <label>Password<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
+            <div class="dialog-actions" style="justify-content:flex-start">
+              <button type="button" id="authRegisterBtn" class="ghost">Register</button>
+            </div>
+          </div>
+
+          <div id="authUserPanel" class="auth-section hidden">
+            <div class="auth-user-card">
+              <div><strong id="authUserName">User</strong></div>
+              <div id="authUserEmail" class="muted"></div>
+              <div id="authUserMeta" class="muted"></div>
+            </div>
+            <div class="dialog-actions" style="justify-content:flex-start">
+              <button type="button" id="authLogoutBtn" class="ghost danger">Logout</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="auth-panel">
+          <h3>API Tokens</h3>
+          <div class="auth-token-create">
+            <label>Name<input id="authTokenName" placeholder="My API Token" /></label>
+            <div class="dialog-actions" style="justify-content:flex-start">
+              <button type="button" id="authCreateTokenBtn" class="ghost">Create Token</button>
+              <button type="button" id="authRefreshTokensBtn" class="ghost">Refresh Tokens</button>
+            </div>
+          </div>
+          <div id="authTokensList" class="io-task-list"></div>
+          <div class="muted">New token value (shown once)</div>
+          <pre id="authTokenOutput">No token created yet.</pre>
+        </div>
+
+        <div class="dialog-actions auth-dialog-actions">
+          <button type="button" id="authCloseBtn" class="ghost">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast hidden" role="status" aria-live="polite">
+      <div id="toastText">Ready</div>
+      <div class="toast-actions">
+        <button id="toastUndoBtn" type="button" class="ghost hidden">Undo</button>
+        <button id="toastCloseBtn" type="button" class="ghost">Dismiss</button>
+      </div>
+    </div>
+
+    <script type="module" src="/app.mjs"></script>
+  </body>
+</html>
