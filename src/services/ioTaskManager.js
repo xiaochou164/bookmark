@@ -6,6 +6,7 @@ const {
   exportCsv,
   exportBookmarksHtml
 } = require('./bookmarkTransfer');
+const { hasOwner } = require('./tenantScope');
 
 const IO_TASK_HISTORY_LIMIT = 300;
 const IO_TASK_TICK_MS = 1000;
@@ -83,22 +84,31 @@ class IoTaskManager {
     });
   }
 
-  async listTasks({ limit = 50, status = '', type = '' } = {}) {
+  async listTasks({ userId = '', limit = 50, status = '', type = '' } = {}) {
     const db = await this.dbRepo.read();
+    const scopedUserId = String(userId || '').trim();
     let tasks = Array.isArray(db.ioTasks) ? [...db.ioTasks] : [];
+    if (scopedUserId) tasks = tasks.filter((t) => hasOwner(t, scopedUserId));
     if (status) tasks = tasks.filter((t) => String(t.status || '') === String(status));
     if (type) tasks = tasks.filter((t) => String(t.type || '') === toTaskType(type));
     tasks.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     return tasks.slice(0, Math.max(1, Math.min(500, Number(limit || 50) || 50)));
   }
 
-  async getTask(taskId) {
+  async getTask(taskId, { userId = '' } = {}) {
     const db = await this.dbRepo.read();
-    return (db.ioTasks || []).find((t) => String(t.id) === String(taskId)) || null;
+    const scopedUserId = String(userId || '').trim();
+    return (
+      (db.ioTasks || []).find(
+        (t) => String(t.id) === String(taskId) && (!scopedUserId || hasOwner(t, scopedUserId))
+      ) || null
+    );
   }
 
-  async enqueueTask({ type, input = {}, sourceTaskId = null } = {}) {
+  async enqueueTask({ userId = '', type, input = {}, sourceTaskId = null } = {}) {
     const taskType = toTaskType(type);
+    const scopedUserId = String(userId || '').trim();
+    if (!scopedUserId) throw new Error('userId is required');
     if (!['import_html', 'import_json', 'import_csv', 'export_html', 'export_json', 'export_csv'].includes(taskType)) {
       throw new Error(`unsupported task type: ${type}`);
     }
@@ -106,6 +116,7 @@ class IoTaskManager {
     const now = Date.now();
     const task = {
       id: `io_task_${crypto.randomUUID()}`,
+      userId: scopedUserId,
       type: taskType,
       status: 'queued',
       createdAt: now,
@@ -134,10 +145,11 @@ class IoTaskManager {
     return task;
   }
 
-  async retryTask(taskId) {
-    const source = await this.getTask(taskId);
+  async retryTask(taskId, { userId = '' } = {}) {
+    const source = await this.getTask(taskId, { userId });
     if (!source) throw new Error('task not found');
     return this.enqueueTask({
+      userId: String(source.userId || userId || ''),
       type: source.type,
       input: source.input || {},
       sourceTaskId: source.id
@@ -204,6 +216,7 @@ class IoTaskManager {
         if (task.type === 'import_html') {
           summary = await importBookmarksHtml({
             dbRepo: this.dbRepo,
+            userId: String(task.userId || ''),
             html: String(input.content || ''),
             targetFolderId: input.targetFolderId || 'root',
             conflictStrategy: input.conflictStrategy || 'skip'
@@ -211,6 +224,7 @@ class IoTaskManager {
         } else if (task.type === 'import_json') {
           summary = await importJson({
             dbRepo: this.dbRepo,
+            userId: String(task.userId || ''),
             jsonText: String(input.content || ''),
             targetFolderId: input.targetFolderId || 'root',
             conflictStrategy: input.conflictStrategy || 'skip'
@@ -218,6 +232,7 @@ class IoTaskManager {
         } else if (task.type === 'import_csv') {
           summary = await importCsv({
             dbRepo: this.dbRepo,
+            userId: String(task.userId || ''),
             csvText: String(input.content || ''),
             targetFolderId: input.targetFolderId || 'root',
             conflictStrategy: input.conflictStrategy || 'skip',
@@ -229,9 +244,10 @@ class IoTaskManager {
         await this.updateTask(taskId, { progress: { percent: 20, step: 'building_export' } });
         let out;
         const options = input.options && typeof input.options === 'object' ? input.options : {};
-        if (task.type === 'export_json') out = await exportJson({ dbRepo: this.dbRepo, options });
-        if (task.type === 'export_csv') out = await exportCsv({ dbRepo: this.dbRepo, options });
-        if (task.type === 'export_html') out = await exportBookmarksHtml({ dbRepo: this.dbRepo, options });
+        const userId = String(task.userId || '');
+        if (task.type === 'export_json') out = await exportJson({ dbRepo: this.dbRepo, userId, options });
+        if (task.type === 'export_csv') out = await exportCsv({ dbRepo: this.dbRepo, userId, options });
+        if (task.type === 'export_html') out = await exportBookmarksHtml({ dbRepo: this.dbRepo, userId, options });
         if (!out) throw new Error('export builder returned empty');
         await this.updateTask(taskId, { progress: { percent: 70, step: 'storing_export_file' } });
         const stored = await this.objectStorage.putText('exports', `io/${taskId}-${out.filename}`, out.body, {

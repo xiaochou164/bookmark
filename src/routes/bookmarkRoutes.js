@@ -1,3 +1,5 @@
+const { hasOwner, scopeDbForUser } = require('../services/tenantScope');
+
 function registerBookmarkRoutes(app, deps) {
   const {
     dbRepo,
@@ -68,10 +70,13 @@ function registerBookmarkRoutes(app, deps) {
     return out;
   };
   const editablePermissions = { canView: true, canEdit: true, canDelete: true };
+  const userIdOf = (req) => String(req.auth?.user?.id || '');
+  const bookmarkPermissionsOf = (req, item) =>
+    typeof req.authz?.bookmarkPermissions === 'function' ? req.authz.bookmarkPermissions(item) : editablePermissions;
 
   app.get('/api/bookmarks', async (req, res, next) => {
     try {
-      const db = await dbRepo.read();
+      const db = scopeDbForUser(await dbRepo.read(), userIdOf(req));
       const allItems = applyBookmarkFilters(db.bookmarks, db, req.query || {});
       const total = allItems.length;
       const pageSize = Math.min(100, Math.max(1, toPositiveInt(req.query?.pageSize, 24)));
@@ -97,18 +102,20 @@ function registerBookmarkRoutes(app, deps) {
 
   app.post('/api/bookmarks', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const input = sanitizeBookmarkInput(req.body);
       if (!input.url) return next(badRequest('url is required'));
       const now = Date.now();
       let created;
 
       await dbRepo.update((db) => {
-        if (!db.folders.some((f) => f.id === input.folderId)) {
+        if (!(db.folders || []).some((f) => hasOwner(f, userId) && f.id === input.folderId)) {
           input.folderId = 'root';
         }
 
         created = {
           id: `bm_${crypto.randomUUID()}`,
+          userId,
           title: input.title,
           url: input.url,
           note: input.note,
@@ -150,12 +157,13 @@ function registerBookmarkRoutes(app, deps) {
 
   app.put('/api/bookmarks/:id', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const now = Date.now();
       let updated = null;
 
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((x) => x.id === id);
+        const item = db.bookmarks.find((x) => hasOwner(x, userId) && x.id === id);
         if (!item) return db;
 
         if (typeof req.body.title !== 'undefined') item.title = String(req.body.title || '').trim() || '(untitled)';
@@ -175,7 +183,7 @@ function registerBookmarkRoutes(app, deps) {
         }
         if (typeof req.body.folderId !== 'undefined') {
           const folderId = String(req.body.folderId || 'root');
-          if (db.folders.some((f) => f.id === folderId)) {
+          if ((db.folders || []).some((f) => hasOwner(f, userId) && f.id === folderId)) {
             item.folderId = folderId;
             item.collectionId = folderId;
           }
@@ -198,12 +206,13 @@ function registerBookmarkRoutes(app, deps) {
 
   app.delete('/api/bookmarks/:id', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const now = Date.now();
       let ok = false;
 
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((b) => b.id === id);
+        const item = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id);
         if (!item) return db;
         item.deletedAt = now;
         item.updatedAt = now;
@@ -220,11 +229,12 @@ function registerBookmarkRoutes(app, deps) {
 
   app.post('/api/bookmarks/:id/restore', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const now = Date.now();
       let item = null;
       await dbRepo.update((db) => {
-        const found = db.bookmarks.find((b) => b.id === id);
+        const found = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id);
         if (!found) return db;
         found.deletedAt = null;
         found.updatedAt = now;
@@ -240,11 +250,12 @@ function registerBookmarkRoutes(app, deps) {
 
   app.post('/api/bookmarks/:id/opened', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const now = Date.now();
       let item = null;
       await dbRepo.update((db) => {
-        const found = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
+        const found = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id && !b.deletedAt);
         if (!found) return db;
         found.lastOpenedAt = now;
         found.read = true;
@@ -261,8 +272,9 @@ function registerBookmarkRoutes(app, deps) {
 
   app.post('/api/bookmarks/:id/metadata/fetch', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
-      const snapshot = await dbRepo.read();
+      const snapshot = scopeDbForUser(await dbRepo.read(), userId);
       const item = snapshot.bookmarks.find((b) => b.id === id && !b.deletedAt);
       if (!item) return next(notFound('bookmark not found'));
       if (!item.url) return next(badRequest('bookmark url is empty'));
@@ -274,7 +286,7 @@ function registerBookmarkRoutes(app, deps) {
       } catch (err) {
         let failed = null;
         await dbRepo.update((db) => {
-          const target = db.bookmarks.find((b) => b.id === id);
+          const target = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id);
           if (!target) return db;
           target.metadata = {
             ...(target.metadata || {}),
@@ -296,7 +308,7 @@ function registerBookmarkRoutes(app, deps) {
       let updated = null;
       const now = Date.now();
       await dbRepo.update((db) => {
-        const target = db.bookmarks.find((b) => b.id === id);
+        const target = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id);
         if (!target) return db;
         target.metadata = {
           ...(target.metadata || {}),
@@ -322,8 +334,9 @@ function registerBookmarkRoutes(app, deps) {
   app.post('/api/bookmarks/:id/article/extract', async (req, res, next) => {
     try {
       if (!extractAndPersistArticle) return next(badRequest('article extractor unavailable'));
+      const userId = userIdOf(req);
       const id = String(req.params.id);
-      const snapshot = await dbRepo.read();
+      const snapshot = scopeDbForUser(await dbRepo.read(), userId);
       const item = snapshot.bookmarks.find((b) => b.id === id && !b.deletedAt);
       if (!item) return next(notFound('bookmark not found'));
       if (!item.url) return next(badRequest('bookmark url is empty'));
@@ -340,7 +353,7 @@ function registerBookmarkRoutes(app, deps) {
       } catch (err) {
         let failed = null;
         await dbRepo.update((db) => {
-          const target = db.bookmarks.find((b) => b.id === id);
+          const target = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id);
           if (!target) return db;
           target.article = {
             ...(target.article || {}),
@@ -362,7 +375,7 @@ function registerBookmarkRoutes(app, deps) {
       let updated = null;
       const now = Date.now();
       await dbRepo.update((db) => {
-        const target = db.bookmarks.find((b) => b.id === id);
+        const target = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id);
         if (!target) return db;
         target.article = {
           ...(target.article || {}),
@@ -386,8 +399,9 @@ function registerBookmarkRoutes(app, deps) {
 
   app.get('/api/bookmarks/:id/article', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
-      const db = await dbRepo.read();
+      const db = scopeDbForUser(await dbRepo.read(), userId);
       const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
       if (!item) return next(notFound('bookmark not found'));
       const article = item.article && typeof item.article === 'object' ? item.article : {};
@@ -400,8 +414,9 @@ function registerBookmarkRoutes(app, deps) {
 
   app.get('/api/bookmarks/:id/preview', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
-      const db = await dbRepo.read();
+      const db = scopeDbForUser(await dbRepo.read(), userId);
       const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
       if (!item) return next(notFound('bookmark not found'));
       if (!item.url) return next(badRequest('bookmark url is empty'));
@@ -455,14 +470,15 @@ function registerBookmarkRoutes(app, deps) {
 
   app.get('/api/bookmarks/:id/highlights', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
-      const db = await dbRepo.read();
+      const db = scopeDbForUser(await dbRepo.read(), userId);
       const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
       if (!item) return next(notFound('bookmark not found'));
       res.json({
         ok: true,
         bookmarkId: id,
-        permissions: editablePermissions,
+        permissions: bookmarkPermissionsOf(req, item),
         highlights: Array.isArray(item.highlights) ? item.highlights : []
       });
     } catch (err) {
@@ -472,13 +488,14 @@ function registerBookmarkRoutes(app, deps) {
 
   app.post('/api/bookmarks/:id/highlights', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const input = normalizeHighlightInput(req.body || {}, { partial: false });
       if (!input.text && !input.quote && !input.anchors?.exact) return next(badRequest('highlight text or quote is required'));
       const now = Date.now();
       let created = null;
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
+        const item = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id && !b.deletedAt);
         if (!item) return db;
         item.highlights = Array.isArray(item.highlights) ? item.highlights : [];
         created = {
@@ -504,7 +521,7 @@ function registerBookmarkRoutes(app, deps) {
         return db;
       });
       if (!created) return next(notFound('bookmark not found'));
-      res.status(201).json({ ok: true, bookmarkId: id, permissions: editablePermissions, highlight: created });
+      res.status(201).json({ ok: true, bookmarkId: id, permissions: bookmarkPermissionsOf(req, { userId }), highlight: created });
     } catch (err) {
       next(err);
     }
@@ -512,13 +529,14 @@ function registerBookmarkRoutes(app, deps) {
 
   app.put('/api/bookmarks/:id/highlights/:highlightId', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const highlightId = String(req.params.highlightId);
       const input = normalizeHighlightInput(req.body || {}, { partial: true });
       let updated = null;
       const now = Date.now();
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
+        const item = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id && !b.deletedAt);
         if (!item) return db;
         item.highlights = Array.isArray(item.highlights) ? item.highlights : [];
         const hl = item.highlights.find((h) => String(h.id) === highlightId);
@@ -539,7 +557,7 @@ function registerBookmarkRoutes(app, deps) {
         return db;
       });
       if (!updated) return next(notFound('highlight not found'));
-      res.json({ ok: true, bookmarkId: id, permissions: editablePermissions, highlight: updated });
+      res.json({ ok: true, bookmarkId: id, permissions: bookmarkPermissionsOf(req, { userId }), highlight: updated });
     } catch (err) {
       next(err);
     }
@@ -547,12 +565,13 @@ function registerBookmarkRoutes(app, deps) {
 
   app.delete('/api/bookmarks/:id/highlights/:highlightId', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const highlightId = String(req.params.highlightId);
       let removed = false;
       const now = Date.now();
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
+        const item = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id && !b.deletedAt);
         if (!item) return db;
         item.highlights = Array.isArray(item.highlights) ? item.highlights : [];
         const before = item.highlights.length;
@@ -570,6 +589,7 @@ function registerBookmarkRoutes(app, deps) {
 
   app.post('/api/bookmarks/:id/highlights/:highlightId/annotations', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const highlightId = String(req.params.highlightId);
       const input = normalizeAnnotationInput(req.body || {}, { partial: false });
@@ -577,7 +597,7 @@ function registerBookmarkRoutes(app, deps) {
       const now = Date.now();
       let created = null;
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
+        const item = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id && !b.deletedAt);
         if (!item) return db;
         item.highlights = Array.isArray(item.highlights) ? item.highlights : [];
         const hl = item.highlights.find((h) => String(h.id) === highlightId);
@@ -596,7 +616,9 @@ function registerBookmarkRoutes(app, deps) {
         return db;
       });
       if (!created) return next(notFound('highlight not found'));
-      res.status(201).json({ ok: true, bookmarkId: id, highlightId, permissions: editablePermissions, annotation: created });
+      res
+        .status(201)
+        .json({ ok: true, bookmarkId: id, highlightId, permissions: bookmarkPermissionsOf(req, { userId }), annotation: created });
     } catch (err) {
       next(err);
     }
@@ -604,6 +626,7 @@ function registerBookmarkRoutes(app, deps) {
 
   app.put('/api/bookmarks/:id/highlights/:highlightId/annotations/:annotationId', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const highlightId = String(req.params.highlightId);
       const annotationId = String(req.params.annotationId);
@@ -611,7 +634,7 @@ function registerBookmarkRoutes(app, deps) {
       let updated = null;
       const now = Date.now();
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
+        const item = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id && !b.deletedAt);
         if (!item) return db;
         const hl = (item.highlights || []).find((h) => String(h.id) === highlightId);
         if (!hl) return db;
@@ -627,7 +650,7 @@ function registerBookmarkRoutes(app, deps) {
         return db;
       });
       if (!updated) return next(notFound('annotation not found'));
-      res.json({ ok: true, bookmarkId: id, highlightId, permissions: editablePermissions, annotation: updated });
+      res.json({ ok: true, bookmarkId: id, highlightId, permissions: bookmarkPermissionsOf(req, { userId }), annotation: updated });
     } catch (err) {
       next(err);
     }
@@ -635,13 +658,14 @@ function registerBookmarkRoutes(app, deps) {
 
   app.delete('/api/bookmarks/:id/highlights/:highlightId/annotations/:annotationId', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const id = String(req.params.id);
       const highlightId = String(req.params.highlightId);
       const annotationId = String(req.params.annotationId);
       let removed = false;
       const now = Date.now();
       await dbRepo.update((db) => {
-        const item = db.bookmarks.find((b) => b.id === id && !b.deletedAt);
+        const item = db.bookmarks.find((b) => hasOwner(b, userId) && b.id === id && !b.deletedAt);
         if (!item) return db;
         const hl = (item.highlights || []).find((h) => String(h.id) === highlightId);
         if (!hl) return db;
@@ -665,8 +689,10 @@ function registerBookmarkRoutes(app, deps) {
   app.post('/api/bookmarks/:id/metadata/tasks', async (req, res, next) => {
     try {
       if (!metadataTasks) return next(badRequest('metadata task manager unavailable'));
+      const userId = userIdOf(req);
       const bookmarkId = String(req.params.id);
       const out = await metadataTasks.enqueue({
+        userId,
         bookmarkId,
         timeoutMs: req.body?.timeoutMs,
         maxAttempts: req.body?.maxAttempts,
@@ -689,10 +715,11 @@ function registerBookmarkRoutes(app, deps) {
   app.get('/api/bookmarks/:id/metadata/tasks', async (req, res, next) => {
     try {
       if (!metadataTasks) return next(badRequest('metadata task manager unavailable'));
+      const userId = userIdOf(req);
       const bookmarkId = String(req.params.id);
       const limit = Math.min(100, Math.max(1, toPositiveInt(req.query?.limit, 20)));
       const status = req.query?.status ? String(req.query.status) : '';
-      const tasks = await metadataTasks.listTasks({ bookmarkId, status, limit });
+      const tasks = await metadataTasks.listTasks({ userId, bookmarkId, status, limit });
       res.json({ ok: true, tasks });
     } catch (err) {
       next(err);
@@ -702,10 +729,11 @@ function registerBookmarkRoutes(app, deps) {
   app.get('/api/metadata/tasks', async (req, res, next) => {
     try {
       if (!metadataTasks) return next(badRequest('metadata task manager unavailable'));
+      const userId = userIdOf(req);
       const limit = Math.min(200, Math.max(1, toPositiveInt(req.query?.limit, 50)));
       const bookmarkId = req.query?.bookmarkId ? String(req.query.bookmarkId) : '';
       const status = req.query?.status ? String(req.query.status) : '';
-      const tasks = await metadataTasks.listTasks({ bookmarkId, status, limit });
+      const tasks = await metadataTasks.listTasks({ userId, bookmarkId, status, limit });
       res.json({ ok: true, tasks });
     } catch (err) {
       next(err);
@@ -715,7 +743,7 @@ function registerBookmarkRoutes(app, deps) {
   app.get('/api/metadata/tasks/:taskId', async (req, res, next) => {
     try {
       if (!metadataTasks) return next(badRequest('metadata task manager unavailable'));
-      const task = await metadataTasks.getTask(String(req.params.taskId));
+      const task = await metadataTasks.getTask(String(req.params.taskId), { userId: userIdOf(req) });
       if (!task) return next(notFound('metadata task not found'));
       res.json({ ok: true, task });
     } catch (err) {
@@ -727,6 +755,7 @@ function registerBookmarkRoutes(app, deps) {
     try {
       if (!metadataTasks) return next(badRequest('metadata task manager unavailable'));
       const out = await metadataTasks.retryTask(String(req.params.taskId), {
+        userId: userIdOf(req),
         timeoutMs: req.body?.timeoutMs,
         maxAttempts: req.body?.maxAttempts,
         baseBackoffMs: req.body?.baseBackoffMs,
@@ -749,6 +778,7 @@ function registerBookmarkRoutes(app, deps) {
 
   app.post('/api/bookmarks/bulk', async (req, res, next) => {
     try {
+      const userId = userIdOf(req);
       const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
       const action = String(req.body?.action || '');
       if (!ids.length) return next(badRequest('ids required'));
@@ -758,6 +788,7 @@ function registerBookmarkRoutes(app, deps) {
       await dbRepo.update((db) => {
         const set = new Set(ids);
         for (const item of db.bookmarks) {
+          if (!hasOwner(item, userId)) continue;
           if (!set.has(item.id)) continue;
           if (action === 'favorite') item.favorite = Boolean(req.body?.value);
           if (action === 'archive') item.archived = Boolean(req.body?.value);
@@ -766,7 +797,7 @@ function registerBookmarkRoutes(app, deps) {
           if (action === 'restore') item.deletedAt = null;
           if (action === 'move') {
             const folderId = String(req.body?.folderId || 'root');
-            if (db.folders.some((f) => f.id === folderId)) {
+            if ((db.folders || []).some((f) => hasOwner(f, userId) && f.id === folderId)) {
               item.folderId = folderId;
               item.collectionId = folderId;
             }

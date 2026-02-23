@@ -10,8 +10,10 @@ const { registerTagRoutes } = require('./routes/tagRoutes');
 const { registerReminderRoutes } = require('./routes/reminderRoutes');
 const { registerIoRoutes } = require('./routes/ioRoutes');
 const { registerAuthRoutes } = require('./routes/authRoutes');
+const { registerCollabRoutes } = require('./routes/collabRoutes');
+const { registerProductRoutes } = require('./routes/productRoutes');
 const { registerPluginRoutes } = require('./routes/pluginRoutes');
-const { JsonStore } = require('./store');
+const { JsonStore, SQLiteStore } = require('./store');
 const { DbRepository } = require('./repositories/dbRepository');
 const { PluginManager } = require('./pluginManager');
 const raindropSyncPlugin = require('./plugins/raindropSyncPlugin');
@@ -22,6 +24,9 @@ const { extractAndPersistArticle } = require('./services/articleExtractor');
 const { ReminderManager, normalizeReminderState } = require('./services/reminderManager');
 const { IoTaskManager } = require('./services/ioTaskManager');
 const { AuthService } = require('./services/authService');
+const { createTenantBootstrapMiddleware } = require('./services/tenantScope');
+const { createAuthorizationMiddleware } = require('./services/permissionService');
+const { createJobQueueBroker } = require('./infra/jobQueue');
 
 function normalizeTags(raw) {
   if (!Array.isArray(raw)) return [];
@@ -103,6 +108,53 @@ function ensureDbShape(db) {
   db.apiTokens = Array.isArray(db.apiTokens) ? db.apiTokens : [];
   db.reminderEvents = Array.isArray(db.reminderEvents) ? db.reminderEvents : [];
   db.reminderSchedulerState = db.reminderSchedulerState || {};
+  db.collectionShares = Array.isArray(db.collectionShares) ? db.collectionShares : [];
+  db.publicCollectionLinks = Array.isArray(db.publicCollectionLinks) ? db.publicCollectionLinks : [];
+  db.collaborationAuditLogs = Array.isArray(db.collaborationAuditLogs) ? db.collaborationAuditLogs : [];
+  db.userEntitlements = db.userEntitlements || {};
+  db.billingSubscriptions = Array.isArray(db.billingSubscriptions) ? db.billingSubscriptions : [];
+  db.quotaUsage = db.quotaUsage || {};
+  db.savedSearches = Array.isArray(db.savedSearches) ? db.savedSearches : [];
+  db.searchIndex = Array.isArray(db.searchIndex) ? db.searchIndex : [];
+  db.brokenLinkTasks = Array.isArray(db.brokenLinkTasks) ? db.brokenLinkTasks : [];
+  db.backups = Array.isArray(db.backups) ? db.backups : [];
+  db.aiSuggestionJobs = Array.isArray(db.aiSuggestionJobs) ? db.aiSuggestionJobs : [];
+
+  for (const share of db.collectionShares) {
+    share.id = String(share.id || `shr_${crypto.randomUUID()}`);
+    share.ownerUserId = String(share.ownerUserId || share.userId || '');
+    share.folderId = String(share.folderId || 'root');
+    share.inviteEmail = String(share.inviteEmail || '').trim().toLowerCase();
+    share.memberUserId = share.memberUserId ? String(share.memberUserId) : '';
+    share.role = String(share.role || 'viewer');
+    share.status = String(share.status || 'pending');
+    share.createdAt = Number(share.createdAt || Date.now());
+    share.updatedAt = Number(share.updatedAt || share.createdAt);
+    share.acceptedAt = share.acceptedAt ? Number(share.acceptedAt) : 0;
+  }
+
+  for (const link of db.publicCollectionLinks) {
+    link.id = String(link.id || `pub_${crypto.randomUUID()}`);
+    link.ownerUserId = String(link.ownerUserId || link.userId || '');
+    link.folderId = String(link.folderId || 'root');
+    link.token = String(link.token || crypto.randomUUID());
+    link.enabled = typeof link.enabled === 'undefined' ? true : Boolean(link.enabled);
+    link.title = String(link.title || '');
+    link.description = String(link.description || '');
+    link.createdAt = Number(link.createdAt || Date.now());
+    link.updatedAt = Number(link.updatedAt || link.createdAt);
+    link.revokedAt = link.revokedAt ? Number(link.revokedAt) : 0;
+  }
+
+  for (const row of db.collaborationAuditLogs) {
+    row.id = String(row.id || `audit_${crypto.randomUUID()}`);
+    row.userId = String(row.userId || '');
+    row.action = String(row.action || '');
+    row.resourceType = String(row.resourceType || '');
+    row.resourceId = String(row.resourceId || '');
+    row.createdAt = Number(row.createdAt || Date.now());
+    row.payload = row.payload && typeof row.payload === 'object' ? row.payload : {};
+  }
 
   if (!db.folders.find((f) => f.id === 'root')) {
     db.folders.unshift({
@@ -121,6 +173,7 @@ function ensureDbShape(db) {
     folder.parentId = typeof folder.parentId === 'undefined' ? 'root' : folder.parentId;
     if (folder.id === 'root') folder.parentId = null;
     folder.color = String(folder.color || '#8f96a3');
+    folder.icon = Array.from(String(folder.icon || '').trim()).slice(0, 2).join('');
     folder.position = Number(folder.position || 0);
     folder.createdAt = Number(folder.createdAt || Date.now());
     folder.updatedAt = Number(folder.updatedAt || folder.createdAt);
@@ -409,7 +462,9 @@ async function main() {
   const app = express();
   registerBaseHttp(app);
 
-  const store = new JsonStore(config.dataFile);
+  const store = config.dbBackend === 'sqlite'
+    ? new SQLiteStore(config.sqliteFile, { importJsonFile: config.dataFile })
+    : new JsonStore(config.dataFile);
   await store.init();
   await store.update((db) => seedDemoDataIfEmpty(ensureDbShape(db)));
   const dbRepo = new DbRepository({ store, normalizeDb: ensureDbShape });
@@ -419,8 +474,9 @@ async function main() {
     publicBasePath: '/api/assets'
   });
   await objectStorage.init();
+  const jobQueue = await createJobQueueBroker(config);
 
-  const plugins = new PluginManager({ store });
+  const plugins = new PluginManager({ store, jobQueue });
   plugins.register(raindropSyncPlugin);
   plugins.startScheduler();
 
@@ -434,6 +490,32 @@ async function main() {
   const reminders = new ReminderManager({ dbRepo });
   reminders.start();
   const auth = new AuthService({ dbRepo, isProduction: config.isProduction });
+
+  app.use(async (req, res, next) => {
+    try {
+      const method = String(req.method || 'GET').toUpperCase();
+      if (!['GET', 'HEAD'].includes(method)) return next();
+      const reqPath = String(req.path || req.url || '/');
+      if (reqPath.startsWith('/api/')) return next();
+      if (reqPath === '/openapi.json') return next();
+      if (reqPath === '/login.html') return next();
+      if (reqPath.startsWith('/public/c/')) return next();
+      const isPageRequest = reqPath === '/' || reqPath.endsWith('.html');
+      if (!isPageRequest) return next();
+
+      const authCtx = await auth.resolveAuthFromRequest(req);
+      if (authCtx?.authenticated) {
+        req.auth = authCtx;
+        return next();
+      }
+
+      const nextPath = String(req.originalUrl || reqPath || '/');
+      const target = `/login.html?next=${encodeURIComponent(nextPath.startsWith('/') ? nextPath : '/')}`;
+      return res.redirect(302, target);
+    } catch (err) {
+      return next(err);
+    }
+  });
 
   app.use('/api/assets', express.static(config.objectStorageDir));
 
@@ -455,6 +537,8 @@ async function main() {
       allowPaths: ['/api/health', '/health']
     })
   );
+  app.use('/api', createTenantBootstrapMiddleware(dbRepo));
+  app.use('/api', createAuthorizationMiddleware());
 
   registerSystemRoutes(app, {
     dbRepo,
@@ -504,12 +588,30 @@ async function main() {
     notFound
   });
 
+  registerCollabRoutes(app, {
+    dbRepo,
+    badRequest,
+    notFound
+  });
+
+  registerProductRoutes(app, {
+    dbRepo,
+    objectStorage,
+    badRequest,
+    notFound
+  });
+
   registerPluginRoutes(app, { plugins });
 
   registerErrorStack(app);
 
   app.listen(config.port, config.host, () => {
     console.log('[startup]', startupConfigView(config));
+    console.log('[job-queue]', {
+      requested: config.queueBackend,
+      active: jobQueue?.backend || 'memory',
+      meta: jobQueue?.meta || {}
+    });
     console.log(`Cloud bookmarks listening on http://localhost:${config.port}`);
   });
 }

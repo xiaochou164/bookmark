@@ -3,210 +3,511 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Rainboard Cloud</title>
+    <title>Rainboard 云书签</title>
+    <meta name="theme-color" content="#1194ff" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="shell">
       <aside class="sidebar">
+        <div class="sidebar-account" id="sidebarAccountArea">
+          <button type="button" id="sidebarAccountBtn" class="sidebar-account-btn" aria-haspopup="menu" aria-expanded="false">
+            <span id="sidebarAccountAvatar" class="sidebar-account-avatar">未</span>
+            <span class="sidebar-account-text">
+              <strong id="sidebarAccountName">未登录</strong>
+              <small id="sidebarAccountMeta">点击登录</small>
+            </span>
+            <span class="sidebar-account-caret">▾</span>
+          </button>
+          <div id="sidebarAccountMenu" class="sidebar-account-menu hidden" role="menu" aria-label="账号菜单">
+            <button type="button" id="sidebarAccountMenuAuth" class="sidebar-account-menu-item" role="menuitem">账号与 Token</button>
+            <button type="button" id="sidebarAccountMenuSettings" class="sidebar-account-menu-item" role="menuitem">设置</button>
+            <button type="button" id="sidebarAccountMenuLogout" class="sidebar-account-menu-item danger" role="menuitem">退出登录</button>
+          </div>
+        </div>
+
         <div class="brand">
           <div class="brand-dot"></div>
           <div>
             <strong>Rainboard</strong>
-            <small>Cloud Bookmarks</small>
+            <small>云书签</small>
           </div>
         </div>
 
-        <div class="section-title">Quick Access</div>
+        <div class="section-title">快捷入口</div>
         <nav id="quickNav" class="nav-list"></nav>
 
         <div class="section-head">
-          <div class="section-title">Collections</div>
-          <button id="newCollectionBtn" class="icon-btn">+</button>
+          <div class="section-title">已保存查询</div>
+          <button id="savedQueriesSidebarRefreshBtn" class="icon-btn" title="刷新已保存查询" aria-label="刷新已保存查询">↻</button>
+        </div>
+        <div id="savedQueriesSidebarMeta" class="sidebar-section-meta muted">尚未加载</div>
+        <nav id="savedQueriesSidebar" class="nav-list sidebar-subnav"></nav>
+
+        <div id="collectionsSectionHead" class="section-head collections-section-head">
+          <div class="section-head-main">
+            <span class="section-drag-hint" aria-hidden="true">⋮⋮</span>
+            <div id="collectionsSectionTitle" class="section-title">My Collections</div>
+          </div>
+          <div class="section-head-actions">
+            <button id="collectionsSectionMenuBtn" class="icon-btn" title="集合分组菜单" aria-label="集合分组菜单">⋯</button>
+            <button id="collapseAllCollectionsBtn" class="icon-btn" title="折叠全部集合" aria-label="折叠全部集合">▾</button>
+            <button id="newCollectionBtn" class="icon-btn" title="新建集合" aria-label="新建集合">+</button>
+          </div>
         </div>
         <div id="collectionsTree" class="tree"></div>
 
         <div class="section-head">
-          <div class="section-title">Tags</div>
-          <button id="tagManagerBtn" class="icon-btn">⋯</button>
+          <div class="section-title">快速过滤…</div>
+          <div class="section-head-actions">
+            <button id="quickFiltersMenuBtn" class="icon-btn" title="快速过滤菜单" aria-label="快速过滤菜单">⋯</button>
+          </div>
         </div>
+        <div id="quickFiltersList" class="sidebar-filter-list"></div>
+
+        <div class="section-head">
+          <div id="tagsSectionTitle" class="section-title">标签</div>
+          <div class="section-head-actions">
+            <button id="tagsSortToggleBtn" class="icon-btn" title="切换标签排序" aria-label="切换标签排序">#</button>
+            <button id="tagsExpandToggleBtn" class="icon-btn" title="展开更多标签" aria-label="展开更多标签">+</button>
+            <button id="tagManagerBtn" class="icon-btn" title="标签管理" aria-label="标签管理">⋯</button>
+          </div>
+        </div>
+        <div id="tagsMeta" class="sidebar-section-meta muted"></div>
         <div id="tagsList" class="tags"></div>
+
+        <div id="sidebarStatusCard" class="sidebar-status-card">
+          <div class="sidebar-status-card-head">
+            <strong>Rainboard</strong>
+            <span id="sidebarStatusBadge" class="sidebar-status-badge">就绪</span>
+          </div>
+          <div id="sidebarStatusMeta" class="muted">正在加载状态…</div>
+          <div class="sidebar-status-card-actions">
+            <button type="button" id="sidebarStatusSyncBtn" class="ghost">同步</button>
+            <button type="button" id="sidebarStatusSettingsBtn" class="ghost">设置</button>
+          </div>
+        </div>
       </aside>
 
       <main class="main">
         <header class="toolbar">
-          <div class="search-wrap">
-            <input id="searchInput" type="search" placeholder="Search titles, links, notes, tags..." />
+          <div class="toolbar-left">
+            <div class="search-wrap">
+              <span id="searchLeadingIcon" class="search-leading-icon" aria-hidden="true"></span>
+              <input id="searchInput" type="search" placeholder="搜索标题、链接、备注、标签..." role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestList" autocomplete="off" />
+              <button id="advancedSearchToggleBtn" class="ghost search-inline-tool" type="button" aria-label="高级搜索" title="高级搜索">
+                <span class="search-inline-tool-icon" aria-hidden="true">⌕</span>
+                <span class="search-inline-tool-caret" aria-hidden="true">▾</span>
+              </button>
+              <div id="searchSuggestPopover" class="search-suggest-popover hidden" aria-label="搜索建议">
+                <div id="searchSuggestList" class="search-suggest-list" role="listbox" aria-label="搜索建议列表"></div>
+              </div>
+            </div>
           </div>
-          <select id="sortSelect">
-            <option value="newest">Newest</option>
-            <option value="updated">Recently Updated</option>
-            <option value="oldest">Oldest</option>
-            <option value="title">Title</option>
-          </select>
-          <button id="refreshBtn" class="ghost">Refresh</button>
-          <button id="authBtn" class="ghost">Sign In</button>
-          <button id="addBookmarkBtn">+ Add Bookmark</button>
+          <div class="toolbar-right">
+            <button id="askAiBtn" class="ghost toolbar-ask-btn" type="button" aria-label="询问 AI" title="询问">询问</button>
+            <button id="settingsBtn" class="ghost">设置</button>
+            <button id="authBtn" class="ghost">登录</button>
+            <div id="addToolbarMenuWrap" class="header-menu-wrap add-split-wrap">
+              <div class="toolbar-add-split" role="group" aria-label="添加">
+                <button id="addBookmarkBtn" type="button" class="add-main-btn">添加</button>
+                <button id="addMenuToggleBtn" type="button" class="add-caret-btn" aria-haspopup="menu" aria-expanded="false" aria-label="添加菜单"></button>
+              </div>
+              <div id="addToolbarMenu" class="header-menu hidden" role="menu" aria-label="添加菜单">
+                <button type="button" class="header-menu-item" data-add-menu-action="bookmark" role="menuitem">新建书签</button>
+                <button type="button" class="header-menu-item" data-add-menu-action="collection" role="menuitem">创建集合</button>
+                <button type="button" class="header-menu-item" data-add-menu-action="upload" role="menuitem">上传文件…</button>
+                <div class="header-menu-sep" role="separator"></div>
+                <button type="button" class="header-menu-item" data-add-menu-action="io" role="menuitem">导入 / 导出</button>
+              </div>
+            </div>
+          </div>
         </header>
 
+        <section id="advancedSearchPanel" class="advanced-search-panel hidden">
+          <div class="advanced-search-grid">
+            <label>标签（逗号分隔）<input id="advancedSearchTags" placeholder="工作, 阅读" /></label>
+            <label>域名<input id="advancedSearchDomain" placeholder="example.com" /></label>
+            <label>类型
+              <select id="advancedSearchType">
+                <option value="">全部</option>
+                <option value="web">网页</option>
+                <option value="pdf">PDF</option>
+                <option value="image">图片</option>
+                <option value="video">视频</option>
+              </select>
+            </label>
+            <label>收藏状态
+              <select id="advancedSearchFavorite">
+                <option value="">全部</option>
+                <option value="true">仅收藏</option>
+                <option value="false">排除收藏</option>
+              </select>
+            </label>
+            <label>归档状态
+              <select id="advancedSearchArchived">
+                <option value="">全部</option>
+                <option value="true">仅归档</option>
+                <option value="false">排除归档</option>
+              </select>
+            </label>
+            <label class="advanced-search-checkbox"><input id="advancedSearchEnabled" type="checkbox" /> 启用高级搜索</label>
+          </div>
+          <div class="advanced-search-actions">
+            <button id="advancedSearchApplyBtn" type="button" class="ghost">应用</button>
+            <button id="advancedSearchResetBtn" type="button" class="ghost">重置</button>
+            <button id="advancedSearchSaveBtn" type="button" class="ghost">保存查询</button>
+            <button id="advancedSearchSavedRefreshBtn" type="button" class="ghost">刷新已保存</button>
+            <select id="advancedSearchSavedSelect">
+              <option value="">已保存查询...</option>
+            </select>
+            <button id="advancedSearchSavedApplyBtn" type="button" class="ghost">加载</button>
+            <button id="advancedSearchSavedDeleteBtn" type="button" class="ghost danger">删除</button>
+          </div>
+          <div id="advancedSearchMeta" class="muted"></div>
+        </section>
+
         <div class="view-header">
-          <div>
-            <h1 id="viewTitle">All Bookmarks</h1>
+          <div class="view-header-main">
+            <div class="view-title-block">
+              <label class="view-page-select" title="选择当前页" aria-label="选择当前页">
+                <input id="viewSelectPageCheckbox" type="checkbox" />
+              </label>
+              <span id="viewTitleIcon" class="view-title-icon" aria-hidden="true"></span>
+              <h1 id="viewTitle">全部书签</h1>
+              <button id="viewOpenBrowserBtn" class="ghost view-open-btn" type="button" aria-label="在新标签页打开当前视图" title="在新标签页打开当前视图"></button>
+            </div>
             <p id="viewMeta" class="muted"></p>
           </div>
           <div class="actions">
-            <button id="importExportBtn" class="ghost">Import / Export</button>
-            <button id="pluginPanelBtn" class="ghost">Sync Plugin</button>
-            <button id="bulkFavoriteBtn" class="ghost">Favorite</button>
-            <button id="bulkArchiveBtn" class="ghost">Archive</button>
-            <button id="bulkDeleteBtn" class="ghost danger">Delete</button>
-            <select id="bulkMoveSelect">
-              <option value="">Move To...</option>
-            </select>
+            <div class="actions-group actions-general actions-header-tools">
+              <button id="refreshBtn" class="ghost header-tool-btn" title="刷新">刷新</button>
+              <div id="headerSortMenuWrap" class="header-menu-wrap">
+                <button id="headerSortBtn" type="button" class="ghost header-tool-btn header-menu-trigger" aria-haspopup="menu" aria-expanded="false">排序</button>
+                <div id="headerSortMenu" class="header-menu hidden" role="menu" aria-label="排序菜单">
+                  <button type="button" class="header-menu-item" data-sort-option="newest" role="menuitem">按日期（新到旧）</button>
+                  <button type="button" class="header-menu-item" data-sort-option="updated" role="menuitem">按更新（新到旧）</button>
+                  <button type="button" class="header-menu-item" data-sort-option="oldest" role="menuitem">按日期（旧到新）</button>
+                  <button type="button" class="header-menu-item" data-sort-option="title" role="menuitem">按标题</button>
+                </div>
+                <select id="sortSelect" class="header-sort-select hidden" aria-label="排序">
+                  <option value="newest">按日期（新到旧）</option>
+                  <option value="updated">按更新（新到旧）</option>
+                  <option value="oldest">按日期（旧到新）</option>
+                  <option value="title">按标题</option>
+                </select>
+              </div>
+
+              <div id="headerViewMenuWrap" class="header-menu-wrap">
+                <button id="headerViewBtn" type="button" class="ghost header-tool-btn header-menu-trigger" aria-haspopup="menu" aria-expanded="false">视图</button>
+                <div id="headerViewMenu" class="header-menu hidden" role="menu" aria-label="视图菜单">
+                  <button type="button" class="header-menu-item" data-layout-option="list" role="menuitem">列表</button>
+                  <button type="button" class="header-menu-item" data-layout-option="card" role="menuitem">卡片</button>
+                  <button type="button" class="header-menu-item" data-layout-option="headline" role="menuitem">标题</button>
+                  <button type="button" class="header-menu-item" data-layout-option="moodboard" role="menuitem">看板</button>
+                  <div class="header-menu-sep" role="separator"></div>
+                  <button type="button" id="headerViewColumnsBtn" class="header-menu-item hidden" role="menuitem">列表列…</button>
+                  <div id="bookmarkLayoutSwitch" class="bookmark-layout-switch hidden" aria-label="书签展示布局">
+                    <button type="button" class="ghost" data-layout-mode="list" aria-pressed="false">行</button>
+                    <button type="button" class="ghost" data-layout-mode="card" aria-pressed="false">卡片</button>
+                    <button type="button" class="ghost" data-layout-mode="headline" aria-pressed="false">标题</button>
+                    <button type="button" class="ghost" data-layout-mode="moodboard" aria-pressed="false">看板</button>
+                  </div>
+                  <div class="view-columns-menu-wrap header-submenu-wrap">
+                    <button type="button" id="listColumnsBtn" class="ghost view-columns-btn hidden" aria-haspopup="menu" aria-expanded="false">列表列</button>
+                    <div id="listColumnsMenu" class="view-columns-menu hidden" role="menu" aria-label="列表列设置">
+                      <label><input type="checkbox" id="listColFolder" checked /> 集合</label>
+                      <label><input type="checkbox" id="listColType" checked /> 类型</label>
+                      <label><input type="checkbox" id="listColExcerpt" checked /> 摘要</label>
+                      <label><input type="checkbox" id="listColTags" checked /> 标签</label>
+                      <label><input type="checkbox" id="listColTime" checked /> 时间</label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="headerMoreMenuWrap" class="header-menu-wrap">
+                <button id="headerMoreBtn" type="button" class="ghost header-tool-btn header-menu-trigger" aria-haspopup="menu" aria-expanded="false">更多</button>
+                <div id="headerMoreMenu" class="header-menu hidden" role="menu" aria-label="更多菜单">
+                  <button type="button" class="header-menu-item" data-header-more-action="export" role="menuitem">导出书签</button>
+                  <button type="button" class="header-menu-item" data-header-more-action="plugin" role="menuitem">同步插件</button>
+                </div>
+              </div>
+              <button id="importExportBtn" class="ghost hidden">导出书签</button>
+              <button id="pluginPanelBtn" class="ghost hidden">同步插件</button>
+            </div>
+            <div id="bulkActionsBar" class="actions-group actions-bulk hidden" aria-live="polite">
+              <span id="bulkSelectionCount" class="bulk-selection-pill">已选 0 项</span>
+              <button id="bulkFavoriteBtn" class="ghost">收藏</button>
+              <button id="bulkArchiveBtn" class="ghost">归档</button>
+              <button id="bulkDeleteBtn" class="ghost danger">删除</button>
+              <select id="bulkMoveSelect">
+                <option value="">移动到...</option>
+              </select>
+            </div>
           </div>
         </div>
 
         <section id="cards" class="cards"></section>
+        <div id="listLoadMoreBar" class="list-load-more-bar hidden" aria-live="polite">
+          <button type="button" id="listLoadMoreBtn" class="ghost">更多…</button>
+          <div id="listLoadMoreMeta" class="muted"></div>
+        </div>
         <div class="pager" id="pager">
-          <div class="pager-left muted" id="pagerMeta">0 items</div>
+          <div class="pager-left muted" id="pagerMeta">0 条</div>
           <div class="pager-right">
             <select id="pageSizeSelect">
-              <option value="12">12 / page</option>
-              <option value="24" selected>24 / page</option>
-              <option value="48">48 / page</option>
-              <option value="96">96 / page</option>
+              <option value="12">12 / 页</option>
+              <option value="24" selected>24 / 页</option>
+              <option value="48">48 / 页</option>
+              <option value="96">96 / 页</option>
             </select>
-            <button id="prevPageBtn" class="ghost">Prev</button>
-            <span id="pageLabel" class="muted">Page 1 / 1</span>
-            <button id="nextPageBtn" class="ghost">Next</button>
+            <button id="prevPageBtn" class="ghost">上一页</button>
+            <span id="pageLabel" class="muted">第 1 / 1 页</span>
+            <button id="nextPageBtn" class="ghost">下一页</button>
           </div>
         </div>
       </main>
 
+      <button type="button" id="detailPanelBackdrop" class="detail-panel-backdrop hidden" aria-label="关闭详情"></button>
+
       <aside class="detail" id="detailPanel">
-        <h3>Details</h3>
-        <div id="emptyDetail" class="muted">Select a bookmark card to edit details.</div>
+        <div class="detail-panel-head">
+          <div class="detail-panel-head-main">
+            <h3>详情</h3>
+            <span id="detailPanelModeBadge" class="detail-panel-mode-badge">未选择</span>
+          </div>
+          <div class="detail-panel-head-tools">
+            <div class="detail-panel-nav" role="group" aria-label="条目切换">
+              <button type="button" id="detailPrevBtn" class="ghost icon-action-btn" aria-label="上一条" title="上一条"></button>
+              <button type="button" id="detailNextBtn" class="ghost icon-action-btn" aria-label="下一条" title="下一条"></button>
+            </div>
+            <div class="detail-panel-mode-switch" role="tablist" aria-label="详情模式">
+              <button type="button" id="detailPanelViewModeBtn" class="ghost" role="tab" aria-selected="true" aria-pressed="true">查看</button>
+              <button type="button" id="detailPanelEditModeBtn" class="ghost" role="tab" aria-selected="false" aria-pressed="false">编辑</button>
+            </div>
+            <div class="detail-panel-preview-shortcuts" role="group" aria-label="预览模式">
+              <button type="button" id="detailPanelWebBtn" class="ghost icon-action-btn" aria-label="网页预览" title="网页预览"></button>
+              <button type="button" id="detailPanelReaderBtn" class="ghost icon-action-btn" aria-label="阅读模式" title="阅读模式"></button>
+            </div>
+            <div id="detailPanelMoreMenuWrap" class="header-menu-wrap detail-panel-more-wrap">
+              <button type="button" id="detailPanelMoreBtn" class="ghost icon-action-btn hidden" aria-haspopup="menu" aria-expanded="false" aria-label="更多操作" title="更多操作"></button>
+              <div id="detailPanelMoreMenu" class="header-menu hidden" role="menu" aria-label="详情更多操作">
+                <button type="button" class="header-menu-item" data-detail-panel-more-action="open-new" role="menuitem">在新标签页打开</button>
+                <button type="button" class="header-menu-item" data-detail-panel-more-action="preview-web" role="menuitem">网页预览</button>
+                <button type="button" class="header-menu-item" data-detail-panel-more-action="preview-reader" role="menuitem">阅读模式预览</button>
+                <button type="button" class="header-menu-item" data-detail-panel-more-action="copy-link" role="menuitem">复制链接</button>
+                <div class="header-menu-sep" role="separator"></div>
+                <button type="button" class="header-menu-item" data-detail-panel-more-action="toggle-edit" role="menuitem">进入编辑模式</button>
+                <button type="button" class="header-menu-item danger" data-detail-panel-more-action="delete" role="menuitem">删除</button>
+                <button type="button" class="header-menu-item hidden" data-detail-panel-more-action="restore" role="menuitem">恢复</button>
+              </div>
+            </div>
+            <button type="button" id="detailCloseBtn" class="ghost icon-action-btn hidden" aria-label="关闭详情" title="关闭详情"></button>
+          </div>
+        </div>
+        <div id="emptyDetail" class="muted">选择一个书签卡片以编辑详情。</div>
 
         <form id="detailForm" class="hidden">
-          <label>Title<input id="detailTitle" /></label>
-          <label>URL<input id="detailUrl" /></label>
-          <label>Collection<select id="detailFolder"></select></label>
-          <label>Tags (comma)<input id="detailTags" /></label>
-          <label>Note<textarea id="detailNote" rows="7"></textarea></label>
-          <label>Reminder (timestamp ms, optional)<input id="detailReminder" /></label>
-          <div id="detailReminderInfo" class="muted"></div>
-
-          <div class="detail-row">
-            <label><input type="checkbox" id="detailFavorite" /> Favorite</label>
-            <label><input type="checkbox" id="detailArchived" /> Archived</label>
-            <label><input type="checkbox" id="detailRead" /> Read</label>
+          <div class="detail-summary-card">
+            <div class="detail-summary-top">
+              <div class="detail-summary-main">
+                <div id="detailSummaryKind" class="muted">未选择</div>
+                <div id="detailSummaryTitle" class="detail-summary-title">选择一个书签</div>
+                <div id="detailSummaryHost" class="muted"></div>
+              </div>
+              <div class="detail-summary-toolbar" aria-label="详情快捷操作">
+                <button type="button" id="detailHeaderOpenBtn" class="ghost icon-action-btn" title="打开" aria-label="打开"></button>
+                <button type="button" id="detailHeaderPreviewBtn" class="ghost icon-action-btn" title="预览" aria-label="预览"></button>
+                <button type="button" id="detailHeaderEditBtn" class="ghost icon-action-btn" title="编辑" aria-label="编辑"></button>
+                <button type="button" id="detailHeaderCancelEditBtn" class="ghost icon-action-btn hidden" title="取消编辑" aria-label="取消编辑"></button>
+                <button type="button" id="detailHeaderDeleteBtn" class="ghost icon-action-btn danger" title="删除" aria-label="删除"></button>
+                <button type="button" id="detailHeaderRestoreBtn" class="ghost icon-action-btn hidden" title="恢复" aria-label="恢复"></button>
+              </div>
+            </div>
+            <div id="detailSummaryChips" class="detail-summary-chips"></div>
           </div>
-          <div id="detailMetaInfo" class="muted"></div>
-          <div id="detailMetaTaskInfo" class="muted"></div>
-          <div id="detailArticleInfo" class="muted"></div>
-          <div id="detailFetchHistory" class="muted"></div>
-          <div class="detail-section">
+
+          <div class="detail-section" data-detail-section-key="basic">
             <div class="detail-section-head">
-              <strong>Highlights</strong>
+              <button type="button" class="detail-section-toggle" data-detail-section-toggle="basic" aria-expanded="true">
+                <span class="detail-section-caret" aria-hidden="true">▾</span>
+                <strong>基本信息</strong>
+              </button>
+            </div>
+            <label>标题<input id="detailTitle" /></label>
+            <label>链接<input id="detailUrl" /></label>
+            <div class="detail-grid-2">
+              <label>集合<select id="detailFolder"></select></label>
+              <label>标签（逗号分隔）<input id="detailTags" /></label>
+            </div>
+            <label>备注<textarea id="detailNote" rows="7"></textarea></label>
+          </div>
+
+          <div class="detail-section" data-detail-section-key="status">
+            <div class="detail-section-head">
+              <button type="button" class="detail-section-toggle" data-detail-section-toggle="status" aria-expanded="true">
+                <span class="detail-section-caret" aria-hidden="true">▾</span>
+                <strong>状态与提醒</strong>
+              </button>
+            </div>
+            <label>提醒（毫秒时间戳，可选）<input id="detailReminder" /></label>
+            <div id="detailReminderInfo" class="muted"></div>
+            <div class="detail-row">
+              <label><input type="checkbox" id="detailFavorite" /> 收藏</label>
+              <label><input type="checkbox" id="detailArchived" /> 归档</label>
+              <label><input type="checkbox" id="detailRead" /> 已读</label>
+            </div>
+            <div class="detail-inline-actions">
+              <button type="button" id="snoozeReminderBtn" class="ghost">延后 1 小时</button>
+              <button type="button" id="dismissReminderBtn" class="ghost">忽略提醒</button>
+              <button type="button" id="clearReminderBtn" class="ghost">清除提醒</button>
+              <button type="button" id="scanRemindersBtn" class="ghost">扫描提醒</button>
+            </div>
+          </div>
+
+          <div class="detail-section" data-detail-section-key="fetch">
+            <div class="detail-section-head">
+              <button type="button" class="detail-section-toggle" data-detail-section-toggle="fetch" aria-expanded="true">
+                <span class="detail-section-caret" aria-hidden="true">▾</span>
+                <strong>抓取与阅读</strong>
+              </button>
               <div class="detail-inline-actions">
-                <button type="button" id="addHighlightBtn" class="ghost">Add Highlight</button>
-                <button type="button" id="refreshHighlightsBtn" class="ghost">Refresh</button>
+                <button type="button" id="fetchMetaBtn" class="ghost">抓取元数据</button>
+                <button type="button" id="extractArticleBtn" class="ghost">提取正文</button>
+                <button type="button" id="retryMetaTaskBtn" class="ghost hidden">重试元数据任务</button>
+                <button type="button" id="refreshFetchStatusBtn" class="ghost">刷新抓取状态</button>
+              </div>
+            </div>
+            <div id="detailFetchSummaryChips" class="detail-summary-chips detail-inline-status"></div>
+            <div id="detailMetaInfo" class="muted"></div>
+            <div id="detailMetaTaskInfo" class="muted"></div>
+            <div id="detailArticleInfo" class="muted"></div>
+            <details id="detailFetchDetails" class="detail-status-details">
+              <summary>抓取详情与历史</summary>
+              <div id="detailFetchHistory" class="muted"></div>
+            </details>
+          </div>
+
+          <div class="detail-section" data-detail-section-key="highlights">
+            <div class="detail-section-head">
+              <button type="button" class="detail-section-toggle" data-detail-section-toggle="highlights" aria-expanded="true">
+                <span class="detail-section-caret" aria-hidden="true">▾</span>
+                <strong>高亮</strong>
+              </button>
+              <div class="detail-inline-actions">
+                <button type="button" id="addHighlightBtn" class="ghost">新增高亮</button>
+                <button type="button" id="refreshHighlightsBtn" class="ghost">刷新</button>
               </div>
             </div>
             <div id="detailHighlightsInfo" class="muted"></div>
-            <div id="detailHighlightsList" class="highlight-list"></div>
+            <div class="detail-highlights-shell">
+              <div id="detailHighlightsList" class="highlight-list"></div>
+            </div>
           </div>
 
-          <div class="detail-actions">
-            <button type="button" id="saveDetailBtn">Save</button>
-            <button type="button" id="openLinkBtn" class="ghost">Open</button>
-            <button type="button" id="openPreviewBtn" class="ghost">Preview</button>
-            <button type="button" id="snoozeReminderBtn" class="ghost">Snooze 1h</button>
-            <button type="button" id="dismissReminderBtn" class="ghost">Dismiss Reminder</button>
-            <button type="button" id="clearReminderBtn" class="ghost">Clear Reminder</button>
-            <button type="button" id="scanRemindersBtn" class="ghost">Scan Reminders</button>
-            <button type="button" id="fetchMetaBtn" class="ghost">Fetch Metadata</button>
-            <button type="button" id="extractArticleBtn" class="ghost">Extract Article</button>
-            <button type="button" id="retryMetaTaskBtn" class="ghost hidden">Retry Metadata Task</button>
-            <button type="button" id="refreshFetchStatusBtn" class="ghost">Refresh Fetch Status</button>
-            <button type="button" id="deleteDetailBtn" class="ghost danger">Delete</button>
-            <button type="button" id="restoreDetailBtn" class="ghost hidden">Restore</button>
+          <div class="detail-actions detail-actions-sticky">
+            <button type="button" id="saveDetailBtn">保存</button>
+            <button type="button" id="cancelDetailEditBtn" class="ghost hidden">取消编辑</button>
+            <button type="button" id="enableDetailEditBtn" class="ghost">编辑</button>
+            <button type="button" id="openLinkBtn" class="ghost">打开</button>
+            <button type="button" id="openPreviewBtn" class="ghost">预览</button>
+            <button type="button" id="deleteDetailBtn" class="ghost danger">删除</button>
+            <button type="button" id="restoreDetailBtn" class="ghost hidden">恢复</button>
           </div>
         </form>
       </aside>
     </div>
 
     <dialog id="bookmarkDialog">
-      <form method="dialog" id="bookmarkForm" class="dialog-form">
-        <h3>New Bookmark</h3>
-        <label>Title<input id="newTitle" required /></label>
-        <label>URL<input id="newUrl" type="url" required /></label>
-        <label>Collection<select id="newFolder"></select></label>
-        <label>Tags (comma)<input id="newTags" /></label>
-        <label>Note<textarea id="newNote" rows="5"></textarea></label>
-        <div class="dialog-actions">
-          <button value="cancel" class="ghost">Cancel</button>
-          <button id="createBookmarkBtn" value="default">Create</button>
+      <form method="dialog" id="bookmarkForm" class="dialog-form" novalidate>
+        <div class="dialog-header">
+          <h3 class="dialog-title">新建书签</h3>
+          <p class="dialog-subtitle">保存链接并设置集合、标签与备注。布局参考 Raindrop 的快速保存对话框。</p>
+        </div>
+        <div id="bookmarkFormError" class="form-error hidden" role="alert"></div>
+        <div class="dialog-body">
+          <label class="form-field">标题<input id="newTitle" required /></label>
+          <label class="form-field">链接<input id="newUrl" type="url" required placeholder="https://example.com" /></label>
+          <div class="dialog-grid-2">
+            <label class="form-field">集合<select id="newFolder"></select></label>
+            <label class="form-field">标签（逗号分隔）<input id="newTags" placeholder="工作, 阅读" /></label>
+          </div>
+          <label class="form-field">备注<textarea id="newNote" rows="5" placeholder="可选"></textarea></label>
+        </div>
+        <div class="dialog-actions dialog-footer">
+          <button type="submit" value="cancel" formnovalidate class="ghost">取消</button>
+          <button id="createBookmarkBtn" value="default">创建</button>
         </div>
       </form>
     </dialog>
 
     <dialog id="collectionDialog">
-      <form method="dialog" id="collectionForm" class="dialog-form">
-        <h3>New Collection</h3>
-        <label>Name<input id="newCollectionName" required /></label>
-        <label>Parent<select id="newCollectionParent"></select></label>
-        <label>Color<input id="newCollectionColor" value="#8f96a3" /></label>
-        <div class="dialog-actions">
-          <button value="cancel" class="ghost">Cancel</button>
-          <button id="createCollectionBtn" value="default">Create</button>
+      <form method="dialog" id="collectionForm" class="dialog-form" novalidate>
+        <div class="dialog-header">
+          <h3 id="collectionDialogTitle" class="dialog-title">新建集合</h3>
+          <p id="collectionDialogSubtitle" class="dialog-subtitle">创建顶级集合或挂到父级集合下。</p>
+        </div>
+        <div id="collectionFormError" class="form-error hidden" role="alert"></div>
+        <div class="dialog-body">
+          <label class="form-field">名称<input id="newCollectionName" required placeholder="例如：设计灵感" /></label>
+          <div class="dialog-grid-2">
+            <label class="form-field">父级<select id="newCollectionParent"></select></label>
+            <label class="form-field">颜色<input id="newCollectionColor" value="#8f96a3" /></label>
+          </div>
+        </div>
+        <div class="dialog-actions dialog-footer">
+          <button type="submit" value="cancel" formnovalidate class="ghost">取消</button>
+          <button id="createCollectionBtn" value="default">创建</button>
         </div>
       </form>
     </dialog>
 
     <dialog id="pluginDialog">
       <form method="dialog" id="pluginForm" class="dialog-form wide">
-        <h3>Raindrop Sync Plugin</h3>
+        <h3>Raindrop 同步插件</h3>
         <label>Token<input id="pluginToken" /></label>
-        <label><input type="checkbox" id="pluginTopLevel" /> Top-level auto mapping</label>
-        <label>Mappings (JSON array)
+        <label><input type="checkbox" id="pluginTopLevel" /> 顶级自动映射</label>
+        <label>映射（JSON 数组）
           <textarea id="pluginMappings" rows="8"></textarea>
         </label>
         <fieldset style="border:1px solid #e5e8ef;border-radius:10px;padding:10px 12px">
-          <legend class="muted" style="padding:0 6px">Scheduler</legend>
+          <legend class="muted" style="padding:0 6px">调度器</legend>
           <div style="display:grid;gap:10px">
-            <label><input type="checkbox" id="pluginScheduleEnabled" /> Enable scheduler</label>
-            <label><input type="checkbox" id="pluginSchedulePaused" /> Paused</label>
+            <label><input type="checkbox" id="pluginScheduleEnabled" /> 启用调度器</label>
+            <label><input type="checkbox" id="pluginSchedulePaused" /> 暂停</label>
             <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-              <label>Interval (minutes)<input id="pluginScheduleInterval" type="number" min="1" value="15" /></label>
-              <label>Max concurrent<input id="pluginScheduleMaxConcurrent" type="number" min="1" max="10" value="1" /></label>
+              <label>间隔（分钟）<input id="pluginScheduleInterval" type="number" min="1" value="15" /></label>
+              <label>最大并发<input id="pluginScheduleMaxConcurrent" type="number" min="1" max="10" value="1" /></label>
             </div>
-            <label><input type="checkbox" id="pluginScheduleWindowEnabled" /> Run window enabled</label>
+            <label><input type="checkbox" id="pluginScheduleWindowEnabled" /> 启用运行时间窗</label>
             <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-              <label>Window start hour<input id="pluginScheduleWindowStart" type="number" min="0" max="24" value="0" /></label>
-              <label>Window end hour<input id="pluginScheduleWindowEnd" type="number" min="0" max="24" value="24" /></label>
+              <label>开始小时<input id="pluginScheduleWindowStart" type="number" min="0" max="24" value="0" /></label>
+              <label>结束小时<input id="pluginScheduleWindowEnd" type="number" min="0" max="24" value="24" /></label>
             </div>
             <div class="dialog-actions" style="justify-content:flex-start">
-              <button id="pluginScheduleLoadBtn" type="button" class="ghost">Load Schedule</button>
-              <button id="pluginScheduleSaveBtn" type="button" class="ghost">Save Schedule</button>
-              <button id="pluginSchedulePauseBtn" type="button" class="ghost">Pause</button>
-              <button id="pluginScheduleResumeBtn" type="button" class="ghost">Resume</button>
-              <button id="pluginScheduleTickBtn" type="button" class="ghost">Tick Now</button>
+              <button id="pluginScheduleLoadBtn" type="button" class="ghost">加载调度</button>
+              <button id="pluginScheduleSaveBtn" type="button" class="ghost">保存调度</button>
+              <button id="pluginSchedulePauseBtn" type="button" class="ghost">暂停</button>
+              <button id="pluginScheduleResumeBtn" type="button" class="ghost">恢复</button>
+              <button id="pluginScheduleTickBtn" type="button" class="ghost">立即触发</button>
             </div>
           </div>
         </fieldset>
 
         <div class="dialog-actions">
-          <button value="cancel" class="ghost">Close</button>
-          <button id="savePluginCfgBtn" type="button" class="ghost">Save Config</button>
-          <button id="pluginHistoryBtn" type="button" class="ghost">History</button>
-          <button id="pluginAuditBtn" type="button" class="ghost">Audit</button>
-          <button id="pluginDevicesBtn" type="button" class="ghost">Devices</button>
-          <button id="pluginHealthBtn" type="button" class="ghost">Health</button>
-          <button id="pluginRetryBtn" type="button" class="ghost">Retry Latest Failed</button>
-          <button id="pluginReplayBtn" type="button" class="ghost">Replay Latest Task</button>
-          <button id="previewPluginBtn" type="button" class="ghost">Preview</button>
-          <button id="runPluginBtn" type="button">Run Sync</button>
+          <button type="submit" value="cancel" formnovalidate class="ghost">关闭</button>
+          <button id="savePluginCfgBtn" type="button" class="ghost">保存配置</button>
+          <button id="pluginHistoryBtn" type="button" class="ghost">历史</button>
+          <button id="pluginAuditBtn" type="button" class="ghost">审计</button>
+          <button id="pluginDevicesBtn" type="button" class="ghost">设备</button>
+          <button id="pluginHealthBtn" type="button" class="ghost">健康</button>
+          <button id="pluginRetryBtn" type="button" class="ghost">重试最近失败任务</button>
+          <button id="pluginReplayBtn" type="button" class="ghost">重放最近任务</button>
+          <button id="previewPluginBtn" type="button" class="ghost">预演</button>
+          <button id="runPluginBtn" type="button">执行同步</button>
         </div>
         <pre id="pluginOutput"></pre>
         <pre id="pluginScheduleOutput"></pre>
@@ -220,25 +521,39 @@
     <dialog id="previewDialog">
       <div class="dialog-form wide preview-shell">
         <div class="preview-toolbar">
-          <div>
-            <h3 id="previewDialogTitle">Preview</h3>
+          <div class="preview-toolbar-main">
+            <div class="preview-toolbar-top">
+              <h3 id="previewDialogTitle">预览</h3>
+              <span id="previewStateBadge" class="preview-state-badge" data-state="idle">未加载</span>
+            </div>
             <div id="previewDialogMeta" class="muted"></div>
+            <div id="previewStateNote" class="preview-state-note muted">选择一个书签以查看预览。</div>
           </div>
           <div class="preview-actions">
-            <button type="button" id="previewRefreshBtn" class="ghost">Refresh</button>
-            <button type="button" id="previewExtractArticleBtn" class="ghost">Extract Article</button>
-            <button type="button" id="previewReaderBtn" class="ghost">Reader Mode</button>
-            <button type="button" id="previewAddHighlightBtn" class="ghost">Highlight Selection</button>
-            <button type="button" id="previewOriginalBtn" class="ghost">Open Original</button>
-            <button type="button" id="previewCloseBtn">Close</button>
+            <div class="preview-action-group">
+              <button type="button" id="previewRefreshBtn" class="ghost">刷新</button>
+              <button type="button" id="previewExtractArticleBtn" class="ghost">提取正文</button>
+              <button type="button" id="previewOriginalBtn" class="ghost">打开原文</button>
+            </div>
+            <div class="preview-action-group preview-action-group-mode">
+              <button type="button" id="previewReaderBtn" class="ghost" aria-pressed="false">阅读模式</button>
+              <button type="button" id="previewAddHighlightBtn" class="ghost">高亮选区</button>
+            </div>
+            <div class="preview-action-group preview-action-group-end">
+              <button type="button" id="previewCloseBtn">关闭</button>
+            </div>
           </div>
         </div>
         <div id="previewError" class="muted hidden"></div>
         <div class="preview-surface">
-          <iframe id="previewFrame" class="preview-pane hidden" title="Preview Frame"></iframe>
-          <img id="previewImage" class="preview-pane hidden" alt="Preview Image" />
+          <div id="previewLoading" class="preview-loading hidden" aria-live="polite">
+            <div class="preview-loading-spinner" aria-hidden="true"></div>
+            <div>正在加载预览…</div>
+          </div>
+          <iframe id="previewFrame" class="preview-pane hidden" title="预览框架"></iframe>
+          <img id="previewImage" class="preview-pane hidden" alt="预览图片" />
           <video id="previewVideo" class="preview-pane hidden" controls></video>
-          <div id="previewFallback" class="preview-pane hidden muted">Preview unavailable. Use Open Original.</div>
+          <div id="previewFallback" class="preview-pane hidden muted">无法预览，请使用“打开原文”。</div>
         </div>
         <pre id="previewPayload" class="preview-json hidden"></pre>
       </div>
@@ -246,33 +561,33 @@
 
     <dialog id="tagManagerDialog">
       <form method="dialog" id="tagManagerForm" class="dialog-form">
-        <h3>Tag Manager</h3>
+        <h3>标签管理</h3>
         <div class="tag-admin-grid">
           <div>
-            <div class="muted" style="margin-bottom:8px">Current Tags</div>
+            <div class="muted" style="margin-bottom:8px">当前标签</div>
             <div id="tagManagerList" class="tag-admin-list"></div>
           </div>
           <div class="tag-admin-actions">
-            <label>Rename / Merge (single source)
+            <label>重命名 / 合并（单个来源）
               <select id="tagRenameFrom"></select>
             </label>
-            <label>Target tag
+            <label>目标标签
               <input id="tagRenameTo" placeholder="new-tag" />
             </label>
-            <button id="renameTagBtn" type="button" class="ghost">Apply Rename / Merge</button>
+            <button id="renameTagBtn" type="button" class="ghost">执行重命名 / 合并</button>
 
-            <label>Merge multiple tags (comma separated)
+            <label>合并多个标签（逗号分隔）
               <input id="tagMergeSources" placeholder="design, ux, ui" />
             </label>
-            <label>Target tag
+            <label>目标标签
               <input id="tagMergeTarget" placeholder="design" />
             </label>
-            <button id="mergeTagsBtn" type="button" class="ghost">Merge Tags</button>
-            <pre id="tagManagerOutput">Ready</pre>
+            <button id="mergeTagsBtn" type="button" class="ghost">合并标签</button>
+            <pre id="tagManagerOutput">就绪</pre>
           </div>
         </div>
         <div class="dialog-actions">
-          <button value="cancel" class="ghost">Close</button>
+          <button type="submit" value="cancel" formnovalidate class="ghost">关闭</button>
         </div>
       </form>
     </dialog>
@@ -280,73 +595,73 @@
     <dialog id="ioDialog">
       <div class="dialog-form wide io-grid">
         <div class="io-panel">
-          <h3>Import</h3>
-          <label>Format
+          <h3>导入</h3>
+          <label>格式
             <select id="ioImportFormat">
-              <option value="import_html">Bookmarks HTML</option>
+              <option value="import_html">书签 HTML</option>
               <option value="import_json">JSON</option>
               <option value="import_csv">CSV</option>
             </select>
           </label>
-          <label>Target Collection
+          <label>目标集合
             <select id="ioImportTargetFolder"></select>
           </label>
-          <label>Conflict Strategy
+          <label>冲突策略
             <select id="ioImportConflict">
-              <option value="skip">Skip duplicate URL in same folder</option>
-              <option value="update">Update duplicate URL in same folder</option>
-              <option value="duplicate">Always duplicate</option>
+              <option value="skip">同集合重复 URL 时跳过</option>
+              <option value="update">同集合重复 URL 时更新</option>
+              <option value="duplicate">始终创建副本</option>
             </select>
           </label>
-          <label>Load File
+          <label>加载文件
             <input id="ioImportFile" type="file" />
           </label>
-          <label>CSV Mapping (JSON, optional)
+          <label>CSV 字段映射（JSON，可选）
             <textarea id="ioImportCsvMapping" rows="4" placeholder='{"title":"Name","url":"Link","folderPath":"Folder"}'></textarea>
           </label>
-          <label>Payload Content
-            <textarea id="ioImportContent" rows="10" placeholder="Paste bookmarks HTML / JSON / CSV here"></textarea>
+          <label>内容载荷
+            <textarea id="ioImportContent" rows="10" placeholder="在这里粘贴书签 HTML / JSON / CSV"></textarea>
           </label>
           <div class="dialog-actions" style="justify-content:flex-start">
-            <button type="button" id="ioQueueImportBtn">Queue Import</button>
-            <button type="button" id="ioClearImportBtn" class="ghost">Clear</button>
+            <button type="button" id="ioQueueImportBtn">加入导入队列</button>
+            <button type="button" id="ioClearImportBtn" class="ghost">清空</button>
           </div>
         </div>
 
         <div class="io-panel">
-          <h3>Export</h3>
-          <label>Format
+          <h3>导出</h3>
+          <label>格式
             <select id="ioExportFormat">
               <option value="export_json">JSON</option>
               <option value="export_csv">CSV</option>
-              <option value="export_html">Bookmarks HTML</option>
+              <option value="export_html">书签 HTML</option>
             </select>
           </label>
-          <label>Scope
+          <label>范围
             <select id="ioExportScope">
-              <option value="all">All (current dataset)</option>
-              <option value="currentFolder">Current folder only</option>
-              <option value="selected">Selected bookmarks only</option>
+              <option value="all">全部（当前数据集）</option>
+              <option value="currentFolder">仅当前集合</option>
+              <option value="selected">仅已选书签</option>
             </select>
           </label>
-          <label><input id="ioExportIncludeTrash" type="checkbox" /> Include trash</label>
+          <label><input id="ioExportIncludeTrash" type="checkbox" /> 包含回收站</label>
           <div class="dialog-actions" style="justify-content:flex-start">
-            <button type="button" id="ioQueueExportBtn">Queue Export</button>
-            <button type="button" id="ioRefreshTasksBtn" class="ghost">Refresh Tasks</button>
+            <button type="button" id="ioQueueExportBtn">加入导出队列</button>
+            <button type="button" id="ioRefreshTasksBtn" class="ghost">刷新任务</button>
           </div>
 
           <div class="io-task-head">
-            <strong>Import / Export Tasks</strong>
+            <strong>导入 / 导出任务</strong>
             <div class="detail-inline-actions">
-              <button type="button" id="ioRetryTaskBtn" class="ghost">Retry Latest Failed</button>
+              <button type="button" id="ioRetryTaskBtn" class="ghost">重试最近失败任务</button>
             </div>
           </div>
           <div id="ioTaskList" class="io-task-list"></div>
-          <pre id="ioTaskOutput">Ready</pre>
+          <pre id="ioTaskOutput">就绪</pre>
         </div>
 
         <div class="dialog-actions io-dialog-actions">
-          <button type="button" id="ioCloseBtn" class="ghost">Close</button>
+          <button type="button" id="ioCloseBtn" class="ghost">关闭</button>
         </div>
       </div>
     </dialog>
@@ -354,62 +669,119 @@
     <dialog id="authDialog">
       <div class="dialog-form auth-grid">
         <div class="auth-panel">
-          <h3 id="authDialogTitle">Account</h3>
-          <div id="authStatusText" class="muted">Not signed in.</div>
+          <h3 id="authDialogTitle">账号</h3>
+          <div id="authStatusText" class="muted">未登录</div>
 
           <div id="authGuestPanel" class="auth-section">
-            <label>Email<input id="authEmail" type="email" autocomplete="username" /></label>
-            <label>Password<input id="authPassword" type="password" autocomplete="current-password" /></label>
+            <label>邮箱<input id="authEmail" type="email" autocomplete="username" /></label>
+            <label>密码<input id="authPassword" type="password" autocomplete="current-password" /></label>
             <div class="dialog-actions" style="justify-content:flex-start">
-              <button type="button" id="authLoginBtn">Login</button>
+              <button type="button" id="authLoginBtn">登录</button>
             </div>
             <hr />
-            <label>Display Name<input id="authRegisterName" autocomplete="name" /></label>
-            <label>Email<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
-            <label>Password<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
+            <label>昵称<input id="authRegisterName" autocomplete="name" /></label>
+            <label>邮箱<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
+            <label>密码<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
             <div class="dialog-actions" style="justify-content:flex-start">
-              <button type="button" id="authRegisterBtn" class="ghost">Register</button>
+              <button type="button" id="authRegisterBtn" class="ghost">注册</button>
             </div>
           </div>
 
           <div id="authUserPanel" class="auth-section hidden">
             <div class="auth-user-card">
-              <div><strong id="authUserName">User</strong></div>
+              <div><strong id="authUserName">用户</strong></div>
               <div id="authUserEmail" class="muted"></div>
               <div id="authUserMeta" class="muted"></div>
             </div>
             <div class="dialog-actions" style="justify-content:flex-start">
-              <button type="button" id="authLogoutBtn" class="ghost danger">Logout</button>
+              <button type="button" id="authLogoutBtn" class="ghost danger">退出登录</button>
             </div>
           </div>
         </div>
 
         <div class="auth-panel">
-          <h3>API Tokens</h3>
+          <h3>API Token</h3>
           <div class="auth-token-create">
-            <label>Name<input id="authTokenName" placeholder="My API Token" /></label>
+            <label>名称<input id="authTokenName" placeholder="我的 API Token" /></label>
             <div class="dialog-actions" style="justify-content:flex-start">
-              <button type="button" id="authCreateTokenBtn" class="ghost">Create Token</button>
-              <button type="button" id="authRefreshTokensBtn" class="ghost">Refresh Tokens</button>
+              <button type="button" id="authCreateTokenBtn" class="ghost">创建 Token</button>
+              <button type="button" id="authRefreshTokensBtn" class="ghost">刷新 Token</button>
             </div>
           </div>
           <div id="authTokensList" class="io-task-list"></div>
-          <div class="muted">New token value (shown once)</div>
-          <pre id="authTokenOutput">No token created yet.</pre>
+          <div class="muted">新 Token 值（仅展示一次）</div>
+          <pre id="authTokenOutput">尚未创建 Token</pre>
         </div>
 
         <div class="dialog-actions auth-dialog-actions">
-          <button type="button" id="authCloseBtn" class="ghost">Close</button>
+          <button type="button" id="authCloseBtn" class="ghost">关闭</button>
         </div>
       </div>
     </dialog>
 
     <div id="toast" class="toast hidden" role="status" aria-live="polite">
-      <div id="toastText">Ready</div>
+      <div id="toastText">就绪</div>
       <div class="toast-actions">
-        <button id="toastUndoBtn" type="button" class="ghost hidden">Undo</button>
-        <button id="toastCloseBtn" type="button" class="ghost">Dismiss</button>
+        <button id="toastUndoBtn" type="button" class="ghost hidden">撤销</button>
+        <button id="toastCloseBtn" type="button" class="ghost">关闭</button>
       </div>
+    </div>
+
+    <dialog id="actionDialog">
+      <div class="dialog-form compact action-dialog-shell">
+        <div class="dialog-header">
+          <h3 id="actionDialogTitle" class="dialog-title">确认操作</h3>
+          <p id="actionDialogMessage" class="dialog-subtitle">请确认继续。</p>
+        </div>
+        <div id="actionDialogError" class="form-error hidden" role="alert"></div>
+        <label id="actionDialogInputWrap" class="form-field hidden">
+          <span id="actionDialogInputLabel">输入</span>
+          <input id="actionDialogInput" />
+        </label>
+        <div class="dialog-actions dialog-footer">
+          <button type="button" id="actionDialogCancelBtn" class="ghost">取消</button>
+          <button type="button" id="actionDialogConfirmBtn">确定</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="collectionContextMenu" class="context-menu hidden" role="menu" aria-label="集合菜单">
+      <button type="button" class="context-menu-item" data-folder-menu-action="openAll" role="menuitem">直接在浏览器打开 所有书签</button>
+      <button type="button" class="context-menu-item" data-folder-menu-action="createNested" role="menuitem">创建嵌套的集合</button>
+      <button type="button" class="context-menu-item" data-folder-menu-action="select" role="menuitem">选择</button>
+      <button type="button" class="context-menu-item" data-folder-menu-action="rename" role="menuitem">改名</button>
+      <button type="button" class="context-menu-item" data-folder-menu-action="changeIcon" role="menuitem">更改图标</button>
+      <button type="button" class="context-menu-item" data-folder-menu-action="share" role="menuitem">分享</button>
+      <button type="button" class="context-menu-item danger" data-folder-menu-action="delete" role="menuitem">删除</button>
+    </div>
+
+    <div id="systemViewContextMenu" class="context-menu hidden" role="menu" aria-label="系统集合菜单">
+      <button type="button" class="context-menu-item" data-system-view-menu-action="open" role="menuitem">打开此视图</button>
+      <button type="button" class="context-menu-item" data-system-view-menu-action="openNew" role="menuitem">在新标签页打开工作台</button>
+      <button type="button" class="context-menu-item" data-system-view-menu-action="selectPage" role="menuitem">选择当前页</button>
+      <button type="button" class="context-menu-item" data-system-view-menu-action="refresh" role="menuitem">刷新此视图</button>
+    </div>
+
+    <div id="collectionsHeaderContextMenu" class="context-menu hidden" role="menu" aria-label="集合分组菜单">
+      <button type="button" class="context-menu-item" data-collections-header-action="new" role="menuitem">新建集合</button>
+      <button type="button" class="context-menu-item" data-collections-header-action="expandAll" role="menuitem">展开全部集合</button>
+      <button type="button" class="context-menu-item" data-collections-header-action="collapseAll" role="menuitem">折叠全部集合</button>
+      <button type="button" class="context-menu-item" data-collections-header-action="refresh" role="menuitem">刷新侧栏</button>
+    </div>
+
+    <div id="quickFilterContextMenu" class="context-menu hidden" role="menu" aria-label="快速过滤菜单">
+      <button type="button" class="context-menu-item" data-quick-filter-menu-action="apply" role="menuitem">应用此过滤</button>
+      <button type="button" class="context-menu-item" data-quick-filter-menu-action="copy" role="menuitem">复制搜索表达式</button>
+      <button type="button" class="context-menu-item" data-quick-filter-menu-action="advanced" role="menuitem">打开高级搜索</button>
+      <button type="button" class="context-menu-item danger" data-quick-filter-menu-action="clear" role="menuitem">清除搜索过滤</button>
+    </div>
+
+    <div id="tagContextMenu" class="context-menu hidden" role="menu" aria-label="标签菜单">
+      <button type="button" class="context-menu-item" data-tag-menu-action="filter" role="menuitem">筛选此标签</button>
+      <button type="button" class="context-menu-item" data-tag-menu-action="rename" role="menuitem">重命名标签</button>
+      <button type="button" class="context-menu-item" data-tag-menu-action="merge" role="menuitem">合并到其他标签</button>
+      <button type="button" class="context-menu-item" data-tag-menu-action="manage" role="menuitem">打开标签管理</button>
+      <button type="button" class="context-menu-item danger" data-tag-menu-action="remove" role="menuitem">移除此标签（所有书签）</button>
     </div>
 
     <script type="module" src="/app.mjs"></script>

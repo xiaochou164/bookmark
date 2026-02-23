@@ -9,7 +9,12 @@ function loadConfig() {
   const nodeEnv = process.env.NODE_ENV || 'development';
   const port = toNumber(process.env.PORT, 3789);
   const host = process.env.HOST || '0.0.0.0';
+  const dbBackend = (process.env.DB_BACKEND || 'sqlite').toLowerCase() === 'json' ? 'json' : 'sqlite';
+  const queueBackend = (process.env.QUEUE_BACKEND || 'memory').toLowerCase() === 'bullmq' ? 'bullmq' : 'memory';
   const dataFile = process.env.DATA_FILE || path.join(__dirname, '..', 'data', 'db.json');
+  const sqliteFile = process.env.SQLITE_FILE || path.join(__dirname, '..', 'data', 'db.sqlite');
+  const redisUrl = process.env.REDIS_URL || '';
+  const queuePrefix = process.env.QUEUE_PREFIX || 'rainboard';
   const objectStorageBackend = process.env.OBJECT_STORAGE_BACKEND || 'local';
   const objectStorageDir = process.env.OBJECT_STORAGE_DIR || path.join(__dirname, '..', 'data', 'objects');
   const logLevel = process.env.LOG_LEVEL || (nodeEnv === 'production' ? 'info' : 'debug');
@@ -21,7 +26,12 @@ function loadConfig() {
     isDevelopment: nodeEnv !== 'production',
     host,
     port,
+    dbBackend,
+    queueBackend,
     dataFile,
+    sqliteFile,
+    redisUrl,
+    queuePrefix,
     objectStorageBackend,
     objectStorageDir,
     logLevel
@@ -34,7 +44,12 @@ function startupConfigView(config) {
     nodeEnv: config.nodeEnv,
     host: config.host,
     port: config.port,
+    dbBackend: config.dbBackend,
+    queueBackend: config.queueBackend,
     dataFile: config.dataFile,
+    sqliteFile: config.sqliteFile,
+    queuePrefix: config.queuePrefix,
+    redisConfigured: Boolean(config.redisUrl),
     objectStorageBackend: config.objectStorageBackend,
     objectStorageDir: config.objectStorageDir,
     logLevel: config.logLevel

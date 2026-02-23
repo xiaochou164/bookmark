@@ -1,6 +1,7 @@
 const PLUGIN_RUN_HISTORY_LIMIT = 300;
 const PLUGIN_TASK_HISTORY_LIMIT = 300;
 const DEFAULT_SCHEDULER_TICK_MS = 15_000;
+const { hasOwner, pluginScopeKey, parsePluginScopeKey } = require('./services/tenantScope');
 
 function defaultScheduleConfig() {
   return {
@@ -163,19 +164,88 @@ function normalizeDevicePatch(input = {}) {
 }
 
 class PluginManager {
-  constructor({ store }) {
+  constructor({ store, jobQueue = null }) {
     this.store = store;
     this.plugins = new Map();
+    this.jobQueue = jobQueue || null;
+    this.pluginRunQueue = null;
     this.taskQueue = [];
     this.taskLoopRunning = false;
     this.schedulerTimer = null;
     this.schedulerTickMs = DEFAULT_SCHEDULER_TICK_MS;
     this.schedulerLoopRunning = false;
+
+    if (this.jobQueue && typeof this.jobQueue.createProcessorQueue === 'function') {
+      this.pluginRunQueue = this.jobQueue.createProcessorQueue('plugin-run', {
+        concurrency: 1,
+        handler: async (payload) => {
+          await this.processTask(payload || {});
+        }
+      });
+    }
   }
 
   register(plugin) {
     if (!plugin?.id) throw new Error('Plugin must have id');
     this.plugins.set(plugin.id, plugin);
+  }
+
+  _scope(pluginId, { userId = '' } = {}) {
+    const id = String(pluginId || '');
+    this.get(id);
+    const uid = String(userId || '').trim();
+    return {
+      pluginId: id,
+      userId: uid,
+      key: uid ? pluginScopeKey(uid, id) : id
+    };
+  }
+
+  _scopeTaskRecord(record, userId) {
+    if (!userId) return true;
+    return String(record?.userId || '') === String(userId);
+  }
+
+  _buildPluginRunDb(fullDb, { pluginId, userId }) {
+    if (!userId) {
+      return {
+        pluginDb: fullDb,
+        mergeInto: (db, nextDb) => nextDb || db
+      };
+    }
+
+    const scopeKey = pluginScopeKey(userId, pluginId);
+    const folders = (fullDb.folders || []).filter((f) => hasOwner(f, userId)).map((f) => structuredClone(f));
+    const bookmarks = (fullDb.bookmarks || []).filter((b) => hasOwner(b, userId)).map((b) => structuredClone(b));
+    const pluginDb = {
+      ...fullDb,
+      folders,
+      bookmarks,
+      pluginState: {
+        ...(fullDb.pluginState || {}),
+        [pluginId]: structuredClone((fullDb.pluginState || {})[scopeKey] || {})
+      }
+    };
+
+    return {
+      pluginDb,
+      mergeInto: (db, nextDb) => {
+        const source = nextDb || pluginDb;
+        db.folders = [
+          ...(db.folders || []).filter((f) => !hasOwner(f, userId)),
+          ...((source.folders || []).map((f) => ({ ...f, userId })))
+        ];
+        db.bookmarks = [
+          ...(db.bookmarks || []).filter((b) => !hasOwner(b, userId)),
+          ...((source.bookmarks || []).map((b) => ({ ...b, userId })))
+        ];
+        db.pluginState = db.pluginState || {};
+        db.pluginState[scopeKey] = structuredClone(
+          (source.pluginState && source.pluginState[pluginId]) || (pluginDb.pluginState && pluginDb.pluginState[pluginId]) || {}
+        );
+        return db;
+      }
+    };
   }
 
   list() {
@@ -188,26 +258,28 @@ class PluginManager {
     return plugin;
   }
 
-  async getConfig(id) {
+  async getConfig(id, ctx = {}) {
+    const scope = this._scope(id, ctx);
     const db = await this.store.read();
-    return db.pluginConfigs?.[id] || {};
+    return db.pluginConfigs?.[scope.key] || {};
   }
 
-  async getConfigMeta(id) {
-    this.get(id);
+  async getConfigMeta(id, ctx = {}) {
+    const scope = this._scope(id, ctx);
     const db = await this.store.read();
-    return normalizeConfigMeta(db.pluginConfigMeta?.[id] || {});
+    return normalizeConfigMeta(db.pluginConfigMeta?.[scope.key] || {});
   }
 
-  async setConfig(id, config) {
-    const plugin = this.get(id);
+  async setConfig(id, config, ctx = {}) {
+    const scope = this._scope(id, ctx);
+    const plugin = this.get(scope.pluginId);
     const nextConfig = { ...(plugin.defaultConfig ? plugin.defaultConfig() : {}), ...(config || {}) };
     const now = Date.now();
     await this.store.update((db) => {
-      db.pluginConfigs[id] = nextConfig;
+      db.pluginConfigs[scope.key] = nextConfig;
       db.pluginConfigMeta = db.pluginConfigMeta || {};
-      const prevMeta = normalizeConfigMeta(db.pluginConfigMeta[id] || {});
-      db.pluginConfigMeta[id] = {
+      const prevMeta = normalizeConfigMeta(db.pluginConfigMeta[scope.key] || {});
+      db.pluginConfigMeta[scope.key] = {
         revision: Number(prevMeta.revision || 0) + 1,
         updatedAt: now
       };
@@ -216,17 +288,23 @@ class PluginManager {
     return nextConfig;
   }
 
-  async getState(id) {
+  async getState(id, ctx = {}) {
+    const scope = this._scope(id, ctx);
     const db = await this.store.read();
-    return db.pluginState?.[id] || {};
+    return db.pluginState?.[scope.key] || {};
   }
 
-  async getConfigBundle(id, { deviceId = '' } = {}) {
-    this.get(id);
-    const [config, meta, schedule] = await Promise.all([this.getConfig(id), this.getConfigMeta(id), this.getSchedule(id)]);
+  async getConfigBundle(id, { deviceId = '', userId = '' } = {}) {
+    const scope = this._scope(id, { userId });
+    const [config, meta, schedule] = await Promise.all([
+      this.getConfig(scope.pluginId, { userId: scope.userId }),
+      this.getConfigMeta(scope.pluginId, { userId: scope.userId }),
+      this.getSchedule(scope.pluginId, { userId: scope.userId })
+    ]);
     const servedAt = Date.now();
     if (deviceId) {
-      await this.upsertDevice(id, String(deviceId), {
+      await this.upsertDevice(scope.pluginId, String(deviceId), {
+        userId: scope.userId,
         status: 'online',
         lastSeenAt: servedAt,
         lastConfigPullAt: servedAt,
@@ -235,7 +313,7 @@ class PluginManager {
       });
     }
     return {
-      pluginId: id,
+      pluginId: scope.pluginId,
       servedAt,
       config,
       configMeta: meta,
@@ -243,17 +321,17 @@ class PluginManager {
     };
   }
 
-  async upsertDevice(id, deviceId, patch = {}) {
-    this.get(id);
+  async upsertDevice(id, deviceId, patch = {}, ctx = {}) {
+    const scope = this._scope(id, { userId: patch.userId || ctx.userId || '' });
     const did = String(deviceId || '').trim();
     if (!did) throw new Error('deviceId is required');
 
     let out;
     await this.store.update((db) => {
       db.pluginDevices = db.pluginDevices || {};
-      db.pluginDevices[id] = db.pluginDevices[id] || {};
+      db.pluginDevices[scope.key] = db.pluginDevices[scope.key] || {};
       const now = Date.now();
-      const prev = db.pluginDevices[id][did] || defaultDeviceRecord(did);
+      const prev = db.pluginDevices[scope.key][did] || defaultDeviceRecord(did);
       const nextPatch = normalizeDevicePatch(patch);
       out = {
         ...prev,
@@ -264,82 +342,84 @@ class PluginManager {
         firstSeenAt: Number(prev.firstSeenAt || nextPatch.lastSeenAt || now),
         lastSeenAt: Number(nextPatch.lastSeenAt || prev.lastSeenAt || now)
       };
-      db.pluginDevices[id][did] = out;
+      db.pluginDevices[scope.key][did] = out;
       return db;
     });
     return out;
   }
 
-  async registerDevice(id, payload = {}) {
+  async registerDevice(id, payload = {}, ctx = {}) {
     const now = Date.now();
     const deviceId = String(payload.deviceId || '').trim();
     if (!deviceId) throw new Error('deviceId is required');
-    return this.upsertDevice(id, deviceId, {
-      ...payload,
-      status: payload.status || 'online',
-      lastSeenAt: now
-    });
+    return this.upsertDevice(
+      id,
+      deviceId,
+      {
+        ...payload,
+        status: payload.status || 'online',
+        lastSeenAt: now
+      },
+      { userId: payload.userId || ctx.userId || '' }
+    );
   }
 
-  async reportDeviceStatus(id, deviceId, payload = {}) {
+  async reportDeviceStatus(id, deviceId, payload = {}, ctx = {}) {
     const now = Date.now();
-    return this.upsertDevice(id, deviceId, {
-      ...payload,
-      lastSeenAt: now
-    });
+    return this.upsertDevice(id, deviceId, { ...payload, lastSeenAt: now }, { userId: payload.userId || ctx.userId || '' });
   }
 
-  async listDevices(id, { limit = 50 } = {}) {
-    this.get(id);
+  async listDevices(id, { limit = 50, userId = '' } = {}) {
+    const scope = this._scope(id, { userId });
     const n = Math.max(1, Math.min(500, Number(limit) || 50));
     const db = await this.store.read();
-    const records = Object.values((db.pluginDevices?.[id] || {}))
+    const records = Object.values((db.pluginDevices?.[scope.key] || {}))
       .map((x) => ({ ...defaultDeviceRecord(x?.deviceId), ...x }))
       .sort((a, b) => Number(b.lastSeenAt || 0) - Number(a.lastSeenAt || 0));
     return records.slice(0, n);
   }
 
-  async getSchedule(id) {
-    this.get(id);
+  async getSchedule(id, ctx = {}) {
+    const scope = this._scope(id, ctx);
     const db = await this.store.read();
-    const raw = db.pluginSchedules?.[id] || {};
+    const raw = db.pluginSchedules?.[scope.key] || {};
     const normalized = normalizeScheduleConfig(raw, raw, { touch: false });
     if (JSON.stringify(raw) !== JSON.stringify(normalized)) {
       await this.store.update((nextDb) => {
         nextDb.pluginSchedules = nextDb.pluginSchedules || {};
-        nextDb.pluginSchedules[id] = normalized;
+        nextDb.pluginSchedules[scope.key] = normalized;
         return nextDb;
       });
     }
     return normalized;
   }
 
-  async setSchedule(id, patch = {}) {
-    this.get(id);
+  async setSchedule(id, patch = {}, ctx = {}) {
+    const scope = this._scope(id, ctx);
     let nextSchedule;
     await this.store.update((db) => {
       db.pluginSchedules = db.pluginSchedules || {};
-      const prev = db.pluginSchedules[id] || {};
+      const prev = db.pluginSchedules[scope.key] || {};
       nextSchedule = normalizeScheduleConfig(patch, prev);
       if (typeof patch.nextRunAt !== 'undefined') {
         nextSchedule.nextRunAt = Number(patch.nextRunAt || 0);
       } else if (typeof prev.nextRunAt === 'undefined' || Number(prev.nextRunAt || 0) <= 0) {
         nextSchedule.nextRunAt = nextSchedule.enabled ? Date.now() + nextSchedule.intervalMinutes * 60_000 : 0;
       }
-      db.pluginSchedules[id] = nextSchedule;
+      db.pluginSchedules[scope.key] = nextSchedule;
       return db;
     });
     return nextSchedule;
   }
 
-  async patchScheduleStatus(id, patch = {}) {
-    this.get(id);
+  async patchScheduleStatus(id, patch = {}, ctx = {}) {
+    const scope = this._scope(id, ctx);
     let nextSchedule;
     await this.store.update((db) => {
       db.pluginSchedules = db.pluginSchedules || {};
-      const prev = normalizeScheduleConfig(db.pluginSchedules[id] || {}, db.pluginSchedules[id] || {}, { touch: false });
+      const prev = normalizeScheduleConfig(db.pluginSchedules[scope.key] || {}, db.pluginSchedules[scope.key] || {}, { touch: false });
       nextSchedule = { ...prev, ...patch, updatedAt: Date.now() };
-      db.pluginSchedules[id] = nextSchedule;
+      db.pluginSchedules[scope.key] = nextSchedule;
       return db;
     });
     return nextSchedule;
@@ -366,7 +446,7 @@ class PluginManager {
     this.schedulerTimer = null;
   }
 
-  async tickSchedulers({ pluginId = null, force = false, source = 'scheduler' } = {}) {
+  async tickSchedulers({ pluginId = null, userId = '', force = false, source = 'scheduler' } = {}) {
     if (this.schedulerLoopRunning && !force) {
       return { ok: true, busy: true, tickedAt: Date.now(), source, results: [] };
     }
@@ -380,13 +460,39 @@ class PluginManager {
       const db = await this.store.read();
       const schedules = db.pluginSchedules || {};
       const taskItems = Array.isArray(db.pluginTasks) ? db.pluginTasks : [];
-      const pluginIds = pluginId ? [String(pluginId)] : [...this.plugins.keys()];
+      const requestedPluginId = pluginId ? String(pluginId) : '';
+      const requestedUserId = String(userId || '').trim();
+      const targets = requestedPluginId
+        ? [
+            {
+              pluginId: requestedPluginId,
+              userId: requestedUserId,
+              scheduleKey: requestedUserId ? pluginScopeKey(requestedUserId, requestedPluginId) : requestedPluginId,
+              raw: schedules[requestedUserId ? pluginScopeKey(requestedUserId, requestedPluginId) : requestedPluginId] || {}
+            }
+          ]
+        : Object.entries(schedules).map(([key, raw]) => {
+            const parsed = parsePluginScopeKey(key);
+            return {
+              pluginId: parsed ? parsed.pluginId : key,
+              userId: parsed ? parsed.userId : '',
+              scheduleKey: key,
+              raw: raw || {}
+            };
+          });
       const results = [];
 
-      for (const id of pluginIds) {
+      for (const target of targets) {
+        const id = target.pluginId;
+        const targetUserId = String(target.userId || '').trim();
         this.get(id);
-        const schedule = normalizeScheduleConfig(schedules[id] || {}, schedules[id] || {});
-        const activeCount = taskItems.filter((t) => t.pluginId === id && (t.status === 'queued' || t.status === 'running')).length;
+        const schedule = normalizeScheduleConfig(target.raw || {}, target.raw || {});
+        const activeCount = taskItems.filter(
+          (t) =>
+            t.pluginId === id &&
+            this._scopeTaskRecord(t, targetUserId) &&
+            (t.status === 'queued' || t.status === 'running')
+        ).length;
         const intervalMs = Math.max(1, Number(schedule.intervalMinutes || 15)) * 60_000;
         const dueAt = Number(schedule.nextRunAt || (schedule.lastEnqueuedAt ? Number(schedule.lastEnqueuedAt) + intervalMs : 0) || 0);
         let action = 'skipped';
@@ -414,7 +520,7 @@ class PluginManager {
           try {
             task = await this.enqueueRunTask(id, {}, {
               idempotencyKey: `sched:${id}:${Math.floor(tickedAt / intervalMs)}`
-            });
+            }, { userId: targetUserId });
             action = task?.deduped ? 'deduped' : 'enqueued';
             reason = task?.deduped ? 'idempotent_active_task' : '';
             patch = {
@@ -435,9 +541,10 @@ class PluginManager {
           }
         }
 
-        const savedSchedule = await this.patchScheduleStatus(id, patch);
+        const savedSchedule = await this.patchScheduleStatus(id, patch, { userId: targetUserId });
         results.push({
           pluginId: id,
+          userId: targetUserId || null,
           action,
           reason,
           activeCount,
@@ -452,13 +559,13 @@ class PluginManager {
     }
   }
 
-  async listRuns(id, { limit = 20 } = {}) {
-    this.get(id);
+  async listRuns(id, { limit = 20, userId = '' } = {}) {
+    const scope = this._scope(id, { userId });
     const n = Math.max(1, Math.min(200, Number(limit) || 20));
     const db = await this.store.read();
     const items = Array.isArray(db.pluginRuns) ? db.pluginRuns : [];
     return items
-      .filter((x) => x.pluginId === id)
+      .filter((x) => x.pluginId === scope.pluginId && this._scopeTaskRecord(x, scope.userId))
       .sort((a, b) => Number(b.startedAt || 0) - Number(a.startedAt || 0))
       .slice(0, n);
   }
@@ -476,22 +583,22 @@ class PluginManager {
     });
   }
 
-  async listTasks(id, { limit = 20 } = {}) {
-    this.get(id);
+  async listTasks(id, { limit = 20, userId = '' } = {}) {
+    const scope = this._scope(id, { userId });
     const n = Math.max(1, Math.min(200, Number(limit) || 20));
     const db = await this.store.read();
     const items = Array.isArray(db.pluginTasks) ? db.pluginTasks : [];
     return items
-      .filter((x) => x.pluginId === id)
+      .filter((x) => x.pluginId === scope.pluginId && this._scopeTaskRecord(x, scope.userId))
       .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))
       .slice(0, n);
   }
 
-  async getTask(id, taskId) {
-    this.get(id);
+  async getTask(id, taskId, ctx = {}) {
+    const scope = this._scope(id, ctx);
     const db = await this.store.read();
     const items = Array.isArray(db.pluginTasks) ? db.pluginTasks : [];
-    return items.find((x) => x.pluginId === id && x.id === taskId) || null;
+    return items.find((x) => x.pluginId === scope.pluginId && x.id === taskId && this._scopeTaskRecord(x, scope.userId)) || null;
   }
 
   async appendTaskRecord(record) {
@@ -507,31 +614,39 @@ class PluginManager {
     });
   }
 
-  async patchTaskRecord(taskId, patch) {
+  async patchTaskRecord(taskId, patch, ctx = {}) {
     await this.store.update((db) => {
       db.pluginTasks = Array.isArray(db.pluginTasks) ? db.pluginTasks : [];
-      const item = db.pluginTasks.find((x) => x.id === taskId);
+      const userId = String(ctx.userId || '').trim();
+      const item = db.pluginTasks.find((x) => x.id === taskId && (!userId || this._scopeTaskRecord(x, userId)));
       if (item) Object.assign(item, patch || {});
       return db;
     });
   }
 
-  async findActiveTaskByIdempotency(id, idempotencyKey) {
+  async findActiveTaskByIdempotency(id, idempotencyKey, ctx = {}) {
     if (!idempotencyKey) return null;
+    const scope = this._scope(id, ctx);
     const db = await this.store.read();
     const items = Array.isArray(db.pluginTasks) ? db.pluginTasks : [];
     return (
       items
-        .filter((x) => x.pluginId === id && x.idempotencyKey === idempotencyKey && (x.status === 'queued' || x.status === 'running'))
+        .filter(
+          (x) =>
+            x.pluginId === scope.pluginId &&
+            this._scopeTaskRecord(x, scope.userId) &&
+            x.idempotencyKey === idempotencyKey &&
+            (x.status === 'queued' || x.status === 'running')
+        )
         .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0] || null
     );
   }
 
-  async enqueueRunTask(id, inputConfig, meta = {}) {
-    this.get(id);
+  async enqueueRunTask(id, inputConfig, meta = {}, ctx = {}) {
+    const scope = this._scope(id, ctx);
     const idempotencyKey = String(meta?.idempotencyKey || '').trim();
     if (idempotencyKey) {
-      const existing = await this.findActiveTaskByIdempotency(id, idempotencyKey);
+      const existing = await this.findActiveTaskByIdempotency(scope.pluginId, idempotencyKey, { userId: scope.userId });
       if (existing) {
         return { ...existing, deduped: true };
       }
@@ -539,7 +654,8 @@ class PluginManager {
     const createdAt = Date.now();
     const task = {
       id: `ptask_${crypto.randomUUID()}`,
-      pluginId: id,
+      pluginId: scope.pluginId,
+      userId: scope.userId || '',
       type: 'run',
       status: 'queued',
       createdAt,
@@ -557,33 +673,51 @@ class PluginManager {
     };
 
     await this.appendTaskRecord(task);
-    this.taskQueue.push({ taskId: task.id, pluginId: id, inputConfig: inputConfig || {} });
-    setTimeout(() => {
-      this.kickTaskLoop().catch((err) => {
-        console.error('plugin task loop failed', err);
-      });
-    }, 0);
+    const jobPayload = { taskId: task.id, pluginId: scope.pluginId, userId: scope.userId || '', inputConfig: inputConfig || {} };
+    try {
+      if (this.pluginRunQueue && typeof this.pluginRunQueue.enqueue === 'function') {
+        await this.pluginRunQueue.enqueue(jobPayload, {
+          jobId: `ptask:${task.id}`
+        });
+      } else {
+        this.taskQueue.push(jobPayload);
+        setTimeout(() => {
+          this.kickTaskLoop().catch((err) => {
+            console.error('plugin task loop failed', err);
+          });
+        }, 0);
+      }
+    } catch (err) {
+      await this.patchTaskRecord(task.id, {
+        status: 'failed',
+        finishedAt: Date.now(),
+        error: safeErrorInfo(err)
+      }, { userId: scope.userId || '' });
+      throw err;
+    }
     return task;
   }
 
-  async retryTask(id, taskId) {
-    const task = await this.getTask(id, taskId);
+  async retryTask(id, taskId, ctx = {}) {
+    const scope = this._scope(id, ctx);
+    const task = await this.getTask(scope.pluginId, taskId, { userId: scope.userId });
     if (!task) throw new Error('task not found');
-    return this.enqueueRunTask(id, task.inputSnapshot || {}, {
+    return this.enqueueRunTask(scope.pluginId, task.inputSnapshot || {}, {
       sourceTaskId: task.id,
       replayReason: 'retry_failed',
       idempotencyKey: ''
-    });
+    }, { userId: scope.userId || task.userId || '' });
   }
 
-  async replayTask(id, taskId) {
-    const task = await this.getTask(id, taskId);
+  async replayTask(id, taskId, ctx = {}) {
+    const scope = this._scope(id, ctx);
+    const task = await this.getTask(scope.pluginId, taskId, { userId: scope.userId });
     if (!task) throw new Error('task not found');
-    return this.enqueueRunTask(id, task.inputSnapshot || {}, {
+    return this.enqueueRunTask(scope.pluginId, task.inputSnapshot || {}, {
       sourceTaskId: task.id,
       replayReason: 'replay_manual',
       idempotencyKey: ''
-    });
+    }, { userId: scope.userId || task.userId || '' });
   }
 
   async kickTaskLoop() {
@@ -611,10 +745,10 @@ class PluginManager {
       status: 'running',
       startedAt,
       error: null
-    });
+    }, { userId: job.userId || '' });
 
     try {
-      const result = await this.run(job.pluginId, job.inputConfig);
+      const result = await this.run(job.pluginId, job.inputConfig, { userId: job.userId || '' });
       const finishedAt = Date.now();
       await this.patchTaskRecord(job.taskId, {
         status: 'succeeded',
@@ -623,7 +757,7 @@ class PluginManager {
         runLogId: result?.task?.id || null,
         resultSummary: summarizePluginResult(result),
         error: null
-      });
+      }, { userId: job.userId || '' });
     } catch (err) {
       const finishedAt = Date.now();
       await this.patchTaskRecord(job.taskId, {
@@ -632,23 +766,26 @@ class PluginManager {
         durationMs: finishedAt - startedAt,
         runLogId: err?.runLogId || null,
         error: safeErrorInfo(err)
-      });
+      }, { userId: job.userId || '' });
     }
   }
 
-  async preview(id, inputConfig) {
-    const plugin = this.get(id);
-    const savedConfig = await this.getConfig(id);
+  async preview(id, inputConfig, ctx = {}) {
+    const scope = this._scope(id, ctx);
+    const plugin = this.get(scope.pluginId);
+    const savedConfig = await this.getConfig(scope.pluginId, { userId: scope.userId });
     const effectiveConfig = { ...(plugin.defaultConfig ? plugin.defaultConfig() : {}), ...savedConfig, ...(inputConfig || {}) };
     const startedAt = Date.now();
     const runId = `prun_${crypto.randomUUID()}`;
     try {
       const db = await this.store.read();
-      const result = await plugin.run({ mode: 'preview', config: effectiveConfig, db, now: Date.now() });
+      const { pluginDb } = this._buildPluginRunDb(db, { pluginId: scope.pluginId, userId: scope.userId });
+      const result = await plugin.run({ mode: 'preview', config: effectiveConfig, db: pluginDb, now: Date.now() });
       const finishedAt = Date.now();
       await this.appendRunRecord({
         id: runId,
-        pluginId: id,
+        pluginId: scope.pluginId,
+        userId: scope.userId || '',
         type: 'preview',
         status: 'succeeded',
         startedAt,
@@ -662,7 +799,8 @@ class PluginManager {
       const finishedAt = Date.now();
       await this.appendRunRecord({
         id: runId,
-        pluginId: id,
+        pluginId: scope.pluginId,
+        userId: scope.userId || '',
         type: 'preview',
         status: 'failed',
         startedAt,
@@ -675,9 +813,10 @@ class PluginManager {
     }
   }
 
-  async run(id, inputConfig) {
-    const plugin = this.get(id);
-    const savedConfig = await this.getConfig(id);
+  async run(id, inputConfig, ctx = {}) {
+    const scope = this._scope(id, ctx);
+    const plugin = this.get(scope.pluginId);
+    const savedConfig = await this.getConfig(scope.pluginId, { userId: scope.userId });
     const effectiveConfig = { ...(plugin.defaultConfig ? plugin.defaultConfig() : {}), ...savedConfig, ...(inputConfig || {}) };
     const startedAt = Date.now();
     const runId = `prun_${crypto.randomUUID()}`;
@@ -685,13 +824,15 @@ class PluginManager {
     let pluginResult = null;
     try {
       await this.store.update(async (db) => {
-        pluginResult = await plugin.run({ mode: 'apply', config: effectiveConfig, db, now: Date.now() });
-        return pluginResult?.nextDb || db;
+        const { pluginDb, mergeInto } = this._buildPluginRunDb(db, { pluginId: scope.pluginId, userId: scope.userId });
+        pluginResult = await plugin.run({ mode: 'apply', config: effectiveConfig, db: pluginDb, now: Date.now() });
+        return mergeInto(db, pluginResult?.nextDb || pluginDb);
       });
       const finishedAt = Date.now();
       await this.appendRunRecord({
         id: runId,
-        pluginId: id,
+        pluginId: scope.pluginId,
+        userId: scope.userId || '',
         type: 'run',
         status: 'succeeded',
         startedAt,
@@ -705,7 +846,8 @@ class PluginManager {
       const finishedAt = Date.now();
       await this.appendRunRecord({
         id: runId,
-        pluginId: id,
+        pluginId: scope.pluginId,
+        userId: scope.userId || '',
         type: 'run',
         status: 'failed',
         startedAt,

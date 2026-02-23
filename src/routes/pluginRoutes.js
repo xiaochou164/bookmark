@@ -1,5 +1,6 @@
 function registerPluginRoutes(app, deps) {
   const { plugins } = deps;
+  const userIdOf = (req) => String(req.auth?.user?.id || '');
   const summarizeByStatus = (items = []) =>
     items.reduce((acc, item) => {
       const key = String(item?.status || 'unknown');
@@ -43,7 +44,7 @@ function registerPluginRoutes(app, deps) {
 
   app.get('/api/plugins/:id/config', async (req, res, next) => {
     try {
-      const config = await plugins.getConfig(req.params.id);
+      const config = await plugins.getConfig(req.params.id, { userId: userIdOf(req) });
       res.json(config);
     } catch (err) {
       next(err);
@@ -52,7 +53,7 @@ function registerPluginRoutes(app, deps) {
 
   app.get('/api/plugins/:id/schedule', async (req, res, next) => {
     try {
-      const schedule = await plugins.getSchedule(req.params.id);
+      const schedule = await plugins.getSchedule(req.params.id, { userId: userIdOf(req) });
       res.json(schedule);
     } catch (err) {
       next(err);
@@ -62,7 +63,7 @@ function registerPluginRoutes(app, deps) {
   app.get('/api/plugins/:id/devices', async (req, res, next) => {
     try {
       const limit = Number(req.query?.limit || 50);
-      const items = await plugins.listDevices(req.params.id, { limit });
+      const items = await plugins.listDevices(req.params.id, { limit, userId: userIdOf(req) });
       res.json({ items });
     } catch (err) {
       next(err);
@@ -71,7 +72,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/devices/register', async (req, res, next) => {
     try {
-      const item = await plugins.registerDevice(req.params.id, req.body || {});
+      const item = await plugins.registerDevice(req.params.id, req.body || {}, { userId: userIdOf(req) });
       res.json({ ok: true, item });
     } catch (err) {
       next(err);
@@ -80,7 +81,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/devices/:deviceId/status', async (req, res, next) => {
     try {
-      const item = await plugins.reportDeviceStatus(req.params.id, req.params.deviceId, req.body || {});
+      const item = await plugins.reportDeviceStatus(req.params.id, req.params.deviceId, req.body || {}, { userId: userIdOf(req) });
       res.json({ ok: true, item });
     } catch (err) {
       next(err);
@@ -89,7 +90,7 @@ function registerPluginRoutes(app, deps) {
 
   app.get('/api/plugins/:id/devices/:deviceId/config', async (req, res, next) => {
     try {
-      const bundle = await plugins.getConfigBundle(req.params.id, { deviceId: req.params.deviceId });
+      const bundle = await plugins.getConfigBundle(req.params.id, { deviceId: req.params.deviceId, userId: userIdOf(req) });
       res.json(bundle);
     } catch (err) {
       next(err);
@@ -98,7 +99,7 @@ function registerPluginRoutes(app, deps) {
 
   app.put('/api/plugins/:id/schedule', async (req, res, next) => {
     try {
-      const schedule = await plugins.setSchedule(req.params.id, req.body || {});
+      const schedule = await plugins.setSchedule(req.params.id, req.body || {}, { userId: userIdOf(req) });
       res.json(schedule);
     } catch (err) {
       next(err);
@@ -107,7 +108,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/schedule/pause', async (req, res, next) => {
     try {
-      const schedule = await plugins.setSchedule(req.params.id, { paused: true });
+      const schedule = await plugins.setSchedule(req.params.id, { paused: true }, { userId: userIdOf(req) });
       res.json({ ok: true, schedule });
     } catch (err) {
       next(err);
@@ -116,7 +117,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/schedule/resume', async (req, res, next) => {
     try {
-      const schedule = await plugins.setSchedule(req.params.id, { paused: false });
+      const schedule = await plugins.setSchedule(req.params.id, { paused: false }, { userId: userIdOf(req) });
       res.json({ ok: true, schedule });
     } catch (err) {
       next(err);
@@ -126,7 +127,7 @@ function registerPluginRoutes(app, deps) {
   app.post('/api/plugins/:id/schedule/tick', async (req, res, next) => {
     try {
       const force = typeof req.body?.force === 'undefined' ? true : Boolean(req.body.force);
-      const result = await plugins.tickSchedulers({ pluginId: req.params.id, force, source: 'api' });
+      const result = await plugins.tickSchedulers({ pluginId: req.params.id, userId: userIdOf(req), force, source: 'api' });
       res.json(result);
     } catch (err) {
       next(err);
@@ -154,7 +155,7 @@ function registerPluginRoutes(app, deps) {
 
   app.put('/api/plugins/:id/config', async (req, res, next) => {
     try {
-      const config = await plugins.setConfig(req.params.id, req.body || {});
+      const config = await plugins.setConfig(req.params.id, req.body || {}, { userId: userIdOf(req) });
       res.json(config);
     } catch (err) {
       next(err);
@@ -163,7 +164,7 @@ function registerPluginRoutes(app, deps) {
 
   app.get('/api/plugins/:id/state', async (req, res, next) => {
     try {
-      const state = await plugins.getState(req.params.id);
+      const state = await plugins.getState(req.params.id, { userId: userIdOf(req) });
       res.json(state);
     } catch (err) {
       next(err);
@@ -173,7 +174,7 @@ function registerPluginRoutes(app, deps) {
   app.get('/api/plugins/:id/runs', async (req, res, next) => {
     try {
       const limit = Number(req.query?.limit || 20);
-      const items = await plugins.listRuns(req.params.id, { limit });
+      const items = await plugins.listRuns(req.params.id, { limit, userId: userIdOf(req) });
       res.json({ items });
     } catch (err) {
       next(err);
@@ -183,7 +184,7 @@ function registerPluginRoutes(app, deps) {
   app.get('/api/plugins/:id/tasks', async (req, res, next) => {
     try {
       const limit = Number(req.query?.limit || 20);
-      const items = await plugins.listTasks(req.params.id, { limit });
+      const items = await plugins.listTasks(req.params.id, { limit, userId: userIdOf(req) });
       res.json({ items });
     } catch (err) {
       next(err);
@@ -193,11 +194,11 @@ function registerPluginRoutes(app, deps) {
   app.get('/api/plugins/:id/audit', async (req, res, next) => {
     try {
       const [state, runs, tasks, schedule, devices] = await Promise.all([
-        plugins.getState(req.params.id),
-        plugins.listRuns(req.params.id, { limit: 20 }),
-        plugins.listTasks(req.params.id, { limit: 20 }),
-        plugins.getSchedule(req.params.id),
-        plugins.listDevices(req.params.id, { limit: 20 })
+        plugins.getState(req.params.id, { userId: userIdOf(req) }),
+        plugins.listRuns(req.params.id, { limit: 20, userId: userIdOf(req) }),
+        plugins.listTasks(req.params.id, { limit: 20, userId: userIdOf(req) }),
+        plugins.getSchedule(req.params.id, { userId: userIdOf(req) }),
+        plugins.listDevices(req.params.id, { limit: 20, userId: userIdOf(req) })
       ]);
 
       const mappingState = state?.mappingState || {};
@@ -242,10 +243,10 @@ function registerPluginRoutes(app, deps) {
   app.get('/api/plugins/:id/health', async (req, res, next) => {
     try {
       const [schedule, tasks, runs, devices] = await Promise.all([
-        plugins.getSchedule(req.params.id),
-        plugins.listTasks(req.params.id, { limit: 200 }),
-        plugins.listRuns(req.params.id, { limit: 200 }),
-        plugins.listDevices(req.params.id, { limit: 50 })
+        plugins.getSchedule(req.params.id, { userId: userIdOf(req) }),
+        plugins.listTasks(req.params.id, { limit: 200, userId: userIdOf(req) }),
+        plugins.listRuns(req.params.id, { limit: 200, userId: userIdOf(req) }),
+        plugins.listDevices(req.params.id, { limit: 50, userId: userIdOf(req) })
       ]);
       const now = Date.now();
       const activeTasks = tasks.filter((t) => t.status === 'queued' || t.status === 'running');
@@ -306,7 +307,7 @@ function registerPluginRoutes(app, deps) {
 
   app.get('/api/plugins/:id/tasks/:taskId', async (req, res, next) => {
     try {
-      const item = await plugins.getTask(req.params.id, req.params.taskId);
+      const item = await plugins.getTask(req.params.id, req.params.taskId, { userId: userIdOf(req) });
       if (!item) {
         res.status(404).json({ error: { code: 'NOT_FOUND', message: 'task not found', details: null } });
         return;
@@ -326,7 +327,7 @@ function registerPluginRoutes(app, deps) {
       }
       const task = await plugins.enqueueRunTask(req.params.id, req.body?.input || {}, {
         idempotencyKey: req.body?.idempotencyKey || ''
-      });
+      }, { userId: userIdOf(req) });
       res.status(202).json({ ok: true, task });
     } catch (err) {
       next(err);
@@ -335,7 +336,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/tasks/:taskId/retry', async (req, res, next) => {
     try {
-      const task = await plugins.retryTask(req.params.id, req.params.taskId);
+      const task = await plugins.retryTask(req.params.id, req.params.taskId, { userId: userIdOf(req) });
       res.status(202).json({ ok: true, task, mode: 'retry' });
     } catch (err) {
       next(err);
@@ -344,7 +345,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/tasks/:taskId/replay', async (req, res, next) => {
     try {
-      const task = await plugins.replayTask(req.params.id, req.params.taskId);
+      const task = await plugins.replayTask(req.params.id, req.params.taskId, { userId: userIdOf(req) });
       res.status(202).json({ ok: true, task, mode: 'replay' });
     } catch (err) {
       next(err);
@@ -353,7 +354,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/preview', async (req, res, next) => {
     try {
-      const result = await plugins.preview(req.params.id, req.body || {});
+      const result = await plugins.preview(req.params.id, req.body || {}, { userId: userIdOf(req) });
       res.json(result);
     } catch (err) {
       next(err);
@@ -362,7 +363,7 @@ function registerPluginRoutes(app, deps) {
 
   app.post('/api/plugins/:id/run', async (req, res, next) => {
     try {
-      const result = await plugins.run(req.params.id, req.body || {});
+      const result = await plugins.run(req.params.id, req.body || {}, { userId: userIdOf(req) });
       res.json(result);
     } catch (err) {
       next(err);

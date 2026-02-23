@@ -277,6 +277,32 @@ class AuthService {
     return user ? sanitizeUser(user) : null;
   }
 
+  async updateUserProfile(userId, { displayName, email } = {}) {
+    const uid = String(userId || '');
+    const nextName = typeof displayName === 'undefined' ? undefined : String(displayName || '').trim();
+    const nextEmail = typeof email === 'undefined' ? undefined : String(email || '').trim().toLowerCase();
+    let updated = null;
+    const now = Date.now();
+    await this.dbRepo.update((db) => {
+      db.users = Array.isArray(db.users) ? db.users : [];
+      const user = db.users.find((u) => String(u.id) === uid && !u.disabledAt);
+      if (!user) throw new Error('user not found');
+      if (typeof nextEmail !== 'undefined') {
+        if (!nextEmail || !nextEmail.includes('@')) throw new Error('valid email is required');
+        const taken = db.users.find((u) => String(u.id) !== uid && !u.disabledAt && String(u.email || '').toLowerCase() === nextEmail);
+        if (taken) throw Object.assign(new Error('email already exists'), { code: 'EMAIL_EXISTS' });
+        user.email = nextEmail;
+      }
+      if (typeof nextName !== 'undefined') {
+        user.displayName = nextName || user.displayName || user.email?.split('@')?.[0] || 'User';
+      }
+      user.updatedAt = now;
+      updated = sanitizeUser(user);
+      return db;
+    });
+    return updated;
+  }
+
   async listApiTokens(userId) {
     const db = await this.dbRepo.read();
     return (db.apiTokens || [])
@@ -337,6 +363,37 @@ class AuthService {
     await this.dbRepo.update((db) => {
       db.authSessions = Array.isArray(db.authSessions) ? db.authSessions : [];
       const rec = db.authSessions.find((s) => String(s.id) === String(sessionId));
+      if (!rec || rec.revokedAt) return db;
+      rec.revokedAt = now;
+      rec.updatedAt = now;
+      revoked = sanitizeSession(rec);
+      return db;
+    });
+    return revoked;
+  }
+
+  async listSessions(userId) {
+    const uid = String(userId || '');
+    const now = Date.now();
+    const db = await this.dbRepo.read();
+    return (db.authSessions || [])
+      .filter((s) => String(s.userId) === uid)
+      .map(sanitizeSession)
+      .map((s) => ({
+        ...s,
+        status: s.revokedAt ? 'revoked' : Number(s.expiresAt || 0) <= now ? 'expired' : 'active'
+      }))
+      .sort((a, b) => Number(b.lastSeenAt || b.updatedAt || b.createdAt || 0) - Number(a.lastSeenAt || a.updatedAt || a.createdAt || 0));
+  }
+
+  async revokeUserSession(userId, sessionId) {
+    const uid = String(userId || '');
+    const sid = String(sessionId || '');
+    const now = Date.now();
+    let revoked = null;
+    await this.dbRepo.update((db) => {
+      db.authSessions = Array.isArray(db.authSessions) ? db.authSessions : [];
+      const rec = db.authSessions.find((s) => String(s.id) === sid && String(s.userId) === uid);
       if (!rec || rec.revokedAt) return db;
       rec.revokedAt = now;
       rec.updatedAt = now;

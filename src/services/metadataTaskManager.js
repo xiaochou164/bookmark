@@ -5,6 +5,7 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 const MAX_TIMEOUT_MS = 30_000;
 const MAX_ATTEMPTS = 5;
 const MAX_BACKOFF_MS = 60_000;
+const { hasOwner } = require('./tenantScope');
 
 function toSafeInt(value, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
   const n = Number(value);
@@ -105,23 +106,32 @@ class MetadataTaskManager {
     });
   }
 
-  async listTasks({ bookmarkId = '', status = '', limit = 50 } = {}) {
+  async listTasks({ userId = '', bookmarkId = '', status = '', limit = 50 } = {}) {
     const db = await this.dbRepo.read();
+    const scopedUserId = String(userId || '').trim();
     let tasks = Array.isArray(db.metadataTasks) ? [...db.metadataTasks] : [];
+    if (scopedUserId) tasks = tasks.filter((t) => hasOwner(t, scopedUserId));
     if (bookmarkId) tasks = tasks.filter((t) => String(t.bookmarkId || '') === String(bookmarkId));
     if (status) tasks = tasks.filter((t) => String(t.status || '') === String(status));
     tasks.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
     return tasks.slice(0, Math.max(1, Math.min(500, Number(limit || 50) || 50)));
   }
 
-  async getTask(taskId) {
+  async getTask(taskId, { userId = '' } = {}) {
     const db = await this.dbRepo.read();
-    return (db.metadataTasks || []).find((t) => String(t.id) === String(taskId)) || null;
+    const scopedUserId = String(userId || '').trim();
+    return (
+      (db.metadataTasks || []).find(
+        (t) => String(t.id) === String(taskId) && (!scopedUserId || hasOwner(t, scopedUserId))
+      ) || null
+    );
   }
 
-  async enqueue({ bookmarkId, timeoutMs, maxAttempts, baseBackoffMs, sourceTaskId = null, replayReason = '', dedupe = true } = {}) {
+  async enqueue({ userId = '', bookmarkId, timeoutMs, maxAttempts, baseBackoffMs, sourceTaskId = null, replayReason = '', dedupe = true } = {}) {
     const id = String(bookmarkId || '').trim();
+    const scopedUserId = String(userId || '').trim();
     if (!id) throw new Error('bookmarkId is required');
+    if (!scopedUserId) throw new Error('userId is required');
     const cfg = normalizeTaskConfig({ timeoutMs, maxAttempts, baseBackoffMs });
     const now = Date.now();
     let out = null;
@@ -129,13 +139,14 @@ class MetadataTaskManager {
 
     await this.dbRepo.update((db) => {
       db.metadataTasks = Array.isArray(db.metadataTasks) ? db.metadataTasks : [];
-      const bookmark = db.bookmarks.find((b) => String(b.id) === id && !b.deletedAt);
+      const bookmark = db.bookmarks.find((b) => hasOwner(b, scopedUserId) && String(b.id) === id && !b.deletedAt);
       if (!bookmark) throw new Error('bookmark not found');
       if (!bookmark.url) throw new Error('bookmark url is empty');
 
       if (dedupe) {
         const existing = db.metadataTasks
           .filter((t) => String(t.bookmarkId || '') === id && ['queued', 'running', 'retry_scheduled'].includes(String(t.status || '')))
+          .filter((t) => hasOwner(t, scopedUserId))
           .sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0))[0];
         if (existing) {
           out = existing;
@@ -146,6 +157,7 @@ class MetadataTaskManager {
 
       const task = {
         id: `meta_task_${crypto.randomUUID()}`,
+        userId: scopedUserId,
         type: 'bookmark_metadata_fetch',
         bookmarkId: id,
         bookmarkUrl: String(bookmark.url || ''),
@@ -189,9 +201,10 @@ class MetadataTaskManager {
   }
 
   async retryTask(taskId, overrides = {}) {
-    const source = await this.getTask(taskId);
+    const source = await this.getTask(taskId, { userId: overrides.userId || '' });
     if (!source) throw new Error('task not found');
     return this.enqueue({
+      userId: String(source.userId || overrides.userId || ''),
       bookmarkId: source.bookmarkId,
       timeoutMs: overrides.timeoutMs ?? source.timeoutMs,
       maxAttempts: overrides.maxAttempts ?? source.maxAttempts,
@@ -235,7 +248,12 @@ class MetadataTaskManager {
       const task = db.metadataTasks.find((t) => String(t.id) === String(taskId));
       if (!task) return db;
       if (!['queued', 'retry_scheduled'].includes(String(task.status || ''))) return db;
-      const bookmark = db.bookmarks.find((b) => String(b.id) === String(task.bookmarkId || '') && !b.deletedAt);
+      const bookmark = db.bookmarks.find(
+        (b) =>
+          String(b.id) === String(task.bookmarkId || '') &&
+          !b.deletedAt &&
+          (!task.userId || hasOwner(b, task.userId))
+      );
       if (!bookmark || !bookmark.url) {
         task.status = 'failed';
         task.updatedAt = now;
@@ -260,7 +278,7 @@ class MetadataTaskManager {
       };
       bookmark.updatedAt = now;
       taskSnapshot = structuredClone(task);
-      bookmarkSnapshot = { id: bookmark.id, url: bookmark.url };
+      bookmarkSnapshot = { id: bookmark.id, url: bookmark.url, userId: String(bookmark.userId || task.userId || '') };
       return db;
     });
 
@@ -271,7 +289,9 @@ class MetadataTaskManager {
       const finishedAt = Date.now();
       await this.dbRepo.update((db) => {
         const task = (db.metadataTasks || []).find((t) => String(t.id) === String(taskId));
-        const bookmark = db.bookmarks.find((b) => String(b.id) === String(bookmarkSnapshot.id));
+        const bookmark = db.bookmarks.find(
+          (b) => String(b.id) === String(bookmarkSnapshot.id) && (!bookmarkSnapshot.userId || hasOwner(b, bookmarkSnapshot.userId))
+        );
         if (task && task.status === 'running') {
           task.status = 'succeeded';
           task.updatedAt = finishedAt;
@@ -303,7 +323,9 @@ class MetadataTaskManager {
       const errInfo = safeError(err);
       await this.dbRepo.update((db) => {
         const task = (db.metadataTasks || []).find((t) => String(t.id) === String(taskId));
-        const bookmark = db.bookmarks.find((b) => String(b.id) === String(bookmarkSnapshot.id));
+        const bookmark = db.bookmarks.find(
+          (b) => String(b.id) === String(bookmarkSnapshot.id) && (!bookmarkSnapshot.userId || hasOwner(b, bookmarkSnapshot.userId))
+        );
         if (!task) return db;
         const nextAttempt = Math.max(1, Number(task.attempt || taskSnapshot.attempt || 1) + 1);
         const canRetry = nextAttempt <= Number(task.maxAttempts || taskSnapshot.maxAttempts || DEFAULT_MAX_ATTEMPTS);

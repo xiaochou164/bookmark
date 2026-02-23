@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>设置 - Rainboard 云书签</title>
+    <meta name="theme-color" content="#1194ff" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="auth-page">
+    <main class="settings-page-shell">
+      <aside class="settings-nav">
+        <div class="settings-nav-head">
+          <div class="brand">
+            <div class="brand-dot"></div>
+            <div>
+              <strong>Rainboard</strong>
+              <small>用户设置</small>
+            </div>
+          </div>
+          <div class="settings-nav-account">
+            <div class="settings-nav-avatar" id="settingsNavAvatar">用</div>
+            <div class="settings-nav-account-text">
+              <strong id="settingsNavUserName">未登录</strong>
+              <small id="settingsNavUserEmail">请先登录</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-nav-block">
+          <div class="settings-nav-title">页面</div>
+          <div class="settings-nav-pages" id="settingsNavPages">
+            <button type="button" class="settings-nav-page" data-settings-target="account">账号与安全</button>
+            <button type="button" class="settings-nav-page" data-settings-target="collab">共享与公开</button>
+            <button type="button" class="settings-nav-page" data-settings-target="product">产品能力</button>
+          </div>
+        </div>
+
+        <div class="settings-nav-block">
+          <div class="settings-nav-title">操作</div>
+          <button class="ghost" id="settingsRefreshBtn" type="button">刷新全部数据</button>
+        </div>
+        <a class="settings-back-link" href="/">返回主界面</a>
+      </aside>
+
+      <section class="settings-page-card">
+        <div class="settings-page-header">
+          <div class="settings-page-header-main">
+            <h1>用户设置</h1>
+            <p class="muted">账号、安全、共享、产品能力与运维工具集中管理。</p>
+          </div>
+          <div class="settings-page-header-actions">
+            <a class="ghost button-link" href="/">返回主界面</a>
+          </div>
+        </div>
+
+        <div id="settingsStatus" class="settings-status-banner muted">正在加载设置...</div>
+
+        <div class="settings-sections">
+          <section id="settingsSectionAccount" class="settings-section" data-settings-section="account">
+            <div class="settings-section-head">
+              <div>
+                <h2>账号与安全</h2>
+                <p class="muted">个人资料、API Token、登录会话与同步设备。</p>
+              </div>
+            </div>
+            <div class="settings-section-grid">
+              <section class="settings-panel">
+                <h3>账号信息</h3>
+                <form id="profileForm" class="settings-form">
+                  <label>昵称<input id="profileDisplayName" /></label>
+                  <label>邮箱<input id="profileEmail" type="email" /></label>
+                  <div class="settings-actions">
+                    <button type="submit">保存资料</button>
+                    <button type="button" class="ghost" id="profileReloadBtn">重新加载</button>
+                  </div>
+                </form>
+                <div id="profileMeta" class="muted"></div>
+              </section>
+
+              <section class="settings-panel">
+                <h3>API Token</h3>
+                <div class="settings-form">
+                  <label>名称<input id="settingsTokenName" placeholder="我的 API Token" /></label>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="settingsCreateTokenBtn">创建 Token</button>
+                    <button type="button" class="ghost" id="settingsRefreshTokensBtn">刷新 Token 列表</button>
+                  </div>
+                </div>
+                <pre id="settingsTokenOutput">尚未创建 Token</pre>
+                <div id="settingsTokensList" class="io-task-list"></div>
+              </section>
+
+              <section class="settings-panel">
+                <h3>登录会话</h3>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" id="settingsRefreshSessionsBtn">刷新会话</button>
+                </div>
+                <div id="settingsSessionsList" class="io-task-list"></div>
+              </section>
+
+              <section class="settings-panel">
+                <h3>同步设备（Raindrop 插件）</h3>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" id="settingsRefreshDevicesBtn">刷新设备</button>
+                </div>
+                <div id="settingsDevicesList" class="io-task-list"></div>
+              </section>
+            </div>
+          </section>
+
+          <section id="settingsSectionCollab" class="settings-section" data-settings-section="collab">
+            <div class="settings-section-head">
+              <div>
+                <h2>共享与公开</h2>
+                <p class="muted">共享集合邀请、公开页面链接与协作审计日志。</p>
+              </div>
+            </div>
+            <div class="settings-section-grid">
+              <section class="settings-panel">
+                <h3>共享集合</h3>
+                <div class="settings-form">
+                  <label>集合
+                    <select id="shareFolderSelect"></select>
+                  </label>
+                  <label>邀请邮箱<input id="shareInviteEmail" type="email" placeholder="friend@example.com" /></label>
+                  <label>角色
+                    <select id="shareRoleSelect">
+                      <option value="viewer">只读</option>
+                      <option value="editor">可编辑</option>
+                    </select>
+                  </label>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="shareCreateBtn">创建邀请</button>
+                    <button type="button" class="ghost" id="shareRefreshBtn">刷新共享</button>
+                  </div>
+                </div>
+                <div id="shareOwnedList" class="io-task-list"></div>
+                <div id="shareIncomingList" class="io-task-list"></div>
+              </section>
+
+              <section class="settings-panel">
+                <h3>公开页面</h3>
+                <div class="settings-form">
+                  <label>集合
+                    <select id="publicFolderSelect"></select>
+                  </label>
+                  <label>标题<input id="publicLinkTitle" placeholder="共享集合" /></label>
+                  <label>描述<textarea id="publicLinkDesc" rows="3"></textarea></label>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="publicCreateBtn">创建公开链接</button>
+                    <button type="button" class="ghost" id="publicRefreshBtn">刷新公开链接</button>
+                  </div>
+                </div>
+                <div id="publicLinksList" class="io-task-list"></div>
+              </section>
+
+              <section class="settings-panel settings-panel-span-2">
+                <h3>协作审计日志</h3>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" id="auditRefreshBtn">刷新审计</button>
+                </div>
+                <div id="auditList" class="io-task-list"></div>
+              </section>
+            </div>
+          </section>
+
+          <section id="settingsSectionProduct" class="settings-section" data-settings-section="product">
+            <div class="settings-section-head">
+              <div>
+                <h2>产品能力与运维工具</h2>
+                <p class="muted">套餐、配额、索引/坏链扫描、备份恢复与 AI 工具。</p>
+              </div>
+            </div>
+            <div class="settings-section-grid">
+              <section class="settings-panel">
+                <h3>套餐与订阅</h3>
+                <div class="settings-form">
+                  <label>套餐
+                    <select id="productPlanSelect">
+                      <option value="free">免费版</option>
+                      <option value="pro">专业版</option>
+                    </select>
+                  </label>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="productLoadPlanBtn">刷新套餐</button>
+                    <button type="button" class="ghost" id="productSavePlanBtn">保存套餐（模拟计费）</button>
+                  </div>
+                </div>
+                <pre id="productEntitlementOutput"></pre>
+              </section>
+
+              <section class="settings-panel">
+                <h3>配额</h3>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" id="quotaRefreshBtn">刷新配额</button>
+                </div>
+                <pre id="quotaOutput"></pre>
+              </section>
+
+              <section class="settings-panel">
+                <h3>搜索 / 去重 / 坏链</h3>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" id="searchRebuildBtn">重建全文索引</button>
+                  <button type="button" class="ghost" id="dedupeScanBtn">扫描重复项</button>
+                  <button type="button" class="ghost" id="brokenLinkScanBtn">扫描坏链</button>
+                  <button type="button" class="ghost" id="brokenLinkTasksBtn">查看坏链任务</button>
+                </div>
+                <pre id="searchToolsOutput"></pre>
+              </section>
+
+              <section class="settings-panel">
+                <h3>备份与恢复</h3>
+                <div class="settings-actions">
+                  <button type="button" class="ghost" id="backupCreateBtn">创建备份</button>
+                  <button type="button" class="ghost" id="backupRefreshBtn">刷新备份列表</button>
+                </div>
+                <div id="backupList" class="io-task-list"></div>
+              </section>
+
+              <section class="settings-panel settings-panel-span-2">
+                <h3>AI 建议（占位实现）</h3>
+                <div class="settings-form">
+                  <label>书签 ID<input id="aiBookmarkIdInput" placeholder="bm_..." /></label>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="aiSuggestBtn">生成建议</button>
+                    <button type="button" class="ghost" id="aiJobsBtn">查看 AI 任务</button>
+                  </div>
+                </div>
+                <pre id="aiOutput"></pre>
+              </section>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/settings.mjs"></script>
+  </body>
+  </html>

@@ -55,7 +55,7 @@
 
 - 前端：组件化 SPA（React/Vue 均可）
 - 后端：Node.js + API 层 + Service 层 + Repository 层
-- 数据：PostgreSQL（替代 `data/db.json`）
+- 数据：SQLite（当前阶段替代 `data/db.json`，保留后续升级 PostgreSQL 的扩展路径）
 - 队列：同步/抓取任务队列（Redis + BullMQ 等）
 - 存储：对象存储（封面/备份/附件）
 - 可观测性：日志、指标、错误追踪

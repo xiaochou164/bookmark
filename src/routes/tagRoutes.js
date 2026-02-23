@@ -1,3 +1,5 @@
+const { hasOwner, scopeDbForUser } = require('../services/tenantScope');
+
 function registerTagRoutes(app, deps) {
   const { dbRepo, tagsSummary, normalizeTags, badRequest } = deps;
 
@@ -41,9 +43,10 @@ function registerTagRoutes(app, deps) {
     return { affected, replaced, target: normalizedTarget };
   }
 
-  app.get('/api/tags', async (_req, res, next) => {
+  app.get('/api/tags', async (req, res, next) => {
     try {
-      const db = await dbRepo.read();
+      const userId = String(req.auth?.user?.id || '');
+      const db = scopeDbForUser(await dbRepo.read(), userId);
       res.json({ items: tagsSummary(db.bookmarks) });
     } catch (err) {
       next(err);
@@ -52,6 +55,7 @@ function registerTagRoutes(app, deps) {
 
   app.post('/api/tags/rename', async (req, res, next) => {
     try {
+      const userId = String(req.auth?.user?.id || '');
       const from = String(req.body?.from || '').trim();
       const to = String(req.body?.to || '').trim();
       if (!from) return next(badRequest('from is required'));
@@ -59,11 +63,11 @@ function registerTagRoutes(app, deps) {
 
       let result;
       await dbRepo.update((db) => {
-        result = mergeTagsInBookmarks(db.bookmarks, [from], to);
+        result = mergeTagsInBookmarks((db.bookmarks || []).filter((b) => hasOwner(b, userId)), [from], to);
         return db;
       });
 
-      const snapshot = await dbRepo.read();
+      const snapshot = scopeDbForUser(await dbRepo.read(), userId);
       res.json({
         ok: true,
         mode: 'rename',
@@ -80,6 +84,7 @@ function registerTagRoutes(app, deps) {
 
   app.post('/api/tags/merge', async (req, res, next) => {
     try {
+      const userId = String(req.auth?.user?.id || '');
       const rawSources = Array.isArray(req.body?.sources) ? req.body.sources : [];
       const sources = rawSources.map((x) => String(x || '').trim()).filter(Boolean);
       const target = String(req.body?.target || '').trim();
@@ -88,11 +93,11 @@ function registerTagRoutes(app, deps) {
 
       let result;
       await dbRepo.update((db) => {
-        result = mergeTagsInBookmarks(db.bookmarks, sources, target);
+        result = mergeTagsInBookmarks((db.bookmarks || []).filter((b) => hasOwner(b, userId)), sources, target);
         return db;
       });
 
-      const snapshot = await dbRepo.read();
+      const snapshot = scopeDbForUser(await dbRepo.read(), userId);
       res.json({
         ok: true,
         mode: 'merge',
@@ -100,6 +105,46 @@ function registerTagRoutes(app, deps) {
         target: result.target,
         affectedBookmarks: result.affected,
         replacedTags: result.replaced,
+        items: tagsSummary(snapshot.bookmarks)
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/tags/remove', async (req, res, next) => {
+    try {
+      const userId = String(req.auth?.user?.id || '');
+      const tag = String(req.body?.tag || '').trim();
+      if (!tag) return next(badRequest('tag is required'));
+      const targetKey = tag.toLowerCase();
+
+      let affectedBookmarks = 0;
+      let removedTags = 0;
+      const now = Date.now();
+
+      await dbRepo.update((db) => {
+        for (const item of (db.bookmarks || [])) {
+          if (!hasOwner(item, userId)) continue;
+          if (!Array.isArray(item.tags) || !item.tags.length) continue;
+          const before = item.tags.length;
+          const nextTags = item.tags.filter((t) => String(t || '').trim().toLowerCase() !== targetKey);
+          if (nextTags.length === before) continue;
+          item.tags = normalizeTags(nextTags);
+          item.updatedAt = now;
+          affectedBookmarks += 1;
+          removedTags += (before - nextTags.length);
+        }
+        return db;
+      });
+
+      const snapshot = scopeDbForUser(await dbRepo.read(), userId);
+      res.json({
+        ok: true,
+        mode: 'remove',
+        tag,
+        affectedBookmarks,
+        removedTags,
         items: tagsSummary(snapshot.bookmarks)
       });
     } catch (err) {

@@ -1,3 +1,5 @@
+const { scopeDbForUser } = require('../services/tenantScope');
+
 function registerSystemRoutes(app, deps) {
   const { dbRepo, toFolderTree, bookmarkStats, tagsSummary } = deps;
 
@@ -5,9 +7,10 @@ function registerSystemRoutes(app, deps) {
     res.json({ ok: true, service: 'cloud-bookmarks' });
   });
 
-  app.get('/api/state', async (_req, res, next) => {
+  app.get('/api/state', async (req, res, next) => {
     try {
-      const db = await dbRepo.read();
+      const userId = String(req.auth?.user?.id || '');
+      const db = scopeDbForUser(await dbRepo.read(), userId);
       res.json({
         folders: db.folders,
         foldersTree: toFolderTree(db.folders),
@@ -20,9 +23,10 @@ function registerSystemRoutes(app, deps) {
     }
   });
 
-  app.get('/api/tags', async (_req, res, next) => {
+  app.get('/api/tags', async (req, res, next) => {
     try {
-      const db = await dbRepo.read();
+      const userId = String(req.auth?.user?.id || '');
+      const db = scopeDbForUser(await dbRepo.read(), userId);
       res.json({ items: tagsSummary(db.bookmarks) });
     } catch (err) {
       next(err);

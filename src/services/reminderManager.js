@@ -1,5 +1,6 @@
 const REMINDER_EVENT_HISTORY_LIMIT = 1000;
 const DEFAULT_REMINDER_TICK_MS = 30_000;
+const { hasOwner } = require('./tenantScope');
 
 function normalizeReminderState(input = {}) {
   return {
@@ -46,7 +47,8 @@ class ReminderManager {
     }
   }
 
-  async scanDueReminders() {
+  async scanDueReminders({ userId = '' } = {}) {
+    const scopedUserId = String(userId || '').trim();
     const now = Date.now();
     const result = {
       ok: true,
@@ -61,6 +63,7 @@ class ReminderManager {
       db.reminderEvents = Array.isArray(db.reminderEvents) ? db.reminderEvents : [];
       db.reminderSchedulerState = db.reminderSchedulerState || {};
       for (const bm of db.bookmarks || []) {
+        if (scopedUserId && !hasOwner(bm, scopedUserId)) continue;
         if (bm.deletedAt) continue;
         result.scanned += 1;
         bm.reminderState = normalizeReminderState(bm.reminderState || {});
@@ -94,6 +97,7 @@ class ReminderManager {
         if (!alreadyFired) {
           const event = {
             id: `rem_evt_${crypto.randomUUID()}`,
+            userId: String(bm.userId || ''),
             bookmarkId: String(bm.id),
             type: 'due',
             reminderAt,
@@ -128,10 +132,11 @@ class ReminderManager {
     return result;
   }
 
-  async getOverview({ limit = 20 } = {}) {
+  async getOverview({ userId = '', limit = 20 } = {}) {
     const now = Date.now();
     const db = await this.dbRepo.read();
-    const bookmarks = (db.bookmarks || []).filter((b) => !b.deletedAt);
+    const scopedUserId = String(userId || '').trim();
+    const bookmarks = (db.bookmarks || []).filter((b) => !b.deletedAt && (!scopedUserId || hasOwner(b, scopedUserId)));
     const due = [];
     const upcoming = [];
     for (const bm of bookmarks) {
@@ -152,22 +157,28 @@ class ReminderManager {
       },
       due: due.slice(0, limit),
       upcoming: upcoming.slice(0, limit),
-      events: (Array.isArray(db.reminderEvents) ? db.reminderEvents : []).slice(0, limit),
+      events: (Array.isArray(db.reminderEvents) ? db.reminderEvents : [])
+        .filter((e) => !scopedUserId || hasOwner(e, scopedUserId))
+        .slice(0, limit),
       scheduler: db.reminderSchedulerState || {}
     };
   }
 
-  async dismissBookmarkReminder(bookmarkId) {
+  async dismissBookmarkReminder(bookmarkId, { userId = '' } = {}) {
     const id = String(bookmarkId || '');
+    const scopedUserId = String(userId || '').trim();
     const now = Date.now();
     let out = null;
     await this.dbRepo.update((db) => {
       db.reminderEvents = Array.isArray(db.reminderEvents) ? db.reminderEvents : [];
-      const bm = (db.bookmarks || []).find((b) => String(b.id) === id && !b.deletedAt);
+      const bm = (db.bookmarks || []).find(
+        (b) => String(b.id) === id && !b.deletedAt && (!scopedUserId || hasOwner(b, scopedUserId))
+      );
       if (!bm) return db;
       bm.reminderState = normalizeReminderState(bm.reminderState || {});
       db.reminderEvents.unshift({
         id: `rem_evt_${crypto.randomUUID()}`,
+        userId: String(bm.userId || ''),
         bookmarkId: id,
         type: 'dismissed',
         reminderAt: Number(bm.reminderAt || 0) || 0,
@@ -191,15 +202,18 @@ class ReminderManager {
     return out;
   }
 
-  async snoozeBookmarkReminder(bookmarkId, { minutes = 60, until } = {}) {
+  async snoozeBookmarkReminder(bookmarkId, { userId = '', minutes = 60, until } = {}) {
     const id = String(bookmarkId || '');
+    const scopedUserId = String(userId || '').trim();
     const now = Date.now();
     const targetTs = until ? Number(until) : now + Math.max(1, Number(minutes || 60)) * 60_000;
     if (!Number.isFinite(targetTs) || targetTs <= now) throw new Error('invalid snooze time');
     let out = null;
     await this.dbRepo.update((db) => {
       db.reminderEvents = Array.isArray(db.reminderEvents) ? db.reminderEvents : [];
-      const bm = (db.bookmarks || []).find((b) => String(b.id) === id && !b.deletedAt);
+      const bm = (db.bookmarks || []).find(
+        (b) => String(b.id) === id && !b.deletedAt && (!scopedUserId || hasOwner(b, scopedUserId))
+      );
       if (!bm) return db;
       bm.reminderState = normalizeReminderState(bm.reminderState || {});
       bm.reminderAt = targetTs;
@@ -212,6 +226,7 @@ class ReminderManager {
       bm.updatedAt = now;
       db.reminderEvents.unshift({
         id: `rem_evt_${crypto.randomUUID()}`,
+        userId: String(bm.userId || ''),
         bookmarkId: id,
         type: 'snoozed',
         reminderAt: targetTs,

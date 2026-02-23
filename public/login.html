@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>登录 - Rainboard 云书签</title>
+    <meta name="theme-color" content="#1194ff" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="auth-page">
+    <main class="auth-page-shell">
+      <section class="auth-page-hero">
+        <div class="brand">
+          <div class="brand-dot"></div>
+          <div>
+            <strong>Rainboard</strong>
+            <small>云书签</small>
+          </div>
+        </div>
+        <h1>登录你的云书签</h1>
+        <p class="muted">未登录访问主界面时会自动跳转到这里。登录后会返回你刚才的页面。</p>
+        <div class="auth-hero-badges">
+          <span class="meta-chip type">Web 工作台</span>
+          <span class="meta-chip type">预览与阅读模式</span>
+          <span class="meta-chip type">同步插件</span>
+        </div>
+        <div class="auth-hero-list">
+          <div class="auth-hero-item"><strong>跨端同步</strong><span class="muted">支持 Chrome 扩展与云端任务队列。</span></div>
+          <div class="auth-hero-item"><strong>阅读沉淀</strong><span class="muted">元数据抓取、正文提取、高亮与注释。</span></div>
+          <div class="auth-hero-item"><strong>安全隔离</strong><span class="muted">多租户账号与 API Token、设备会话管理。</span></div>
+        </div>
+      </section>
+
+      <section class="auth-page-card">
+        <div class="auth-page-card-head">
+          <h2>账号登录</h2>
+          <p class="muted">使用邮箱登录，或创建新账号后自动进入你的书签库。</p>
+        </div>
+        <div class="auth-page-tabs">
+          <button type="button" id="loginTabBtn" class="active">登录</button>
+          <button type="button" id="registerTabBtn">注册</button>
+        </div>
+
+        <form id="loginForm" class="auth-page-form">
+          <label>邮箱<input id="loginEmail" type="email" autocomplete="username" required /></label>
+          <label>密码<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+          <button type="submit">登录</button>
+        </form>
+
+        <form id="registerForm" class="auth-page-form hidden">
+          <label>昵称<input id="registerName" autocomplete="name" /></label>
+          <label>邮箱<input id="registerEmail" type="email" autocomplete="username" required /></label>
+          <label>密码<input id="registerPassword" type="password" autocomplete="new-password" required /></label>
+          <button type="submit" class="ghost">注册并登录</button>
+        </form>
+
+        <div id="loginStatus" class="muted">正在检查登录状态...</div>
+        <div class="auth-page-foot muted">
+          <span>登录成功后将返回到你原来的页面。</span>
+          <a href="/" id="backToAppLink">返回主界面</a>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/login.mjs"></script>
+  </body>
+  </html>

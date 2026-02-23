@@ -105,6 +105,83 @@ function registerAuthRoutes(app, deps) {
     }
   });
 
+  app.get('/api/auth/profile', async (req, res, next) => {
+    try {
+      if (!req.auth?.authenticated) {
+        const e = new Error('authentication required');
+        e.status = 401;
+        e.code = 'AUTH_REQUIRED';
+        throw e;
+      }
+      const user = await auth.getUserById(req.auth.user.id);
+      res.json({ ok: true, user });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/auth/profile', async (req, res, next) => {
+    try {
+      if (!req.auth?.authenticated) {
+        const e = new Error('authentication required');
+        e.status = 401;
+        e.code = 'AUTH_REQUIRED';
+        throw e;
+      }
+      const user = await auth.updateUserProfile(req.auth.user.id, {
+        displayName: req.body?.displayName,
+        email: req.body?.email
+      });
+      res.json({ ok: true, user });
+    } catch (err) {
+      const code = String(err?.code || '');
+      const msg = String(err?.message || '');
+      if (code === 'EMAIL_EXISTS') return next(conflict('email already exists'));
+      if (msg === 'valid email is required') return next(badRequest(msg));
+      if (msg === 'user not found') return next(notFound(msg));
+      next(err);
+    }
+  });
+
+  app.get('/api/auth/sessions', async (req, res, next) => {
+    try {
+      if (!req.auth?.authenticated) {
+        const e = new Error('authentication required');
+        e.status = 401;
+        e.code = 'AUTH_REQUIRED';
+        throw e;
+      }
+      const items = await auth.listSessions(req.auth.user.id);
+      res.json({
+        ok: true,
+        items,
+        currentSessionId: req.auth.session?.id || null
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.delete('/api/auth/sessions/:sessionId', async (req, res, next) => {
+    try {
+      if (!req.auth?.authenticated) {
+        const e = new Error('authentication required');
+        e.status = 401;
+        e.code = 'AUTH_REQUIRED';
+        throw e;
+      }
+      const sessionId = String(req.params.sessionId || '');
+      const revoked = await auth.revokeUserSession(req.auth.user.id, sessionId);
+      if (!revoked) return next(notFound('session not found'));
+      if (req.auth.session?.id && String(req.auth.session.id) === sessionId) {
+        res.setHeader('Set-Cookie', auth.clearSessionCookieHeader());
+      }
+      res.status(204).send();
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.get('/api/auth/tokens', async (req, res, next) => {
     try {
       if (!req.auth?.authenticated) {

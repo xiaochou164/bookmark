@@ -1,4 +1,5 @@
 const { JSDOM } = require('jsdom');
+const { hasOwner } = require('./tenantScope');
 
 function normalizeUrl(input = '') {
   return String(input || '').trim();
@@ -194,17 +195,26 @@ function buildFolderPathLookup(folders = []) {
   return { getPath };
 }
 
-function ensureFolderPath(db, targetRootId, segments = []) {
+function ensureFolderPath(db, targetRootId, segments = [], { userId = '' } = {}) {
   let parentId = String(targetRootId || 'root');
+  const scopedUserId = String(userId || '').trim();
   for (const segRaw of segments) {
     const name = String(segRaw || '').trim();
     if (!name) continue;
-    let found = (db.folders || []).find((f) => String(f.parentId || 'root') === parentId && String(f.name || '').trim().toLowerCase() === name.toLowerCase());
+    let found = (db.folders || []).find(
+      (f) =>
+        (!scopedUserId || hasOwner(f, scopedUserId)) &&
+        String(f.parentId || 'root') === parentId &&
+        String(f.name || '').trim().toLowerCase() === name.toLowerCase()
+    );
     if (!found) {
       const now = Date.now();
-      const siblings = (db.folders || []).filter((f) => String(f.parentId || 'root') === parentId);
+      const siblings = (db.folders || []).filter(
+        (f) => (!scopedUserId || hasOwner(f, scopedUserId)) && String(f.parentId || 'root') === parentId
+      );
       found = {
         id: `fld_${crypto.randomUUID()}`,
+        userId: scopedUserId || undefined,
         name,
         parentId,
         color: '#8f96a3',
@@ -235,6 +245,7 @@ function numberOrNull(value) {
 }
 
 function importEntriesIntoDb(db, entries = [], options = {}) {
+  const userId = String(options.userId || '').trim();
   const targetFolderId = String(options.targetFolderId || 'root');
   const conflictStrategy = String(options.conflictStrategy || 'skip'); // skip | update | duplicate
   const now = Date.now();
@@ -248,9 +259,10 @@ function importEntriesIntoDb(db, entries = [], options = {}) {
     samples: []
   };
 
-  const folderCountBefore = (db.folders || []).length;
+  const folderCountBefore = (db.folders || []).filter((f) => !userId || hasOwner(f, userId)).length;
   const existingByFolderAndUrl = new Map();
   for (const bm of db.bookmarks || []) {
+    if (userId && !hasOwner(bm, userId)) continue;
     if (bm.deletedAt) continue;
     const key = `${String(bm.folderId || 'root')}|${normalizeUrl(bm.url).toLowerCase()}`;
     if (!existingByFolderAndUrl.has(key)) existingByFolderAndUrl.set(key, bm);
@@ -263,7 +275,7 @@ function importEntriesIntoDb(db, entries = [], options = {}) {
       summary.invalid += 1;
       continue;
     }
-    const folderId = ensureFolderPath(db, targetFolderId, folderPathSegments(raw.folderPath));
+    const folderId = ensureFolderPath(db, targetFolderId, folderPathSegments(raw.folderPath), { userId });
     const title = String(raw.title || '').trim() || '(untitled)';
     const note = String(raw.note || '');
     const tags = normalizeTags(Array.isArray(raw.tags) ? raw.tags : String(raw.tags || '').split(','));
@@ -295,6 +307,7 @@ function importEntriesIntoDb(db, entries = [], options = {}) {
     const reminderAt = numberOrNull(raw.reminderAt);
     const item = {
       id: `bm_${crypto.randomUUID()}`,
+      userId: userId || undefined,
       title,
       url,
       note,
@@ -329,7 +342,7 @@ function importEntriesIntoDb(db, entries = [], options = {}) {
     if (summary.samples.length < 12) summary.samples.push({ action: 'create', url, title });
   }
 
-  summary.foldersCreated = Math.max(0, (db.folders || []).length - folderCountBefore);
+  summary.foldersCreated = Math.max(0, (db.folders || []).filter((f) => !userId || hasOwner(f, userId)).length - folderCountBefore);
   return summary;
 }
 
@@ -407,39 +420,41 @@ function entriesFromCsvPayload(text, options = {}) {
   }));
 }
 
-async function importBookmarksHtml({ dbRepo, html, targetFolderId = 'root', conflictStrategy = 'skip' }) {
+async function importBookmarksHtml({ dbRepo, userId = '', html, targetFolderId = 'root', conflictStrategy = 'skip' }) {
   const entries = parseBookmarksHtml(html);
   let summary;
   await dbRepo.update((db) => {
-    summary = importEntriesIntoDb(db, entries, { targetFolderId, conflictStrategy });
+    summary = importEntriesIntoDb(db, entries, { userId, targetFolderId, conflictStrategy });
     return db;
   });
   return { format: 'bookmarks_html', ...summary };
 }
 
-async function importJson({ dbRepo, jsonText, targetFolderId = 'root', conflictStrategy = 'skip' }) {
+async function importJson({ dbRepo, userId = '', jsonText, targetFolderId = 'root', conflictStrategy = 'skip' }) {
   const payload = JSON.parse(String(jsonText || 'null'));
   const entries = entriesFromJsonPayload(payload);
   let summary;
   await dbRepo.update((db) => {
-    summary = importEntriesIntoDb(db, entries, { targetFolderId, conflictStrategy });
+    summary = importEntriesIntoDb(db, entries, { userId, targetFolderId, conflictStrategy });
     return db;
   });
   return { format: 'json', ...summary };
 }
 
-async function importCsv({ dbRepo, csvText, targetFolderId = 'root', conflictStrategy = 'skip', mapping = null }) {
+async function importCsv({ dbRepo, userId = '', csvText, targetFolderId = 'root', conflictStrategy = 'skip', mapping = null }) {
   const entries = entriesFromCsvPayload(csvText, { mapping: mapping || {} });
   let summary;
   await dbRepo.update((db) => {
-    summary = importEntriesIntoDb(db, entries, { targetFolderId, conflictStrategy });
+    summary = importEntriesIntoDb(db, entries, { userId, targetFolderId, conflictStrategy });
     return db;
   });
   return { format: 'csv', ...summary };
 }
 
 function filterExportBookmarks(db, options = {}) {
+  const userId = String(options.userId || '').trim();
   let items = [...(db.bookmarks || [])];
+  if (userId) items = items.filter((b) => hasOwner(b, userId));
   if (!options.includeTrash) items = items.filter((b) => !b.deletedAt);
   if (Array.isArray(options.ids) && options.ids.length) {
     const set = new Set(options.ids.map(String));
@@ -457,11 +472,11 @@ function buildExportFolderPath(folders, folderId) {
   return getPath(folderId).join('/');
 }
 
-async function exportJson({ dbRepo, options = {} }) {
+async function exportJson({ dbRepo, userId = '', options = {} }) {
   const db = await dbRepo.read();
-  const bookmarks = filterExportBookmarks(db, options).map((b) => ({ ...b }));
+  const bookmarks = filterExportBookmarks(db, { ...options, userId }).map((b) => ({ ...b }));
   const folderIds = new Set(['root', ...bookmarks.map((b) => String(b.folderId || 'root'))]);
-  const folders = (db.folders || []).filter((f) => folderIds.has(String(f.id)));
+  const folders = (db.folders || []).filter((f) => (!userId || hasOwner(f, userId)) && folderIds.has(String(f.id)));
   return {
     filename: `rainboard-export-${Date.now()}.json`,
     contentType: 'application/json; charset=utf-8',
@@ -470,9 +485,10 @@ async function exportJson({ dbRepo, options = {} }) {
   };
 }
 
-async function exportCsv({ dbRepo, options = {} }) {
+async function exportCsv({ dbRepo, userId = '', options = {} }) {
   const db = await dbRepo.read();
-  const bookmarks = filterExportBookmarks(db, options);
+  const scopedFolders = (db.folders || []).filter((f) => !userId || hasOwner(f, userId));
+  const bookmarks = filterExportBookmarks(db, { ...options, userId });
   const headers = [
     'id',
     'title',
@@ -497,7 +513,7 @@ async function exportCsv({ dbRepo, options = {} }) {
       b.note || '',
       (b.tags || []).join(','),
       b.folderId || 'root',
-      buildExportFolderPath(db.folders || [], b.folderId || 'root'),
+      buildExportFolderPath(scopedFolders, b.folderId || 'root'),
       b.favorite ? 'true' : 'false',
       b.archived ? 'true' : 'false',
       b.read ? 'true' : 'false',
@@ -527,9 +543,10 @@ function buildFolderChildrenMap(folders = []) {
   return map;
 }
 
-async function exportBookmarksHtml({ dbRepo, options = {} }) {
+async function exportBookmarksHtml({ dbRepo, userId = '', options = {} }) {
   const db = await dbRepo.read();
-  const bookmarks = filterExportBookmarks(db, options);
+  const folders = (db.folders || []).filter((f) => !userId || hasOwner(f, userId));
+  const bookmarks = filterExportBookmarks(db, { ...options, userId });
   const bookmarksByFolder = new Map();
   for (const b of bookmarks) {
     const key = String(b.folderId || 'root');
@@ -540,7 +557,7 @@ async function exportBookmarksHtml({ dbRepo, options = {} }) {
     arr.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
   }
 
-  const childFolders = buildFolderChildrenMap(db.folders || []);
+  const childFolders = buildFolderChildrenMap(folders);
   const lines = [];
   lines.push('<!DOCTYPE NETSCAPE-Bookmark-file-1>');
   lines.push('<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">');
