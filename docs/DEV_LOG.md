@@ -602,3 +602,10 @@
 - 变更文件：`/Users/xiaochou164/Desktop/bookmarktorain/public/favicon.svg`, `/Users/xiaochou164/Desktop/bookmarktorain/public/index.html`, `/Users/xiaochou164/Desktop/bookmarktorain/public/login.html`, `/Users/xiaochou164/Desktop/bookmarktorain/public/settings.html`, `/Users/xiaochou164/Desktop/bookmarktorain/src/routes/collabRoutes.js`, `/Users/xiaochou164/Desktop/bookmarktorain/.gitignore`
 - 验证：`node --check /Users/xiaochou164/Desktop/bookmarktorain/src/routes/collabRoutes.js`；`rg` 检查各页面 `favicon.svg` 与 `theme-color` 引用；确认 `/Users/xiaochou164/Desktop/bookmarktorain/public/favicon.svg` 文件存在。
 - 后续：浏览器端强制刷新以清理 favicon 缓存（`Cmd + Shift + R`），必要时重新打开标签页。
+
+### 2026-02-23 22:05 CST
+- 待办：更新 `README.md`（同步当前项目真实能力与运行方式）
+- 内容：重写仓库根文档 `/Users/xiaochou164/Desktop/bookmarktorain/README.md`，将早期 `db.json + 简单插件` 描述升级为当前项目状态：默认 SQLite、Web 工作台（Raindrop 风格对齐）、内容抓取/预览/阅读模式、高亮/注释/提醒、导入导出任务、协作与公开页、产品化接口、插件与 `raindropSync`、Chrome 扩展目录、环境变量与脚本命令，以及 `docs/` 下实施计划/待办/验收文档入口。
+- 变更文件：`/Users/xiaochou164/Desktop/bookmarktorain/README.md`
+- 验证：文档结构与命令/路径按当前仓库文件核对（`package.json`、`src/routes/*`、`docs/*`、`chrome-extension/`）。
+- 后续：提交并推送 README 更新到 GitHub。
