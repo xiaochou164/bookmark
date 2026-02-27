@@ -86,7 +86,7 @@ npm start
 根据你当前的环境（默认会自动匹配机器对应架构）：
 
 ```bash
-docker pull ghcr.io/xiaochou164/bookmark:main
+docker pull ghcr.io/xiaochou164/bookmark:master
 ```
 
 *(如果拉取遇到 Private Packages 鉴权问题，请先在 Github 申请具有 `read:packages` 权限的 PAT Token 并执行 `docker login ghcr.io -u xiaochou164` 登录即可)*
@@ -101,7 +101,7 @@ docker run -d \
   -p 3789:3000 \
   -v ./data:/app/data \
   --restart unless-stopped \
-  ghcr.io/xiaochou164/bookmark:main
+  ghcr.io/xiaochou164/bookmark:master
 ```
 
 部署完成后，即可在浏览器访问：`http://服务器IP:3789`
