@@ -77,6 +77,93 @@ npm start
 - 登录页：`http://localhost:3789/login.html`
 - 设置页：`http://localhost:3789/settings.html`
 
+## Docker 部署 (多架构兼容)
+
+基于 GitHub Actions 的自动构建环境，项目已打包为支持 x86/amd64 与 arm64 架构的容器镜像，可将其部署在树莓派、软路由、常规云服务器或你的 NAS 上。
+
+### 1. 拉取镜像
+
+根据你当前的环境（默认会自动匹配机器对应架构）：
+
+```bash
+docker pull ghcr.io/xiaochou164/bookmark:main
+```
+
+*(如果拉取遇到 Private Packages 鉴权问题，请先在 Github 申请具有 `read:packages` 权限的 PAT Token 并执行 `docker login ghcr.io -u xiaochou164` 登录即可)*
+
+### 2. 运行容器
+
+运行前，建议通过 `-v` 挂载本地数据目录以便数据持久化：
+
+```bash
+docker run -d \
+  --name bookmarktorain \
+  -p 3789:3000 \
+  -v ./data:/app/data \
+  --restart unless-stopped \
+  ghcr.io/xiaochou164/bookmark:main
+```
+
+部署完成后，即可在浏览器访问：`http://服务器IP:3789`
+
+## Cloudflare Workers 运行（可部署）
+
+当前仓库已具备可直接部署到 Cloudflare Workers 的基础能力（含一键发布脚本）：
+
+- Worker 入口：`src/worker.js`
+- 静态资源：`public/`（通过 Workers assets 托管）
+- 已迁移 API：`GET /api/health`、`GET /api/state`
+- D1 路由（配置 DB 后可用）：`GET /api/folders`、`POST /api/folders`
+
+### 1) 本地语法/冒烟检查
+
+```bash
+npm run cf:check
+npm run cf:smoke
+```
+
+### 2) 初始化 D1（首次）
+
+```bash
+npm run cf:d1:create
+```
+
+该命令现在会自动：
+
+- 创建 D1（若同名数据库已存在则自动复用）
+- 将 `database_id` 写入 `wrangler.toml` 的 `[[d1_databases]]` 配置（无需手工编辑）
+
+### 3) 执行 D1 迁移
+
+```bash
+npm run cf:d1:migrate:local
+npm run cf:d1:migrate:remote
+```
+
+### 4) 本地预览与部署
+
+```bash
+npm run cf:dev
+npm run cf:deploy
+```
+
+### 5) 一键发布（推荐）
+
+首次或后续发布都可直接执行（幂等，D1 存在会自动复用）：
+
+```bash
+npm run cf:release
+```
+
+该脚本会串行执行：`cf:check` -> `cf:smoke` -> `cf:d1:create`（自动写回 `wrangler.toml`）-> 本地/远端 D1 迁移 -> `wrangler deploy`。
+
+说明：
+
+- Node/Express 启动链路保持不变（`npm start`），可并行回归。
+- 未迁移的 `/api/*` 路由会返回标准化 `501 NOT_MIGRATED`。
+- 迁移拆解见 `docs/CLOUDFLARE_WORKERS_MIGRATION_TODO.md`。
+- 执行发布前请确保已登录 Cloudflare：`npx wrangler login`。
+
 ## 数据存储与运行模式
 
 默认使用 `SQLite`：
