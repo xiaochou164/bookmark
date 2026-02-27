@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.dockerignore
+docs
+Chrome
+chrome-extension
+scripts
+__pycache__
+sync_bookmarks.py
+wrangler.toml
