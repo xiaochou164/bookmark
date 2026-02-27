@@ -8776,10 +8776,10 @@ function renderIoTaskList(tasks = []) {
         <div class="io-task-row">
           <div class="muted">${t.updatedAt ? new Date(Number(t.updatedAt)).toLocaleString() : ''}</div>
           <div class="detail-inline-actions">
-            <button type="button" class="ghost" data-io-open="${t.id}">打开</button>
-            ${t.outputFile?.url ? `<button type="button" class="ghost" data-io-download="${t.id}">下载</button>` : ''}
-            ${t.reportFile?.url ? `<button type="button" class="ghost" data-io-report="${t.id}">Report</button>` : ''}
-            ${t.status === 'failed' ? `<button type="button" class="ghost" data-io-retry="${t.id}">Retry</button>` : ''}
+            <button type="button" class="ghost" data-io-open="${t.id}">详情</button>
+            ${t.outputFile?.url ? `<button type="button" data-io-download="${t.id}">⬇️ 下载</button>` : ''}
+            ${t.reportFile?.url ? `<button type="button" class="ghost" data-io-report="${t.id}">日志</button>` : ''}
+            ${t.status === 'failed' ? `<button type="button" class="ghost danger" data-io-retry="${t.id}">重试</button>` : ''}
           </div>
         </div>
       </div>`;
@@ -8806,7 +8806,15 @@ function renderIoTaskList(tasks = []) {
     el.addEventListener('click', async () => {
       const out = await api(`/api/io/tasks/${el.dataset.ioDownload}`);
       const url = out?.task?.outputFile?.url;
-      if (url) window.open(url, '_blank', 'noopener');
+      if (url) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        a.target = '_blank';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     });
   });
 
