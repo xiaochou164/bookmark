@@ -8,6 +8,7 @@ const APPLIED_OP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULTS = {
   syncBackend: 'cloud',
   cloudApiBaseUrl: DEFAULT_CLOUD_API_BASE,
+  cloudApiToken: '',
   raindropToken: '',
   topLevelAutoSync: true,
   mappings: [
@@ -104,11 +105,14 @@ function normalizeCloudBaseUrl(input) {
 
 async function cloudRequest(cfg, method, path, body) {
   const baseUrl = normalizeCloudBaseUrl(cfg?.cloudApiBaseUrl);
+  const headers = { 'Content-Type': 'application/json' };
+  const token = String(cfg?.cloudApiToken || '').trim();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const res = await fetch(`${baseUrl}${path}`, {
     method,
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers,
     body: body ? JSON.stringify(body) : undefined
   });
   if (!res.ok) {
@@ -169,7 +173,7 @@ async function ensureDeviceId(cfg) {
 
 async function acquireLease(owner, preview) {
   if (preview) {
-    return async () => {};
+    return async () => { };
   }
   const now = nowMs();
   const { syncLease } = await chrome.storage.local.get({ syncLease: null });
@@ -881,11 +885,11 @@ function applyCloudConfigBundleToExtension(bundle) {
   const schedule = bundle?.schedule || {};
   const mappings = Array.isArray(config.mappings)
     ? config.mappings.map((m, idx) => ({
-        id: String(m.id || `map_${idx}`),
-        collectionId: Number(m.collectionId ?? -1),
-        chromeFolder: String(m.folderName || m.chromeFolder || 'Raindrop Synced'),
-        deleteSync: Boolean(m.deleteSync)
-      }))
+      id: String(m.id || `map_${idx}`),
+      collectionId: Number(m.collectionId ?? -1),
+      chromeFolder: String(m.folderName || m.chromeFolder || 'Raindrop Synced'),
+      deleteSync: Boolean(m.deleteSync)
+    }))
     : [];
 
   const patch = {
@@ -972,10 +976,18 @@ async function runSync({ manual = false, preview = false } = {}) {
 
 async function setupAlarm() {
   const cfg = await getSettings();
+  // Raindrop 自动同步
   await chrome.alarms.clear('autoSync');
-  if (!cfg.autoSyncEnabled) return;
-  const periodInMinutes = Math.max(5, Number(cfg.autoSyncMinutes) || 15);
-  chrome.alarms.create('autoSync', { periodInMinutes });
+  if (cfg.autoSyncEnabled) {
+    const periodInMinutes = Math.max(5, Number(cfg.autoSyncMinutes) || 15);
+    chrome.alarms.create('autoSync', { periodInMinutes });
+  }
+  // Chrome ↔ Rainboard 自动同步
+  await chrome.alarms.clear('autoSyncRainboard');
+  if (cfg.rbAutoSyncEnabled) {
+    const rbPeriod = Math.max(5, Number(cfg.rbAutoSyncMinutes) || 30);
+    chrome.alarms.create('autoSyncRainboard', { periodInMinutes: rbPeriod });
+  }
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
@@ -1009,14 +1021,244 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== 'autoSync') return;
-  try {
-    await runSyncEntry({ manual: false, preview: false });
-  } catch (err) {
-    await setSyncStatus({ ok: false, error: toSafeError(err) });
+  if (alarm.name === 'autoSync') {
+    try {
+      await runSyncEntry({ manual: false, preview: false });
+    } catch (err) {
+      await setSyncStatus({ ok: false, error: toSafeError(err) });
+    }
+  }
+  if (alarm.name === 'autoSyncRainboard') {
+    try {
+      await syncWithRainboard({ preview: false });
+    } catch (err) {
+      // best-effort: log but don't crash service worker
+      console.warn('[autoSyncRainboard] error:', err?.message || err);
+    }
   }
 });
 
+// ── Chrome ↔ Rainboard DB Sync ──────────────────────────────────────────────
+
+/**
+ * Collect all bookmarks from the Chrome bookmark tree (excluding trash folder).
+ * Returns an array of { name: folderName, bookmarks: [{ url, title, chromeId, chromeParentId }] }
+ */
+async function collectChromeBookmarksByFolder() {
+  const tree = await chrome.bookmarks.getTree();
+  const folderMap = new Map(); // folderName -> [bookmarks]
+
+  function walkNode(node, parentFolderName) {
+    if (!node) return;
+    const isFolder = !node.url;
+
+    if (isFolder) {
+      // Use node title as folder name (except root nodes)
+      const folderName = (node.title || '').trim();
+      // Skip the root nodes (id 0, 1, 2) and our trash folder
+      const isRoot = !node.title || node.id === '0';
+      const isTrash = folderName === TRASH_FOLDER;
+
+      if (!isRoot && !isTrash && folderName) {
+        // Use this folder name for all its direct bookmark children
+        for (const child of node.children || []) {
+          if (child.url) {
+            if (!folderMap.has(folderName)) folderMap.set(folderName, []);
+            folderMap.get(folderName).push({
+              url: child.url,
+              title: (child.title || '').trim() || '(untitled)',
+              chromeId: child.id,
+              chromeParentId: child.parentId
+            });
+          }
+        }
+        // Recurse into subfolders, still under this folder name context
+        for (const child of node.children || []) {
+          if (!child.url) walkNode(child, folderName);
+        }
+      } else {
+        // For root nodes, recurse with their title as context
+        for (const child of node.children || []) {
+          walkNode(child, folderName);
+        }
+      }
+    }
+  }
+
+  for (const root of tree) {
+    walkNode(root, '');
+  }
+
+  // Also collect bookmarks directly under bookmark bar without any folder → "待归档"
+  const barId = await getBookmarkBarId().catch(() => '1');
+  const barChildren = await chrome.bookmarks.getChildren(barId).catch(() => []);
+  const directBookmarks = barChildren.filter((n) => n.url);
+  if (directBookmarks.length > 0) {
+    const uncategorizedFolderName = '待归档';
+    if (!folderMap.has(uncategorizedFolderName)) folderMap.set(uncategorizedFolderName, []);
+    for (const bm of directBookmarks) {
+      folderMap.get(uncategorizedFolderName).push({
+        url: bm.url,
+        title: (bm.title || '').trim() || '(untitled)',
+        chromeId: bm.id,
+        chromeParentId: bm.parentId
+      });
+    }
+  }
+
+  const result = [];
+  for (const [name, bookmarks] of folderMap.entries()) {
+    result.push({ name, bookmarks });
+  }
+  return result;
+}
+
+/**
+ * Ensure a Chrome top-level bookmark folder exists (under the bookmark bar).
+ * Returns the folder's Chrome ID.
+ */
+const chromeFolderCache = new Map();
+async function ensureChromeFolderByName(name) {
+  if (chromeFolderCache.has(name)) return chromeFolderCache.get(name);
+  const id = await findOrCreateTopFolder(name);
+  chromeFolderCache.set(name, id);
+  return id;
+}
+
+/**
+ * syncWithRainboard({ preview })
+ * Bidirectional sync between Chrome bookmarks and the Rainboard cloud DB.
+ *
+ * Steps:
+ *  1. Collect all Chrome bookmarks (folder by folder)
+ *  2. POST to /api/chrome-sync with the full snapshot
+ *  3. Apply the response:
+ *     - toAddInChrome: create these bookmarks in Chrome (in correct folder)
+ *     - toDeleteInChrome: move these Chrome bookmarks to trash (if deleteSync)
+ */
+async function syncWithRainboard({ preview = false } = {}) {
+  const cfg = await getSettings();
+  if (!isCloudBackend(cfg)) {
+    throw new Error('Chrome ↔ Rainboard 同步需要云端模式（cloud backend）');
+  }
+  const token = String(cfg.cloudApiToken || '').trim();
+  if (!token) {
+    throw new Error('请先在插件设置中配置云端 API Token');
+  }
+
+  // 1. Collect Chrome bookmarks grouped by folder
+  chromeFolderCache.clear();
+  const folders = await collectChromeBookmarksByFolder();
+
+  const totalChromeBookmarks = folders.reduce((s, f) => s + f.bookmarks.length, 0);
+
+  // 2. Call backend sync API
+  const baseUrl = normalizeCloudBaseUrl(cfg.cloudApiBaseUrl);
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+
+  const syncRes = await fetch(`${baseUrl}/api/chrome-sync`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      folders,
+      deleteSync: true  // 以云端删除记录为准，删除 Chrome 中对应的书签
+    })
+  });
+
+  if (!syncRes.ok) {
+    let message = `Chrome sync API failed: ${syncRes.status}`;
+    try {
+      const payload = await syncRes.json();
+      if (payload?.error?.message) message = payload.error.message;
+      else if (payload?.message) message = payload.message;
+    } catch (_) { }
+    throw new Error(message);
+  }
+
+  const syncData = await syncRes.json();
+  const toAddInChrome = Array.isArray(syncData.toAddInChrome) ? syncData.toAddInChrome : [];
+  const toDeleteInChrome = Array.isArray(syncData.toDeleteInChrome) ? syncData.toDeleteInChrome : [];
+  const serverStats = syncData.stats || {};
+
+  // 3. Apply changes to Chrome (if not preview)
+  let addedToChrome = 0;
+  let deletedFromChrome = 0;
+
+  if (!preview) {
+    // Add bookmarks that exist in DB but not in Chrome
+    for (const item of toAddInChrome) {
+      try {
+        const folderName = String(item.folderName || '').trim() || '待归档';
+        const folderId = await ensureChromeFolderByName(folderName);
+        await chrome.bookmarks.create({
+          parentId: folderId,
+          title: String(item.title || '').trim() || '(untitled)',
+          url: item.url
+        });
+        addedToChrome++;
+      } catch (_err) {
+        // best-effort; skip individual failures
+      }
+    }
+
+    // 删除 Chrome 中已在 DB 被删除的书签（以云端删除记录为准）
+    for (const item of toDeleteInChrome) {
+      try {
+        if (item.chromeId) {
+          // 优先用 chromeId 直接删除
+          try {
+            await chrome.bookmarks.remove(item.chromeId);
+            deletedFromChrome++;
+            continue;
+          } catch (_idErr) {
+            // chromeId 可能已过期，继续用 URL 匹配删除
+          }
+        }
+        // 安全居安：按 URL 搜索 Chrome 中的书签并删除
+        if (item.url) {
+          const found = await chrome.bookmarks.search({ url: item.url });
+          for (const bm of found) {
+            try { await chrome.bookmarks.remove(bm.id); } catch (_) { }
+          }
+          if (found.length > 0) deletedFromChrome++;
+        }
+      } catch (_err) { }
+    }
+  }
+
+  const result = {
+    preview,
+    chromeFolders: folders.length,
+    totalChromeBookmarks,
+    server: serverStats,
+    chrome: {
+      addedToChrome: preview ? toAddInChrome.length : addedToChrome,
+      toAddCount: toAddInChrome.length,
+      toDeleteCount: toDeleteInChrome.length,
+      deletedFromChrome: preview ? 0 : deletedFromChrome,
+    },
+    samples: {
+      toAdd: toAddInChrome.slice(0, 8).map((x) => `+Chrome: ${x.title} (${x.folderName})`),
+      toDelete: toDeleteInChrome.slice(0, 8).map((x) => `-Chrome: ${x.url}`)
+    }
+  };
+
+  if (!preview) {
+    await setSyncStatus({
+      ok: true,
+      rainboardSync: result,
+      error: '',
+      backend: 'cloud'
+    });
+  }
+
+  return result;
+}
+
+// ── Message listener ─────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === 'SYNC_NOW') {
     runSyncEntry({ manual: true, preview: false })
@@ -1056,7 +1298,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const effectiveCfg = {
           ...cfg,
           syncBackend: typeof msg?.syncBackend !== 'undefined' ? String(msg.syncBackend) : cfg.syncBackend,
-          cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl
+          cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl,
+          cloudApiToken: typeof msg?.cloudApiToken !== 'undefined' ? String(msg.cloudApiToken) : cfg.cloudApiToken
         };
         const token = String(msg?.token || '').trim();
         if (!token) throw new Error('Missing token');
@@ -1076,7 +1319,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const effectiveCfg = {
           ...cfg,
           syncBackend: typeof msg?.syncBackend !== 'undefined' ? String(msg.syncBackend) : cfg.syncBackend,
-          cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl
+          cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl,
+          cloudApiToken: typeof msg?.cloudApiToken !== 'undefined' ? String(msg.cloudApiToken) : cfg.cloudApiToken
         };
         if (!isCloudBackend(effectiveCfg)) return { ok: true, mode: 'direct' };
         const health = await pingCloud(effectiveCfg);
@@ -1093,7 +1337,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       const effectiveCfg = {
         ...cfg,
         syncBackend: typeof msg?.syncBackend !== 'undefined' ? String(msg.syncBackend) : cfg.syncBackend,
-        cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl
+        cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl,
+        cloudApiToken: typeof msg?.cloudApiToken !== 'undefined' ? String(msg.cloudApiToken) : cfg.cloudApiToken
       };
       const resp = await pullCloudConfigToExtension(effectiveCfg);
       await setupAlarm();
@@ -1105,9 +1350,75 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
+  if (msg?.type === 'AUTO_FETCH_TOKEN') {
+    (async () => {
+      try {
+        const urlToUse = typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : DEFAULT_CLOUD_API_BASE;
+        const url = normalizeCloudBaseUrl(urlToUse);
+
+        const cookies = await chrome.cookies.getAll({ url });
+        const sessionCookie = cookies.find(c => c.name === 'rb_session');
+        if (!sessionCookie) {
+          return { ok: false, error: '未在该网站找到登录会话，请先手动访问并登录。' };
+        }
+
+        const res = await fetch(`${url}/api/auth/tokens`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cookie': `rb_session=${sessionCookie.value}`
+          },
+          body: JSON.stringify({ name: 'Chrome Ext Auto Token' }),
+          credentials: 'omit'
+        });
+
+        if (!res.ok) {
+          let errText = await res.text().catch(() => '');
+          return { ok: false, error: `认证令牌生成失败 [${res.status}]: ${errText}` };
+        }
+
+        const payload = await res.json();
+        const newToken = payload.token || payload?.item?.token;
+        if (!newToken) {
+          return { ok: false, error: '令牌生成成功但内容解析失败' };
+        }
+
+        // try to pull config using new token immediately to fast-track setup!
+        let hasConfig = false;
+        try {
+          const confRes = await fetch(`${url}/api/plugins/raindropSync/config`, {
+            headers: { 'Authorization': `Bearer ${newToken}` }
+          });
+          if (confRes.ok) hasConfig = true;
+        } catch (_ignore) { }
+
+        return { ok: true, token: newToken, autoPulledConfig: hasConfig };
+      } catch (err) {
+        return { ok: false, error: toSafeError(err) };
+      }
+    })()
+      .then(resp => sendResponse(resp))
+      .catch(err => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
   if (msg?.type === 'LIST_CHROME_TOP_FOLDERS') {
     listChromeTopFolders()
       .then((folders) => sendResponse({ ok: true, folders }))
+      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
+  if (msg?.type === 'SYNC_WITH_RAINBOARD') {
+    syncWithRainboard({ preview: false })
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
+  if (msg?.type === 'PREVIEW_RAINBOARD_SYNC') {
+    syncWithRainboard({ preview: true })
+      .then((result) => sendResponse({ ok: true, ...result }))
       .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
     return true;
   }

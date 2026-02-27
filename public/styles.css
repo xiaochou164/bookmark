@@ -203,6 +203,10 @@ textarea {
   font-weight: 600;
 }
 
+.settings-section-hidden {
+  display: none !important;
+}
+
 .settings-back-link {
   color: var(--muted);
   text-decoration: none;
@@ -3019,6 +3023,60 @@ dialog:has(.compact) {
 
 .dialog-form pre {
   max-height: min(32vh, 260px);
+}
+
+/* ── Plugin Dialog Layout ── */
+.plugin-dialog-shell {
+  width: min(900px, calc(100vw - 24px));
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  padding: 16px;
+  gap: 0;
+}
+
+.plugin-dialog-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef2f8;
+  margin-bottom: 12px;
+}
+
+.plugin-dialog-body {
+  display: grid;
+  gap: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.plugin-dialog-body label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.plugin-dialog-body label:has(input[type="checkbox"]) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.plugin-dialog-footer {
+  padding-top: 12px;
+  border-top: 1px solid #eef2f8;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 8px;
+}
+
+.plugin-pre {
+  max-height: min(28vh, 220px);
 }
 
 .checkbox-field {

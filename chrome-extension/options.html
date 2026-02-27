@@ -1,95 +1,228 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Raindrop Sync 设置</title>
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 24px auto; padding: 0 16px; color: #111; }
-      h1 { font-size: 22px; margin-bottom: 16px; }
-      h2 { font-size: 16px; margin: 16px 0 10px; }
-      .group { margin-bottom: 14px; }
-      label { display: block; margin-bottom: 6px; font-weight: 600; }
-      input[type='text'], input[type='number'], input[type='password'] {
-        width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box;
-      }
-      .row { display: flex; gap: 12px; align-items: center; }
-      .row > div { flex: 1; }
-      .btn { padding: 10px 14px; border: 0; border-radius: 8px; background: #0b63f3; color: #fff; cursor: pointer; }
-      .btn-lite { background: #eef3ff; color: #1a3f92; }
-      .btn[disabled] { opacity: 0.6; cursor: wait; }
-      .map-item { border: 1px solid #e4e4e4; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-      .map-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-      .small { font-size: 12px; color: #666; }
-      #msg { margin-top: 12px; font-size: 13px; }
-      .actions { display: flex; gap: 10px; margin-top: 10px; }
-      select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
-      .token-row { display: flex; gap: 10px; align-items: end; }
-      .token-row .group { flex: 1; }
-      .id-row { display: none; margin-top: 8px; }
-      .mapping-tools { display: flex; gap: 10px; margin: 10px 0; }
-    </style>
-  </head>
-  <body>
-    <h1>Bookmark Raindrop Sync 设置</h1>
 
-    <h2>同步后端</h2>
-    <div class="row">
-      <div class="group">
-        <label for="syncBackend">同步方式</label>
-        <select id="syncBackend">
-          <option value="cloud">云端 API（推荐）</option>
-          <option value="direct">扩展直连 Raindrop（兼容模式）</option>
-        </select>
-      </div>
-      <div class="group">
-        <label for="cloudApiBaseUrl">云端 API 地址</label>
-        <input id="cloudApiBaseUrl" type="text" placeholder="http://localhost:3789" />
-      </div>
-    </div>
-    <div class="small">云端模式下：扩展通过你的 Rainboard Cloud 服务触发 Raindrop 插件任务，不再由扩展直接执行同步逻辑。</div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rainboard Sync 设置</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 900px;
+      margin: 24px auto;
+      padding: 0 16px;
+      color: #111;
+    }
 
-    <div class="token-row">
-      <div class="group">
-        <label for="raindropToken">Raindrop API Token</label>
-        <input id="raindropToken" type="password" placeholder="输入 token" />
-      </div>
-      <button id="refreshCollectionsBtn" class="btn btn-lite" type="button">刷新 Collection</button>
-      <button id="testCloudBtn" class="btn btn-lite" type="button">测试云端连接</button>
-      <button id="pullCloudConfigBtn" class="btn btn-lite" type="button">从云端拉取配置</button>
-    </div>
+    h1 {
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
 
-    <h2>映射规则（多 Collection）</h2>
-    <div class="small">每条映射表示：一个 Raindrop Collection 同步到一个 Chrome 顶层文件夹。</div>
+    h2 {
+      font-size: 16px;
+      margin: 16px 0 10px;
+    }
+
+    .group {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    input[type='text'],
+    input[type='number'],
+    input[type='password'] {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .row>div {
+      flex: 1;
+    }
+
+    .btn {
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      background: #0b63f3;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .btn-lite {
+      background: #eef3ff;
+      color: #1a3f92;
+    }
+
+    .btn[disabled] {
+      opacity: 0.6;
+      cursor: wait;
+    }
+
+    .map-item {
+      border: 1px solid #e4e4e4;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+
+    .map-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .small {
+      font-size: 12px;
+      color: #666;
+    }
+
+    #msg {
+      margin-top: 12px;
+      font-size: 13px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+    }
+
+    .token-row {
+      display: flex;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .token-row .group {
+      flex: 1;
+    }
+
+    .id-row {
+      display: none;
+      margin-top: 8px;
+    }
+
+    .mapping-tools {
+      display: flex;
+      gap: 10px;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Bookmark Raindrop Sync 设置</h1>
+
+  <h2>同步后端</h2>
+  <div class="row">
     <div class="group">
-      <label for="topLevelAutoSync">默认顶级同步到同名顶级文件夹</label>
-      <input id="topLevelAutoSync" type="checkbox" checked />
-      <div class="small">开启后自动生成映射：Raindrop 顶级 collection -> 同名 Chrome 顶级文件夹（手动映射优先）。</div>
+      <label for="syncBackend">同步方式</label>
+      <select id="syncBackend">
+        <option value="cloud">云端 API（推荐）</option>
+        <option value="direct">扩展直连 Raindrop（兼容模式）</option>
+      </select>
     </div>
-    <div class="mapping-tools">
-      <button id="refreshFoldersBtn" class="btn btn-lite" type="button">刷新Chrome文件夹</button>
-      <button id="addMappingBtn" class="btn btn-lite" type="button">新增映射</button>
+    <div class="group">
+      <label for="cloudApiBaseUrl">云端 API 地址</label>
+      <input id="cloudApiBaseUrl" type="text" placeholder="http://localhost:3789" />
     </div>
-    <div id="mappingList"></div>
+  </div>
+  <div class="small">云端模式下：扩展通过你的 Rainboard Cloud 服务触发 Raindrop 插件任务，不再由扩展直接执行同步逻辑。</div>
 
-    <h2>自动同步</h2>
-    <div class="row">
-      <div class="group">
-        <label for="autoSyncEnabled">启用自动同步</label>
-        <input id="autoSyncEnabled" type="checkbox" checked />
-      </div>
-      <div class="group">
-        <label for="autoSyncMinutes">同步间隔（分钟，>=5）</label>
-        <input id="autoSyncMinutes" type="number" min="5" value="15" />
-      </div>
+  <div class="token-row">
+    <div class="group">
+      <label for="cloudApiToken">Rainboard API Token (用于连接系统认证)</label>
+      <input id="cloudApiToken" type="password" placeholder="手动输入或点击自动获取" />
     </div>
+    <button id="autoFetchTokenBtn" class="btn btn-lite" type="button"
+      style="background:#d4edda;color:#155724;font-weight:bold;">✨ 一键自动识别</button>
+    <button id="testCloudBtn" class="btn btn-lite" type="button">测试连接</button>
+    <button id="pullCloudConfigBtn" class="btn btn-lite" type="button">从云端拉取配置</button>
+  </div>
 
-    <div class="actions">
-      <button id="saveBtn" class="btn">保存设置</button>
-      <button id="manualSyncBtn" class="btn btn-lite" type="button">手动同步一次（Apply）</button>
+  <div class="token-row" style="margin-top: 10px;">
+    <div class="group">
+      <label for="raindropToken">Raindrop API Token (用于书签通讯)</label>
+      <input id="raindropToken" type="password" placeholder="输入从 Raindrop 手动获取的 token" />
     </div>
-    <div id="msg"></div>
+    <button id="refreshCollectionsBtn" class="btn btn-lite" type="button">拉取 Collection</button>
+  </div>
 
-    <script src="options.js"></script>
-  </body>
+  <h2>映射规则（多 Collection）</h2>
+  <div class="small">每条映射表示：一个 Raindrop Collection 同步到一个 Chrome 顶层文件夹。</div>
+  <div class="group">
+    <label for="topLevelAutoSync">默认顶级同步到同名顶级文件夹</label>
+    <input id="topLevelAutoSync" type="checkbox" checked />
+    <div class="small">开启后自动生成映射：Raindrop 顶级 collection -> 同名 Chrome 顶级文件夹（手动映射优先）。</div>
+  </div>
+  <div class="mapping-tools">
+    <button id="refreshFoldersBtn" class="btn btn-lite" type="button">刷新Chrome文件夹</button>
+    <button id="addMappingBtn" class="btn btn-lite" type="button">新增映射</button>
+  </div>
+  <div id="mappingList"></div>
+
+  <h2>自动同步</h2>
+  <div class="row">
+    <div class="group">
+      <label for="autoSyncEnabled">启用自动同步</label>
+      <input id="autoSyncEnabled" type="checkbox" checked />
+    </div>
+    <div class="group">
+      <label for="autoSyncMinutes">同步间隔（分钟，>=5）</label>
+      <input id="autoSyncMinutes" type="number" min="5" value="15" />
+    </div>
+  </div>
+
+  <h2>云书签双向同步（Chrome ↔ Rainboard）</h2>
+  <div class="small" style="margin-bottom:10px;">将 Chrome 书签与 Rainboard 本地书签数据库双向同步（需云端模式）。Chrome 有的→写入 Rainboard
+    DB；Rainboard 有的→推送到 Chrome。</div>
+  <div class="row">
+    <div class="group">
+      <label for="rbAutoSyncEnabled">启用自动同步（Chrome ↔ Rainboard）</label>
+      <input id="rbAutoSyncEnabled" type="checkbox" />
+    </div>
+    <div class="group">
+      <label for="rbAutoSyncMinutes">同步间隔（分钟）</label>
+      <input id="rbAutoSyncMinutes" type="number" min="5" value="30" />
+    </div>
+  </div>
+  <div class="actions" style="margin-top:8px;">
+    <button id="rbSyncNowBtn" class="btn btn-lite" type="button">🔄 立即同步 Chrome ↔ 云书签</button>
+    <button id="rbPreviewNowBtn" class="btn btn-lite" type="button">🔍 预览变更（不写入）</button>
+  </div>
+  <div id="rbSyncMsg" style="margin-top:8px;font-size:13px;"></div>
+
+  <div class="actions">
+    <button id="saveBtn" class="btn">保存设置</button>
+    <button id="manualSyncBtn" class="btn btn-lite" type="button">手动同步一次（Raindrop Apply）</button>
+  </div>
+  <div id="msg"></div>
+
+  <script src="options.js"></script>
+</body>
+
 </html>

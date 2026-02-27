@@ -1,0 +1,15 @@
+name = "rainboard"
+main = "src/worker.js"
+compatibility_date = "2026-02-26"
+workers_dev = true
+
+[assets]
+directory = "public"
+binding = "ASSETS"
+
+# 可执行：npm run cf:d1:create（会自动创建/复用 D1，并写入实际 [[d1_databases]] 配置）
+# 下方保留的是注释模板；脚本会在文件末尾追加或更新可用配置块
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "rainboard"
+# database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"

@@ -7579,18 +7579,12 @@ function bindActions() {
     }
     await openAuthDialog();
   });
-  byId('sidebarStatusSyncBtn')?.addEventListener('click', async () => {
+  byId('sidebarStatusSyncBtn')?.addEventListener('click', () => {
     if (!authState.authenticated) {
       redirectToLoginPage();
       return;
     }
-    await loadPluginConfig();
-    await loadPluginSchedule();
-    await loadPluginAudit();
-    await loadPluginDevices();
-    await loadPluginHealth();
-    await loadPluginRuns();
-    byId('pluginDialog')?.showModal();
+    window.location.assign('/plugin.html');
   });
   byId('authCloseBtn').addEventListener('click', () => {
     byId('authDialog').close();
@@ -8273,14 +8267,8 @@ function bindActions() {
     });
   });
 
-  byId('pluginPanelBtn').addEventListener('click', async () => {
-    await loadPluginConfig();
-    await loadPluginSchedule();
-    await loadPluginAudit();
-    await loadPluginDevices();
-    await loadPluginHealth();
-    await loadPluginRuns();
-    byId('pluginDialog').showModal();
+  byId('pluginPanelBtn').addEventListener('click', () => {
+    window.location.assign('/plugin.html');
   });
 
   byId('tagManagerBtn').addEventListener('click', () => {
@@ -8360,7 +8348,7 @@ function bindActions() {
     showToast('重试任务已入队', { timeoutMs: 2500 });
   });
 
-  byId('savePluginCfgBtn').addEventListener('click', async () => {
+  byId('savePluginCfgBtn')?.addEventListener('click', async () => {
     try {
       const mappings = JSON.parse(byId('pluginMappings').value || '[]');
       const payload = {
@@ -8378,27 +8366,27 @@ function bindActions() {
     }
   });
 
-  byId('pluginHistoryBtn').addEventListener('click', async () => {
+  byId('pluginHistoryBtn')?.addEventListener('click', async () => {
     await loadPluginRuns();
   });
 
-  byId('pluginAuditBtn').addEventListener('click', async () => {
+  byId('pluginAuditBtn')?.addEventListener('click', async () => {
     await loadPluginAudit();
   });
 
-  byId('pluginDevicesBtn').addEventListener('click', async () => {
+  byId('pluginDevicesBtn')?.addEventListener('click', async () => {
     await loadPluginDevices();
   });
 
-  byId('pluginHealthBtn').addEventListener('click', async () => {
+  byId('pluginHealthBtn')?.addEventListener('click', async () => {
     await loadPluginHealth();
   });
 
-  byId('pluginScheduleLoadBtn').addEventListener('click', async () => {
+  byId('pluginScheduleLoadBtn')?.addEventListener('click', async () => {
     await loadPluginSchedule();
   });
 
-  byId('pluginScheduleSaveBtn').addEventListener('click', async () => {
+  byId('pluginScheduleSaveBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/plugins/raindropSync/schedule', {
         method: 'PUT',
@@ -8412,7 +8400,7 @@ function bindActions() {
     }
   });
 
-  byId('pluginSchedulePauseBtn').addEventListener('click', async () => {
+  byId('pluginSchedulePauseBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/plugins/raindropSync/schedule/pause', { method: 'POST', body: '{}' });
       byId('pluginScheduleOutput').textContent = JSON.stringify(out, null, 2);
@@ -8424,7 +8412,7 @@ function bindActions() {
     }
   });
 
-  byId('pluginScheduleResumeBtn').addEventListener('click', async () => {
+  byId('pluginScheduleResumeBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/plugins/raindropSync/schedule/resume', { method: 'POST', body: '{}' });
       byId('pluginScheduleOutput').textContent = JSON.stringify(out, null, 2);
@@ -8436,7 +8424,7 @@ function bindActions() {
     }
   });
 
-  byId('pluginScheduleTickBtn').addEventListener('click', async () => {
+  byId('pluginScheduleTickBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/plugins/raindropSync/schedule/tick', {
         method: 'POST',
@@ -8454,7 +8442,7 @@ function bindActions() {
     }
   });
 
-  byId('pluginRetryBtn').addEventListener('click', async () => {
+  byId('pluginRetryBtn')?.addEventListener('click', async () => {
     try {
       const tasks = await fetchPluginTasks(30);
       const latestFailed = tasks.find((t) => t.status === 'failed');
@@ -8477,7 +8465,7 @@ function bindActions() {
     }
   });
 
-  byId('pluginReplayBtn').addEventListener('click', async () => {
+  byId('pluginReplayBtn')?.addEventListener('click', async () => {
     try {
       const tasks = await fetchPluginTasks(30);
       const latest = tasks[0];
@@ -8500,7 +8488,7 @@ function bindActions() {
     }
   });
 
-  byId('previewPluginBtn').addEventListener('click', async () => {
+  byId('previewPluginBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/plugins/raindropSync/preview', { method: 'POST', body: '{}' });
       byId('pluginOutput').textContent = JSON.stringify(out, null, 2);
@@ -8513,7 +8501,7 @@ function bindActions() {
     }
   });
 
-  byId('runPluginBtn').addEventListener('click', async () => {
+  byId('runPluginBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/plugins/raindropSync/tasks', {
         method: 'POST',
@@ -8664,44 +8652,44 @@ async function loadPluginConfig() {
   try {
     const config = await api('/api/plugins/raindropSync/config');
     store.setPluginConfig(config);
-    byId('pluginToken').value = config.raindropToken || '';
-    byId('pluginTopLevel').checked = Boolean(config.topLevelAutoSync);
-    byId('pluginMappings').value = JSON.stringify(config.mappings || [], null, 2);
-    byId('pluginOutput').textContent = '就绪';
+    if (byId('pluginToken')) byId('pluginToken').value = config.raindropToken || '';
+    if (byId('pluginTopLevel')) byId('pluginTopLevel').checked = Boolean(config.topLevelAutoSync);
+    if (byId('pluginMappings')) byId('pluginMappings').value = JSON.stringify(config.mappings || [], null, 2);
+    if (byId('pluginOutput')) byId('pluginOutput').textContent = '就绪';
   } catch (err) {
-    byId('pluginOutput').textContent = err.message;
+    if (byId('pluginOutput')) byId('pluginOutput').textContent = err.message;
   }
 }
 
 function pluginSchedulePayload() {
   return {
-    enabled: byId('pluginScheduleEnabled').checked,
-    paused: byId('pluginSchedulePaused').checked,
-    intervalMinutes: Number(byId('pluginScheduleInterval').value || 15),
-    maxConcurrent: Number(byId('pluginScheduleMaxConcurrent').value || 1),
-    windowEnabled: byId('pluginScheduleWindowEnabled').checked,
-    windowStartHour: Number(byId('pluginScheduleWindowStart').value || 0),
-    windowEndHour: Number(byId('pluginScheduleWindowEnd').value || 24)
+    enabled: byId('pluginScheduleEnabled')?.checked ?? false,
+    paused: byId('pluginSchedulePaused')?.checked ?? false,
+    intervalMinutes: Number(byId('pluginScheduleInterval')?.value || 15),
+    maxConcurrent: Number(byId('pluginScheduleMaxConcurrent')?.value || 1),
+    windowEnabled: byId('pluginScheduleWindowEnabled')?.checked ?? false,
+    windowStartHour: Number(byId('pluginScheduleWindowStart')?.value || 0),
+    windowEndHour: Number(byId('pluginScheduleWindowEnd')?.value || 24)
   };
 }
 
 function applyPluginScheduleToForm(schedule = {}) {
-  byId('pluginScheduleEnabled').checked = Boolean(schedule.enabled);
-  byId('pluginSchedulePaused').checked = Boolean(schedule.paused);
-  byId('pluginScheduleInterval').value = String(Number(schedule.intervalMinutes || 15));
-  byId('pluginScheduleMaxConcurrent').value = String(Number(schedule.maxConcurrent || 1));
-  byId('pluginScheduleWindowEnabled').checked = Boolean(schedule.windowEnabled);
-  byId('pluginScheduleWindowStart').value = String(Number(schedule.windowStartHour ?? 0));
-  byId('pluginScheduleWindowEnd').value = String(Number(schedule.windowEndHour ?? 24));
+  if (byId('pluginScheduleEnabled')) byId('pluginScheduleEnabled').checked = Boolean(schedule.enabled);
+  if (byId('pluginSchedulePaused')) byId('pluginSchedulePaused').checked = Boolean(schedule.paused);
+  if (byId('pluginScheduleInterval')) byId('pluginScheduleInterval').value = String(Number(schedule.intervalMinutes || 15));
+  if (byId('pluginScheduleMaxConcurrent')) byId('pluginScheduleMaxConcurrent').value = String(Number(schedule.maxConcurrent || 1));
+  if (byId('pluginScheduleWindowEnabled')) byId('pluginScheduleWindowEnabled').checked = Boolean(schedule.windowEnabled);
+  if (byId('pluginScheduleWindowStart')) byId('pluginScheduleWindowStart').value = String(Number(schedule.windowStartHour ?? 0));
+  if (byId('pluginScheduleWindowEnd')) byId('pluginScheduleWindowEnd').value = String(Number(schedule.windowEndHour ?? 24));
 }
 
 async function loadPluginSchedule() {
   try {
     const schedule = await api('/api/plugins/raindropSync/schedule');
     applyPluginScheduleToForm(schedule);
-    byId('pluginScheduleOutput').textContent = JSON.stringify(schedule, null, 2);
+    if (byId('pluginScheduleOutput')) byId('pluginScheduleOutput').textContent = JSON.stringify(schedule, null, 2);
   } catch (err) {
-    byId('pluginScheduleOutput').textContent = err.message;
+    if (byId('pluginScheduleOutput')) byId('pluginScheduleOutput').textContent = err.message;
   }
 }
 
@@ -8711,36 +8699,36 @@ async function loadPluginRuns() {
       api('/api/plugins/raindropSync/runs?limit=20'),
       api('/api/plugins/raindropSync/tasks?limit=20')
     ]);
-    byId('pluginHistory').textContent = JSON.stringify({ tasks, runs }, null, 2);
+    if (byId('pluginHistory')) byId('pluginHistory').textContent = JSON.stringify({ tasks, runs }, null, 2);
   } catch (err) {
-    byId('pluginHistory').textContent = err.message;
+    if (byId('pluginHistory')) byId('pluginHistory').textContent = err.message;
   }
 }
 
 async function loadPluginAudit() {
   try {
     const audit = await api('/api/plugins/raindropSync/audit');
-    byId('pluginAudit').textContent = JSON.stringify(audit, null, 2);
+    if (byId('pluginAudit')) byId('pluginAudit').textContent = JSON.stringify(audit, null, 2);
   } catch (err) {
-    byId('pluginAudit').textContent = err.message;
+    if (byId('pluginAudit')) byId('pluginAudit').textContent = err.message;
   }
 }
 
 async function loadPluginDevices() {
   try {
     const devices = await api('/api/plugins/raindropSync/devices?limit=20');
-    byId('pluginDevices').textContent = JSON.stringify(devices, null, 2);
+    if (byId('pluginDevices')) byId('pluginDevices').textContent = JSON.stringify(devices, null, 2);
   } catch (err) {
-    byId('pluginDevices').textContent = err.message;
+    if (byId('pluginDevices')) byId('pluginDevices').textContent = err.message;
   }
 }
 
 async function loadPluginHealth() {
   try {
     const health = await api('/api/plugins/raindropSync/health');
-    byId('pluginHealth').textContent = JSON.stringify(health, null, 2);
+    if (byId('pluginHealth')) byId('pluginHealth').textContent = JSON.stringify(health, null, 2);
   } catch (err) {
-    byId('pluginHealth').textContent = err.message;
+    if (byId('pluginHealth')) byId('pluginHealth').textContent = err.message;
   }
 }
 

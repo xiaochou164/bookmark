@@ -37,7 +37,10 @@ const DEFAULT_DB = {
   searchIndex: [],
   brokenLinkTasks: [],
   backups: [],
-  aiSuggestionJobs: []
+  aiSuggestionJobs: [],
+  aiProviderConfigs: {},
+  aiBatchTasks: [],
+  semanticIndex: []
 };
 
 function normalizeDbShape(parsed = {}) {
@@ -68,7 +71,10 @@ function normalizeDbShape(parsed = {}) {
     searchIndex: Array.isArray(parsed.searchIndex) ? parsed.searchIndex : [],
     brokenLinkTasks: Array.isArray(parsed.brokenLinkTasks) ? parsed.brokenLinkTasks : [],
     backups: Array.isArray(parsed.backups) ? parsed.backups : [],
-    aiSuggestionJobs: Array.isArray(parsed.aiSuggestionJobs) ? parsed.aiSuggestionJobs : []
+    aiSuggestionJobs: Array.isArray(parsed.aiSuggestionJobs) ? parsed.aiSuggestionJobs : [],
+    aiProviderConfigs: parsed.aiProviderConfigs && typeof parsed.aiProviderConfigs === 'object' ? parsed.aiProviderConfigs : {},
+    aiBatchTasks: Array.isArray(parsed.aiBatchTasks) ? parsed.aiBatchTasks : [],
+    semanticIndex: Array.isArray(parsed.semanticIndex) ? parsed.semanticIndex : []
   };
 }
 

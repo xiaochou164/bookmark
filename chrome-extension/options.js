@@ -1,5 +1,6 @@
 const syncBackend = document.getElementById('syncBackend');
 const cloudApiBaseUrl = document.getElementById('cloudApiBaseUrl');
+const cloudApiToken = document.getElementById('cloudApiToken');
 const raindropToken = document.getElementById('raindropToken');
 const autoSyncEnabled = document.getElementById('autoSyncEnabled');
 const autoSyncMinutes = document.getElementById('autoSyncMinutes');
@@ -12,7 +13,14 @@ const refreshCollectionsBtn = document.getElementById('refreshCollectionsBtn');
 const refreshFoldersBtn = document.getElementById('refreshFoldersBtn');
 const testCloudBtn = document.getElementById('testCloudBtn');
 const pullCloudConfigBtn = document.getElementById('pullCloudConfigBtn');
+const autoFetchTokenBtn = document.getElementById('autoFetchTokenBtn');
 const msg = document.getElementById('msg');
+// Chrome ↔ Rainboard 云书签同步
+const rbAutoSyncEnabled = document.getElementById('rbAutoSyncEnabled');
+const rbAutoSyncMinutes = document.getElementById('rbAutoSyncMinutes');
+const rbSyncNowBtn = document.getElementById('rbSyncNowBtn');
+const rbPreviewNowBtn = document.getElementById('rbPreviewNowBtn');
+const rbSyncMsg = document.getElementById('rbSyncMsg');
 
 let availableCollections = [{ id: -1, title: 'Unsorted (-1)' }];
 let availableFolders = ['Raindrop Synced'];
@@ -48,6 +56,7 @@ function updateBackendUi() {
   cloudApiBaseUrl.disabled = !cloud;
   testCloudBtn.disabled = !cloud;
   pullCloudConfigBtn.disabled = !cloud;
+  if (autoFetchTokenBtn) autoFetchTokenBtn.disabled = !cloud;
 }
 
 function callBg(type, payload = {}) {
@@ -217,7 +226,8 @@ async function refreshCollections({ silent = false } = {}) {
   const resp = await callBg('LIST_COLLECTIONS', {
     token,
     syncBackend: syncBackend.value,
-    cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value)
+    cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value),
+    cloudApiToken: cloudApiToken ? cloudApiToken.value.trim() : ''
   });
   refreshCollectionsBtn.disabled = false;
 
@@ -255,21 +265,27 @@ async function load() {
   const data = await chrome.storage.local.get({
     syncBackend: 'cloud',
     cloudApiBaseUrl: 'http://localhost:3789',
+    cloudApiToken: '',
     raindropToken: '',
     topLevelAutoSync: true,
     mappings: [],
     raindropCollectionId: -1,
     chromeImportFolder: 'Raindrop Synced',
     autoSyncEnabled: true,
-    autoSyncMinutes: 15
+    autoSyncMinutes: 15,
+    rbAutoSyncEnabled: false,
+    rbAutoSyncMinutes: 30
   });
 
   syncBackend.value = data.syncBackend || 'cloud';
   cloudApiBaseUrl.value = normalizeCloudUrl(data.cloudApiBaseUrl);
-  raindropToken.value = data.raindropToken;
+  if (cloudApiToken) cloudApiToken.value = data.cloudApiToken || '';
+  raindropToken.value = data.raindropToken || '';
   topLevelAutoSync.checked = Boolean(data.topLevelAutoSync);
   autoSyncEnabled.checked = Boolean(data.autoSyncEnabled);
   autoSyncMinutes.value = data.autoSyncMinutes;
+  if (rbAutoSyncEnabled) rbAutoSyncEnabled.checked = Boolean(data.rbAutoSyncEnabled);
+  if (rbAutoSyncMinutes) rbAutoSyncMinutes.value = data.rbAutoSyncMinutes || 30;
 
   const mappings = data.mappings?.length
     ? data.mappings
@@ -296,7 +312,8 @@ testCloudBtn.addEventListener('click', async () => {
   render('测试云端连接中...');
   const resp = await callBg('PING_CLOUD', {
     cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value),
-    syncBackend: syncBackend.value
+    syncBackend: syncBackend.value,
+    cloudApiToken: cloudApiToken ? cloudApiToken.value.trim() : ''
   });
   testCloudBtn.disabled = false;
   if (!resp.ok) {
@@ -305,6 +322,41 @@ testCloudBtn.addEventListener('click', async () => {
   }
   render(`云端连接正常: ${resp.health?.service || 'cloud-bookmarks'}`, true);
 });
+
+if (autoFetchTokenBtn) {
+  autoFetchTokenBtn.addEventListener('click', async () => {
+    if (!isCloudMode()) {
+      render('当前为直连模式，不能自动识别云端配置', false);
+      return;
+    }
+    autoFetchTokenBtn.disabled = true;
+    render('正在向主页请求身份令牌，请稍候...');
+    const resp = await callBg('AUTO_FETCH_TOKEN', {
+      cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value)
+    });
+    autoFetchTokenBtn.disabled = false;
+
+    if (!resp.ok) {
+      render(`获取失败: ${resp.error || '未知错误'}`, false);
+      return;
+    }
+
+    cloudApiToken.value = resp.token;
+    await chrome.storage.local.set({
+      cloudApiToken: resp.token,
+      syncBackend: syncBackend.value,
+      cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value)
+    });
+
+    if (resp.autoPulledConfig) {
+      // Config was returned and saved or we can pull it!
+      render('认证成功！检测到云端有配置，正在为您拉取...', true);
+      pullCloudConfigBtn.click();
+    } else {
+      render('获取认证 Token 成功！请点击"保存设置"以启用', true);
+    }
+  });
+}
 
 pullCloudConfigBtn.addEventListener('click', async () => {
   if (!isCloudMode()) {
@@ -315,7 +367,8 @@ pullCloudConfigBtn.addEventListener('click', async () => {
   render('从云端拉取配置中...');
   const resp = await callBg('PULL_CLOUD_CONFIG', {
     syncBackend: syncBackend.value,
-    cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value)
+    cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value),
+    cloudApiToken: cloudApiToken ? cloudApiToken.value.trim() : ''
   });
   pullCloudConfigBtn.disabled = false;
   if (!resp.ok) {
@@ -341,11 +394,14 @@ saveBtn.addEventListener('click', async () => {
   const payload = {
     syncBackend: syncBackend.value === 'direct' ? 'direct' : 'cloud',
     cloudApiBaseUrl: normalizeCloudUrl(cloudApiBaseUrl.value),
+    cloudApiToken: cloudApiToken ? cloudApiToken.value.trim() : '',
     raindropToken: raindropToken.value.trim(),
     topLevelAutoSync: topLevelAutoSync.checked,
     mappings,
     autoSyncEnabled: autoSyncEnabled.checked,
-    autoSyncMinutes: Math.max(5, Number(autoSyncMinutes.value || 15))
+    autoSyncMinutes: Math.max(5, Number(autoSyncMinutes.value || 15)),
+    rbAutoSyncEnabled: rbAutoSyncEnabled ? rbAutoSyncEnabled.checked : false,
+    rbAutoSyncMinutes: Math.max(5, Number(rbAutoSyncMinutes?.value || 30))
   };
 
   await chrome.storage.local.set(payload);
@@ -368,5 +424,70 @@ manualSyncBtn.addEventListener('click', async () => {
   }
   render(statsSummaryText(resp.stats), true);
 });
+
+// ── Chrome ↔ Rainboard 云书签同步按鈕 ───────────────────────────────────────
+
+function renderRb(text, ok = true) {
+  if (!rbSyncMsg) return;
+  rbSyncMsg.textContent = text;
+  rbSyncMsg.style.color = ok ? '#0f6f38' : '#b00020';
+}
+
+function formatRbResult(result, title) {
+  const c = result.chrome || {};
+  const s = result.server || {};
+  const lines = [
+    title,
+    `Chrome 文件夹: ${result.chromeFolders || 0}，Chrome 书签总数: ${result.totalChromeBookmarks || 0}`,
+    `新增到 Rainboard: ${s.createdInDb || 0}，跳过重复: ${s.skippedDuplicate || 0}`,
+    `待同步到 Chrome: ${c.toAddCount || 0}${result.preview ? ' (预览)' : `，已写入 ${c.addedToChrome || 0} 条`}`,
+  ];
+  const toAdd = result.samples?.toAdd || [];
+  if (toAdd.length) {
+    lines.push('待推送到 Chrome:');
+    toAdd.forEach(s => lines.push('  ' + s));
+  }
+  return lines.join('\n');
+}
+
+if (rbSyncNowBtn) {
+  rbSyncNowBtn.addEventListener('click', async () => {
+    if (syncBackend.value !== 'cloud') {
+      renderRb('Chrome ↔ Rainboard 同步需要云端模式', false);
+      return;
+    }
+    rbSyncNowBtn.disabled = true;
+    rbPreviewNowBtn.disabled = true;
+    renderRb('同步中（Chrome ↔ Rainboard）...');
+    const resp = await callBg('SYNC_WITH_RAINBOARD');
+    rbSyncNowBtn.disabled = false;
+    rbPreviewNowBtn.disabled = false;
+    if (!resp.ok) {
+      renderRb(resp.error || '同步失败', false);
+      return;
+    }
+    renderRb(formatRbResult(resp, '✅ 同步完成！'), true);
+  });
+}
+
+if (rbPreviewNowBtn) {
+  rbPreviewNowBtn.addEventListener('click', async () => {
+    if (syncBackend.value !== 'cloud') {
+      renderRb('Chrome ↔ Rainboard 同步需要云端模式', false);
+      return;
+    }
+    rbSyncNowBtn.disabled = true;
+    rbPreviewNowBtn.disabled = true;
+    renderRb('预览中（Chrome ↔ Rainboard）...');
+    const resp = await callBg('PREVIEW_RAINBOARD_SYNC');
+    rbSyncNowBtn.disabled = false;
+    rbPreviewNowBtn.disabled = false;
+    if (!resp.ok) {
+      renderRb(resp.error || '预览失败', false);
+      return;
+    }
+    renderRb(formatRbResult(resp, '🔍 预览完成（未写入）'), true);
+  });
+}
 
 load();

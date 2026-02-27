@@ -582,58 +582,7 @@
     </form>
   </dialog>
 
-  <dialog id="pluginDialog">
-    <form method="dialog" id="pluginForm" class="dialog-form wide">
-      <h3>Raindrop 同步插件</h3>
-      <label>Token<input id="pluginToken" /></label>
-      <label><input type="checkbox" id="pluginTopLevel" /> 顶级自动映射</label>
-      <label>映射（JSON 数组）
-        <textarea id="pluginMappings" rows="8"></textarea>
-      </label>
-      <fieldset style="border:1px solid #e5e8ef;border-radius:10px;padding:10px 12px">
-        <legend class="muted" style="padding:0 6px">调度器</legend>
-        <div style="display:grid;gap:10px">
-          <label><input type="checkbox" id="pluginScheduleEnabled" /> 启用调度器</label>
-          <label><input type="checkbox" id="pluginSchedulePaused" /> 暂停</label>
-          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-            <label>间隔（分钟）<input id="pluginScheduleInterval" type="number" min="1" value="15" /></label>
-            <label>最大并发<input id="pluginScheduleMaxConcurrent" type="number" min="1" max="10" value="1" /></label>
-          </div>
-          <label><input type="checkbox" id="pluginScheduleWindowEnabled" /> 启用运行时间窗</label>
-          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-            <label>开始小时<input id="pluginScheduleWindowStart" type="number" min="0" max="24" value="0" /></label>
-            <label>结束小时<input id="pluginScheduleWindowEnd" type="number" min="0" max="24" value="24" /></label>
-          </div>
-          <div class="dialog-actions" style="justify-content:flex-start">
-            <button id="pluginScheduleLoadBtn" type="button" class="ghost">加载调度</button>
-            <button id="pluginScheduleSaveBtn" type="button" class="ghost">保存调度</button>
-            <button id="pluginSchedulePauseBtn" type="button" class="ghost">暂停</button>
-            <button id="pluginScheduleResumeBtn" type="button" class="ghost">恢复</button>
-            <button id="pluginScheduleTickBtn" type="button" class="ghost">立即触发</button>
-          </div>
-        </div>
-      </fieldset>
-
-      <div class="dialog-actions">
-        <button type="submit" value="cancel" formnovalidate class="ghost">关闭</button>
-        <button id="savePluginCfgBtn" type="button" class="ghost">保存配置</button>
-        <button id="pluginHistoryBtn" type="button" class="ghost">历史</button>
-        <button id="pluginAuditBtn" type="button" class="ghost">审计</button>
-        <button id="pluginDevicesBtn" type="button" class="ghost">设备</button>
-        <button id="pluginHealthBtn" type="button" class="ghost">健康</button>
-        <button id="pluginRetryBtn" type="button" class="ghost">重试最近失败任务</button>
-        <button id="pluginReplayBtn" type="button" class="ghost">重放最近任务</button>
-        <button id="previewPluginBtn" type="button" class="ghost">预演</button>
-        <button id="runPluginBtn" type="button">执行同步</button>
-      </div>
-      <pre id="pluginOutput"></pre>
-      <pre id="pluginScheduleOutput"></pre>
-      <pre id="pluginAudit"></pre>
-      <pre id="pluginDevices"></pre>
-      <pre id="pluginHealth"></pre>
-      <pre id="pluginHistory"></pre>
-    </form>
-  </dialog>
+  <!-- Raindrop 同步插件已移至独立页面 /plugin.html -->
 
   <dialog id="previewDialog">
     <div class="dialog-form wide preview-shell">
@@ -849,7 +798,7 @@
             <option value="selected">仅已选书签</option>
           </select>
         </label>
-        <label class="form-field"><input id="ioExportIncludeTrash" type="checkbox" /> 包含回收站</label>
+        <label class="form-field checkbox-field"><input id="ioExportIncludeTrash" type="checkbox" /> 包含回收站</label>
         <div class="dialog-actions" style="justify-content:flex-start">
           <button type="button" id="ioQueueExportBtn">新建导出任务</button>
           <button type="button" id="ioRefreshTasksBtn" class="ghost">刷新任务</button>

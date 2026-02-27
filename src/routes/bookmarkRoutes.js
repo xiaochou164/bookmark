@@ -10,6 +10,7 @@ function registerBookmarkRoutes(app, deps) {
     metadataTasks,
     objectStorage,
     extractAndPersistArticle,
+    aiRules,
     badRequest,
     notFound
   } = deps;
@@ -150,6 +151,19 @@ function registerBookmarkRoutes(app, deps) {
       });
 
       res.status(201).json(created);
+      if (aiRules && created?.id) {
+        setTimeout(() => {
+          aiRules.notifyEvent({
+            userId,
+            trigger: 'bookmark_created',
+            bookmarkId: created.id,
+            source: 'event',
+            payload: { route: '/api/bookmarks' }
+          }).catch((err) => {
+            console.error('[ai-rules] bookmark_created failed', { bookmarkId: created.id, error: String(err?.message || err) });
+          });
+        }, 0);
+      }
     } catch (err) {
       next(err);
     }
@@ -326,6 +340,19 @@ function registerBookmarkRoutes(app, deps) {
 
       if (!updated) return next(notFound('bookmark not found'));
       res.json({ ok: true, item: updated, metadata });
+      if (aiRules && updated?.id) {
+        setTimeout(() => {
+          aiRules.notifyEvent({
+            userId,
+            trigger: 'metadata_fetched',
+            bookmarkId: updated.id,
+            source: 'event',
+            payload: { route: '/api/bookmarks/:id/metadata/fetch', metadataStatus: metadata?.status || 'success' }
+          }).catch((err) => {
+            console.error('[ai-rules] metadata_fetched failed', { bookmarkId: updated.id, error: String(err?.message || err) });
+          });
+        }, 0);
+      }
     } catch (err) {
       next(err);
     }

@@ -37,7 +37,9 @@ const view = {
   entitlement: null,
   subscription: null,
   quota: null,
-  backups: []
+  backups: [],
+  aiConfig: null,
+  aiRuleConfig: null
 };
 let authGuardLastCheckAt = 0;
 let authGuardInFlight = null;
@@ -50,6 +52,19 @@ function setStatus(text, { error = false } = {}) {
   if (!el) return;
   el.textContent = String(text || '');
   el.classList.toggle('danger-text', Boolean(error));
+}
+
+function syncAiDigestControls() {
+  const typeEl = byId('aiDigestWindowTypeSelect');
+  const daysEl = byId('aiDigestDaysInput');
+  if (!typeEl || !daysEl) return;
+  const custom = String(typeEl.value || '') === 'custom_days';
+  daysEl.disabled = !custom;
+  daysEl.closest('label')?.classList.toggle('is-disabled', !custom);
+}
+
+function boolString(v, fallback = false) {
+  return String(typeof v === 'boolean' ? v : fallback);
 }
 
 function settingsSectionElement(sectionKey) {
@@ -433,6 +448,170 @@ function renderBackups() {
   });
 }
 
+function syncAiProviderFieldsVisibility() {
+  const type = byId('aiProviderTypeSelect')?.value || 'openai_compatible';
+  const openaiWrap = byId('aiProviderOpenAIFields');
+  const cfWrap = byId('aiProviderCloudflareFields');
+  if (openaiWrap) openaiWrap.style.display = type === 'openai_compatible' ? '' : 'none';
+  if (cfWrap) cfWrap.style.display = type === 'cloudflare_ai' ? '' : 'none';
+}
+
+function renderAiConfig() {
+  const cfg = view.aiConfig || {
+    enabled: false,
+    providerType: 'openai_compatible',
+    openaiCompatible: {},
+    cloudflareAI: {},
+    tagging: {},
+    autoClassifyOnCreate: {}
+  };
+
+  if (byId('aiEnabledSelect')) byId('aiEnabledSelect').value = String(Boolean(cfg.enabled));
+  if (byId('aiProviderTypeSelect')) byId('aiProviderTypeSelect').value = cfg.providerType || 'openai_compatible';
+
+  if (byId('aiOpenAIBaseUrlInput')) byId('aiOpenAIBaseUrlInput').value = cfg.openaiCompatible?.baseUrl || '';
+  if (byId('aiOpenAIModelInput')) byId('aiOpenAIModelInput').value = cfg.openaiCompatible?.model || '';
+  if (byId('aiOpenAIApiKeyInput')) {
+    byId('aiOpenAIApiKeyInput').value = '';
+    byId('aiOpenAIApiKeyInput').placeholder = cfg.openaiCompatible?.hasApiKey
+      ? `留空则保留已有密钥（${cfg.openaiCompatible.apiKeyMasked || '已设置'}）`
+      : 'sk-...';
+  }
+
+  if (byId('aiCloudflareAccountIdInput')) byId('aiCloudflareAccountIdInput').value = cfg.cloudflareAI?.accountId || '';
+  if (byId('aiCloudflareModelInput')) byId('aiCloudflareModelInput').value = cfg.cloudflareAI?.model || '';
+  if (byId('aiCloudflareApiTokenInput')) {
+    byId('aiCloudflareApiTokenInput').value = '';
+    byId('aiCloudflareApiTokenInput').placeholder = cfg.cloudflareAI?.hasApiToken
+      ? `留空则保留已有 Token（${cfg.cloudflareAI.apiTokenMasked || '已设置'}）`
+      : 'Cloudflare API Token';
+  }
+
+  if (byId('aiTagApplyModeSelect')) byId('aiTagApplyModeSelect').value = cfg.tagging?.applyMode || 'merge';
+  if (byId('aiTagMaxTagsInput')) byId('aiTagMaxTagsInput').value = String(cfg.tagging?.maxTags || 6);
+  if (byId('aiTagPreferChineseSelect')) byId('aiTagPreferChineseSelect').value = String(cfg.tagging?.preferChinese !== false);
+  if (byId('aiTagIncludeDomainSelect')) byId('aiTagIncludeDomainSelect').value = String(cfg.tagging?.includeDomain !== false);
+  if (byId('aiAutoCreateEnabledSelect')) byId('aiAutoCreateEnabledSelect').value = String(Boolean(cfg.autoClassifyOnCreate?.enabled));
+  if (byId('aiAutoCreateRequireConfirmSelect')) byId('aiAutoCreateRequireConfirmSelect').value = String(cfg.autoClassifyOnCreate?.requireConfirm !== false);
+  if (byId('aiAutoCreateAutoTagSelect')) byId('aiAutoCreateAutoTagSelect').value = String(cfg.autoClassifyOnCreate?.autoTag !== false);
+  if (byId('aiAutoCreateRecommendFolderSelect')) byId('aiAutoCreateRecommendFolderSelect').value = String(cfg.autoClassifyOnCreate?.recommendFolder !== false);
+  if (byId('aiAutoCreateAutoMoveFolderSelect')) byId('aiAutoCreateAutoMoveFolderSelect').value = String(Boolean(cfg.autoClassifyOnCreate?.autoMoveRecommendedFolder));
+
+  syncAiProviderFieldsVisibility();
+}
+
+function renderAiRuleConfig() {
+  const cfg = view.aiRuleConfig || {
+    enabled: false,
+    triggers: {},
+    conditions: {},
+    actions: { autoTag: {}, summary: {}, recommendFolder: {} }
+  };
+  if (byId('aiRulesEnabledSelect')) byId('aiRulesEnabledSelect').value = boolString(cfg.enabled, false);
+  if (byId('aiRulesTriggerBookmarkCreatedSelect')) byId('aiRulesTriggerBookmarkCreatedSelect').value = boolString(cfg.triggers?.bookmark_created, true);
+  if (byId('aiRulesTriggerMetadataFetchedSelect')) byId('aiRulesTriggerMetadataFetchedSelect').value = boolString(cfg.triggers?.metadata_fetched, false);
+  if (byId('aiRulesSkipIfArchivedSelect')) byId('aiRulesSkipIfArchivedSelect').value = boolString(cfg.conditions?.skipIfArchived, true);
+  if (byId('aiRulesSkipIfTaggedSelect')) byId('aiRulesSkipIfTaggedSelect').value = boolString(cfg.conditions?.skipIfTagged, false);
+  if (byId('aiRulesSkipIfHasNoteSelect')) byId('aiRulesSkipIfHasNoteSelect').value = boolString(cfg.conditions?.skipIfHasNote, false);
+  if (byId('aiRulesOnlyUnreadSelect')) byId('aiRulesOnlyUnreadSelect').value = boolString(cfg.conditions?.onlyUnread, false);
+  if (byId('aiRulesActionAutoTagEnabledSelect')) byId('aiRulesActionAutoTagEnabledSelect').value = boolString(cfg.actions?.autoTag?.enabled, true);
+  if (byId('aiRulesActionAutoTagApplyModeSelect')) byId('aiRulesActionAutoTagApplyModeSelect').value = cfg.actions?.autoTag?.applyMode || 'merge';
+  if (byId('aiRulesActionSummaryEnabledSelect')) byId('aiRulesActionSummaryEnabledSelect').value = boolString(cfg.actions?.summary?.enabled, false);
+  if (byId('aiRulesActionSummaryNoteModeSelect')) byId('aiRulesActionSummaryNoteModeSelect').value = cfg.actions?.summary?.noteMode || 'if_empty';
+  if (byId('aiRulesActionRecommendFolderEnabledSelect')) byId('aiRulesActionRecommendFolderEnabledSelect').value = boolString(cfg.actions?.recommendFolder?.enabled, false);
+  if (byId('aiRulesActionRecommendFolderAutoMoveSelect')) byId('aiRulesActionRecommendFolderAutoMoveSelect').value = boolString(cfg.actions?.recommendFolder?.autoMove, false);
+}
+
+function readAiConfigForm() {
+  return {
+    enabled: (byId('aiEnabledSelect')?.value || 'false') === 'true',
+    providerType: byId('aiProviderTypeSelect')?.value || 'openai_compatible',
+    openaiCompatible: {
+      baseUrl: byId('aiOpenAIBaseUrlInput')?.value || '',
+      apiKey: byId('aiOpenAIApiKeyInput')?.value || '',
+      model: byId('aiOpenAIModelInput')?.value || ''
+    },
+    cloudflareAI: {
+      accountId: byId('aiCloudflareAccountIdInput')?.value || '',
+      apiToken: byId('aiCloudflareApiTokenInput')?.value || '',
+      model: byId('aiCloudflareModelInput')?.value || ''
+    },
+    tagging: {
+      applyMode: byId('aiTagApplyModeSelect')?.value || 'merge',
+      maxTags: Number(byId('aiTagMaxTagsInput')?.value || 6) || 6,
+      preferChinese: (byId('aiTagPreferChineseSelect')?.value || 'true') === 'true',
+      includeDomain: (byId('aiTagIncludeDomainSelect')?.value || 'true') === 'true'
+    },
+    autoClassifyOnCreate: {
+      enabled: (byId('aiAutoCreateEnabledSelect')?.value || 'false') === 'true',
+      requireConfirm: (byId('aiAutoCreateRequireConfirmSelect')?.value || 'true') === 'true',
+      autoTag: (byId('aiAutoCreateAutoTagSelect')?.value || 'true') === 'true',
+      recommendFolder: (byId('aiAutoCreateRecommendFolderSelect')?.value || 'true') === 'true',
+      autoMoveRecommendedFolder: (byId('aiAutoCreateAutoMoveFolderSelect')?.value || 'false') === 'true'
+    }
+  };
+}
+
+function readAiRuleConfigForm() {
+  return {
+    enabled: (byId('aiRulesEnabledSelect')?.value || 'false') === 'true',
+    triggers: {
+      bookmark_created: (byId('aiRulesTriggerBookmarkCreatedSelect')?.value || 'true') === 'true',
+      metadata_fetched: (byId('aiRulesTriggerMetadataFetchedSelect')?.value || 'false') === 'true'
+    },
+    conditions: {
+      skipIfArchived: (byId('aiRulesSkipIfArchivedSelect')?.value || 'true') === 'true',
+      skipIfTagged: (byId('aiRulesSkipIfTaggedSelect')?.value || 'false') === 'true',
+      skipIfHasNote: (byId('aiRulesSkipIfHasNoteSelect')?.value || 'false') === 'true',
+      onlyUnread: (byId('aiRulesOnlyUnreadSelect')?.value || 'false') === 'true'
+    },
+    actions: {
+      autoTag: {
+        enabled: (byId('aiRulesActionAutoTagEnabledSelect')?.value || 'true') === 'true',
+        applyMode: byId('aiRulesActionAutoTagApplyModeSelect')?.value || 'merge'
+      },
+      summary: {
+        enabled: (byId('aiRulesActionSummaryEnabledSelect')?.value || 'false') === 'true',
+        noteMode: byId('aiRulesActionSummaryNoteModeSelect')?.value || 'if_empty'
+      },
+      recommendFolder: {
+        enabled: (byId('aiRulesActionRecommendFolderEnabledSelect')?.value || 'false') === 'true',
+        autoMove: (byId('aiRulesActionRecommendFolderAutoMoveSelect')?.value || 'false') === 'true'
+      }
+    }
+  };
+}
+
+function readAiBackfillCreateForm() {
+  const folderId = String(byId('aiBackfillFolderIdInput')?.value || '').trim();
+  return {
+    view: byId('aiBackfillViewSelect')?.value || 'all',
+    folderId,
+    includeDescendants: (byId('aiBackfillIncludeDescendantsSelect')?.value || 'true') === 'true',
+    onlyUnread: (byId('aiBackfillOnlyUnreadSelect')?.value || 'false') === 'true',
+    onlyUntagged: (byId('aiBackfillOnlyUntaggedSelect')?.value || 'false') === 'true',
+    onlyNoNote: (byId('aiBackfillOnlyNoNoteSelect')?.value || 'false') === 'true',
+    includeArchived: (byId('aiBackfillIncludeArchivedSelect')?.value || 'false') === 'true',
+    order: byId('aiBackfillOrderSelect')?.value || 'updated_desc',
+    limit: Math.max(1, Math.min(2000, Number(byId('aiBackfillLimitInput')?.value || 300) || 300)),
+    batchSize: Math.max(1, Math.min(50, Number(byId('aiBackfillBatchSizeInput')?.value || 10) || 10))
+  };
+}
+
+function aiBackfillTaskIdValue() {
+  return String(byId('aiBackfillTaskIdInput')?.value || '').trim();
+}
+
+function writeAiBackfillOutput(payload) {
+  const el = byId('aiBackfillOutput');
+  if (!el) return;
+  if (typeof payload === 'string') {
+    el.textContent = payload;
+    return;
+  }
+  el.textContent = JSON.stringify(payload, null, 2);
+}
+
 async function ensureAuth() {
   const me = await fetch('/api/auth/me', { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } })
     .then((r) => (r.ok ? r.json() : { authenticated: false }))
@@ -537,12 +716,24 @@ async function loadBackups() {
   renderBackups();
 }
 
+async function loadAiConfig() {
+  const out = await api('/api/product/ai/config');
+  view.aiConfig = out?.config || null;
+  renderAiConfig();
+}
+
+async function loadAiRuleConfig() {
+  const out = await api('/api/product/ai/rules/config');
+  view.aiRuleConfig = out?.config || null;
+  renderAiRuleConfig();
+}
+
 async function refreshAll() {
   setStatus('正在加载设置...');
   if (!(await ensureAuth())) return;
   await Promise.all([loadTokens(), loadSessions(), loadDevices()]);
   await Promise.all([loadFolders(), loadCollabShares(), loadPublicLinks(), loadAuditLogs()]);
-  await Promise.all([loadEntitlementAndSubscription(), loadQuota(), loadBackups()]);
+  await Promise.all([loadEntitlementAndSubscription(), loadQuota(), loadBackups(), loadAiConfig(), loadAiRuleConfig()]);
   setStatus('设置已加载');
 }
 
@@ -554,6 +745,9 @@ function bind() {
   });
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) runSettingsAuthGuard().catch(() => {});
+  });
+  byId('aiProviderTypeSelect')?.addEventListener('change', () => {
+    syncAiProviderFieldsVisibility();
   });
 
   byId('settingsRefreshBtn')?.addEventListener('click', () => {
@@ -685,6 +879,21 @@ function bind() {
       setStatus(err.message || '重复项扫描失败', { error: true });
     }
   });
+  byId('semanticDedupeScanBtn')?.addEventListener('click', async () => {
+    try {
+      const out = await api('/api/product/ai/dedupe/semantic-scan', {
+        method: 'POST',
+        body: JSON.stringify({ threshold: 0.9, minClusterSize: 2, limit: 240 })
+      });
+      byId('searchToolsOutput').textContent = JSON.stringify(out, null, 2);
+      const total = Number(out?.totalClusters || 0) || 0;
+      const dup = Number(out?.potentialDuplicates || 0) || 0;
+      setStatus(total ? `AI 语义去重聚类完成：${total} 组，潜在重复 ${dup} 条` : 'AI 语义去重聚类完成（未发现聚类）');
+    } catch (err) {
+      byId('searchToolsOutput').textContent = err.message || '失败';
+      setStatus(err.message || 'AI 语义去重聚类失败', { error: true });
+    }
+  });
   byId('brokenLinkScanBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/product/broken-links/scan', { method: 'POST', body: JSON.stringify({ limit: 20 }) });
@@ -717,16 +926,219 @@ function bind() {
   byId('backupRefreshBtn')?.addEventListener('click', () => {
     loadBackups().then(() => setStatus('备份列表已刷新')).catch((err) => setStatus(err.message, { error: true }));
   });
-  byId('aiSuggestBtn')?.addEventListener('click', async () => {
-    const bookmarkId = byId('aiBookmarkIdInput').value.trim();
-    if (!bookmarkId) return setStatus('生成 AI 建议需要书签 ID', { error: true });
+  byId('aiLoadConfigBtn')?.addEventListener('click', () => {
+    loadAiConfig().then(() => setStatus('AI 配置已刷新')).catch((err) => setStatus(err.message || '刷新 AI 配置失败', { error: true }));
+  });
+  byId('aiRulesLoadConfigBtn')?.addEventListener('click', () => {
+    loadAiRuleConfig().then(() => setStatus('AI 规则配置已刷新')).catch((err) => setStatus(err.message || '刷新 AI 规则配置失败', { error: true }));
+  });
+  byId('aiSaveConfigBtn')?.addEventListener('click', async () => {
     try {
-      const out = await api(`/api/product/ai/suggest/${encodeURIComponent(bookmarkId)}`, { method: 'POST', body: JSON.stringify({}) });
+      const payload = readAiConfigForm();
+      const out = await api('/api/product/ai/config', {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      view.aiConfig = out?.config || null;
+      renderAiConfig();
       byId('aiOutput').textContent = JSON.stringify(out, null, 2);
-      setStatus('AI 建议已生成');
+      setStatus('AI 配置已保存');
     } catch (err) {
       byId('aiOutput').textContent = err.message || '失败';
-      setStatus(err.message || 'AI 建议生成失败', { error: true });
+      setStatus(err.message || '保存 AI 配置失败', { error: true });
+    }
+  });
+  byId('aiRulesSaveConfigBtn')?.addEventListener('click', async () => {
+    try {
+      const out = await api('/api/product/ai/rules/config', {
+        method: 'PUT',
+        body: JSON.stringify(readAiRuleConfigForm())
+      });
+      view.aiRuleConfig = out?.config || null;
+      renderAiRuleConfig();
+      byId('aiRulesOutput').textContent = JSON.stringify(out, null, 2);
+      setStatus('AI 规则配置已保存');
+    } catch (err) {
+      byId('aiRulesOutput').textContent = err.message || '失败';
+      setStatus(err.message || '保存 AI 规则配置失败', { error: true });
+    }
+  });
+  byId('aiTestBtn')?.addEventListener('click', async () => {
+    try {
+      const out = await api('/api/product/ai/test', {
+        method: 'POST',
+        body: JSON.stringify(readAiConfigForm())
+      });
+      byId('aiOutput').textContent = JSON.stringify(out, null, 2);
+      setStatus('AI 连接测试成功');
+    } catch (err) {
+      byId('aiOutput').textContent = err.message || '失败';
+      setStatus(err.message || 'AI 连接测试失败', { error: true });
+    }
+  });
+  byId('aiDigestWindowTypeSelect')?.addEventListener('change', syncAiDigestControls);
+  byId('aiDigestRunBtn')?.addEventListener('click', async () => {
+    try {
+      const windowType = byId('aiDigestWindowTypeSelect')?.value || 'day';
+      const days = Math.max(1, Math.min(30, Number(byId('aiDigestDaysInput')?.value || 7) || 7));
+      const maxItems = Math.max(10, Math.min(200, Number(byId('aiDigestMaxItemsInput')?.value || 80) || 80));
+      const out = await api('/api/product/ai/digest', {
+        method: 'POST',
+        body: JSON.stringify({ windowType, days, maxItems })
+      });
+      byId('aiOutput').textContent = JSON.stringify(out, null, 2);
+      const digest = out?.digest || {};
+      const count = Number(digest.bookmarkCount || 0) || 0;
+      setStatus(`AI Digest 已生成（${count} 条书签）`);
+    } catch (err) {
+      byId('aiOutput').textContent = err.message || '失败';
+      setStatus(err.message || 'AI Digest 生成失败', { error: true });
+    }
+  });
+  byId('aiReadingPriorityRunBtn')?.addEventListener('click', async () => {
+    try {
+      const viewScope = byId('aiReadingPriorityViewSelect')?.value || 'all';
+      const folderId = String(byId('aiReadingPriorityFolderIdInput')?.value || '').trim();
+      const onlyUnread = (byId('aiReadingPriorityOnlyUnreadSelect')?.value || 'true') === 'true';
+      const includeArchived = (byId('aiReadingPriorityIncludeArchivedSelect')?.value || 'false') === 'true';
+      const limit = Math.max(3, Math.min(20, Number(byId('aiReadingPriorityLimitInput')?.value || 10) || 10));
+      const candidateLimit = Math.max(limit, Math.min(120, Number(byId('aiReadingPriorityCandidateLimitInput')?.value || 60) || 60));
+      const out = await api('/api/product/ai/reading-priority', {
+        method: 'POST',
+        body: JSON.stringify({
+          view: viewScope,
+          folderId,
+          onlyUnread,
+          includeArchived,
+          limit,
+          candidateLimit
+        })
+      });
+      byId('aiOutput').textContent = JSON.stringify(out, null, 2);
+      const count = Number(out?.items?.length || 0) || 0;
+      setStatus(count ? `AI 阅读优先级建议已生成：${count} 条` : 'AI 阅读优先级建议已生成（无结果）');
+    } catch (err) {
+      byId('aiOutput').textContent = err.message || '失败';
+      setStatus(err.message || 'AI 阅读优先级建议失败', { error: true });
+    }
+  });
+  byId('aiRulesManualRunBtn')?.addEventListener('click', async () => {
+    const bookmarkId = String(byId('aiRulesManualBookmarkIdInput')?.value || '').trim();
+    if (!bookmarkId) return setStatus('手动执行规则需要书签 ID', { error: true });
+    try {
+      const out = await api('/api/product/ai/rules/run', {
+        method: 'POST',
+        body: JSON.stringify({
+          bookmarkId,
+          trigger: byId('aiRulesManualTriggerSelect')?.value || 'manual'
+        })
+      });
+      byId('aiRulesOutput').textContent = JSON.stringify(out, null, 2);
+      setStatus('AI 规则手动执行完成');
+    } catch (err) {
+      byId('aiRulesOutput').textContent = err.message || '失败';
+      setStatus(err.message || 'AI 规则手动执行失败', { error: true });
+    }
+  });
+  byId('aiRulesListRunsBtn')?.addEventListener('click', async () => {
+    try {
+      const out = await api('/api/product/ai/rules/runs?limit=50');
+      byId('aiRulesOutput').textContent = JSON.stringify(out, null, 2);
+      setStatus('AI 规则运行日志已加载');
+    } catch (err) {
+      byId('aiRulesOutput').textContent = err.message || '失败';
+      setStatus(err.message || '加载 AI 规则运行日志失败', { error: true });
+    }
+  });
+  byId('aiBackfillCreateBtn')?.addEventListener('click', async () => {
+    try {
+      const out = await api('/api/product/ai/backfill/tasks', {
+        method: 'POST',
+        body: JSON.stringify(readAiBackfillCreateForm())
+      });
+      writeAiBackfillOutput(out);
+      const taskId = out?.task?.id ? String(out.task.id) : '';
+      if (taskId && byId('aiBackfillTaskIdInput')) byId('aiBackfillTaskIdInput').value = taskId;
+      const queued = Number(out?.meta?.queued || out?.task?.progress?.total || 0) || 0;
+      setStatus(queued ? `AI 回填任务已创建（${queued} 条）` : 'AI 回填任务已创建');
+    } catch (err) {
+      writeAiBackfillOutput(err.message || '失败');
+      setStatus(err.message || '创建 AI 回填任务失败', { error: true });
+    }
+  });
+  byId('aiBackfillListBtn')?.addEventListener('click', async () => {
+    try {
+      const out = await api('/api/product/ai/backfill/tasks?limit=50');
+      writeAiBackfillOutput(out);
+      setStatus('AI 回填任务列表已加载');
+    } catch (err) {
+      writeAiBackfillOutput(err.message || '失败');
+      setStatus(err.message || '加载 AI 回填任务列表失败', { error: true });
+    }
+  });
+  byId('aiBackfillGetBtn')?.addEventListener('click', async () => {
+    const taskId = aiBackfillTaskIdValue();
+    if (!taskId) return setStatus('请输入回填任务 ID', { error: true });
+    try {
+      const out = await api(`/api/product/ai/backfill/tasks/${encodeURIComponent(taskId)}`);
+      writeAiBackfillOutput(out);
+      setStatus('AI 回填任务详情已加载');
+    } catch (err) {
+      writeAiBackfillOutput(err.message || '失败');
+      setStatus(err.message || '加载 AI 回填任务详情失败', { error: true });
+    }
+  });
+  byId('aiBackfillPauseBtn')?.addEventListener('click', async () => {
+    const taskId = aiBackfillTaskIdValue();
+    if (!taskId) return setStatus('请输入回填任务 ID', { error: true });
+    try {
+      const out = await api(`/api/product/ai/backfill/tasks/${encodeURIComponent(taskId)}/pause`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      writeAiBackfillOutput(out);
+      setStatus('AI 回填任务已暂停');
+    } catch (err) {
+      writeAiBackfillOutput(err.message || '失败');
+      setStatus(err.message || '暂停 AI 回填任务失败', { error: true });
+    }
+  });
+  byId('aiBackfillResumeBtn')?.addEventListener('click', async () => {
+    const taskId = aiBackfillTaskIdValue();
+    if (!taskId) return setStatus('请输入回填任务 ID', { error: true });
+    try {
+      const out = await api(`/api/product/ai/backfill/tasks/${encodeURIComponent(taskId)}/resume`, {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      writeAiBackfillOutput(out);
+      setStatus('AI 回填任务已恢复');
+    } catch (err) {
+      writeAiBackfillOutput(err.message || '失败');
+      setStatus(err.message || '恢复 AI 回填任务失败', { error: true });
+    }
+  });
+  byId('aiAutoTagBtn')?.addEventListener('click', async () => {
+    const bookmarkId = byId('aiBookmarkIdInput').value.trim();
+    if (!bookmarkId) return setStatus('执行 AI 自动打标签需要书签 ID', { error: true });
+    const runMode = byId('aiRunModeSelect')?.value || 'autotag';
+    const applyMode = byId('aiRunApplyModeSelect')?.value || '';
+    try {
+      const path = runMode === 'suggest'
+        ? `/api/product/ai/suggest/${encodeURIComponent(bookmarkId)}`
+        : `/api/product/ai/autotag/${encodeURIComponent(bookmarkId)}`;
+      const body = runMode === 'suggest'
+        ? {}
+        : {
+            apply: true,
+            ...(applyMode ? { applyMode } : {})
+          };
+      const out = await api(path, { method: 'POST', body: JSON.stringify(body) });
+      byId('aiOutput').textContent = JSON.stringify(out, null, 2);
+      setStatus(runMode === 'suggest' ? 'AI 标签建议已生成' : 'AI 自动打标签已完成');
+    } catch (err) {
+      byId('aiOutput').textContent = err.message || '失败';
+      setStatus(err.message || 'AI 自动打标签失败', { error: true });
     }
   });
   byId('aiJobsBtn')?.addEventListener('click', async () => {
@@ -743,6 +1155,7 @@ function bind() {
   window.addEventListener('api-unauthorized', () => {
     goLogin();
   });
+  syncAiDigestControls();
 }
 
 async function init() {

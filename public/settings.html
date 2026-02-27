@@ -205,6 +205,7 @@
                 <div class="settings-actions">
                   <button type="button" class="ghost" id="searchRebuildBtn">重建全文索引</button>
                   <button type="button" class="ghost" id="dedupeScanBtn">扫描重复项</button>
+                  <button type="button" class="ghost" id="semanticDedupeScanBtn">AI 语义去重聚类</button>
                   <button type="button" class="ghost" id="brokenLinkScanBtn">扫描坏链</button>
                   <button type="button" class="ghost" id="brokenLinkTasksBtn">查看坏链任务</button>
                 </div>
@@ -221,11 +222,408 @@
               </section>
 
               <section class="settings-panel settings-panel-span-2">
-                <h3>AI 建议（占位实现）</h3>
+                <h3>AI 自动打标签</h3>
+                <p class="muted">支持 OpenAI 兼容协议（如硅基流动）和 Cloudflare AI（Workers AI）。</p>
+                <div class="settings-form">
+                  <label>
+                    <span>启用 AI</span>
+                    <select id="aiEnabledSelect">
+                      <option value="false">关闭</option>
+                      <option value="true">开启</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>提供商类型</span>
+                    <select id="aiProviderTypeSelect">
+                      <option value="openai_compatible">OpenAI 兼容（硅基流动等）</option>
+                      <option value="cloudflare_ai">Cloudflare AI（Workers AI）</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div id="aiProviderOpenAIFields" class="settings-form">
+                  <label>OpenAI 兼容 Base URL<input id="aiOpenAIBaseUrlInput" placeholder="https://api.siliconflow.cn/v1" /></label>
+                  <label>OpenAI 兼容 API Key<input id="aiOpenAIApiKeyInput" type="password" placeholder="留空则保留已有密钥" /></label>
+                  <label>模型<input id="aiOpenAIModelInput" placeholder="Qwen/Qwen2.5-7B-Instruct" /></label>
+                </div>
+
+                <div id="aiProviderCloudflareFields" class="settings-form">
+                  <label>Cloudflare Account ID<input id="aiCloudflareAccountIdInput" placeholder="32位账号 ID" /></label>
+                  <label>Cloudflare API Token<input id="aiCloudflareApiTokenInput" type="password" placeholder="留空则保留已有 Token" /></label>
+                  <label>Cloudflare 模型<input id="aiCloudflareModelInput" placeholder="@cf/meta/llama-3.1-8b-instruct" /></label>
+                </div>
+
+                <div class="settings-form">
+                  <label>
+                    <span>默认打标签模式</span>
+                    <select id="aiTagApplyModeSelect">
+                      <option value="merge">合并到现有标签</option>
+                      <option value="replace">替换现有标签</option>
+                    </select>
+                  </label>
+                  <label>最多标签数<input id="aiTagMaxTagsInput" type="number" min="1" max="12" value="6" /></label>
+                  <label>
+                    <span>优先中文标签</span>
+                    <select id="aiTagPreferChineseSelect">
+                      <option value="true">是</option>
+                      <option value="false">否</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>提示词中包含域名</span>
+                    <select id="aiTagIncludeDomainSelect">
+                      <option value="true">是</option>
+                      <option value="false">否</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="settings-actions">
+                  <button type="button" class="ghost" id="aiLoadConfigBtn">刷新 AI 配置</button>
+                  <button type="button" class="ghost" id="aiSaveConfigBtn">保存 AI 配置</button>
+                  <button type="button" class="ghost" id="aiTestBtn">测试连接</button>
+                </div>
+
+                <div class="settings-panel-subsection">
+                  <h4>Digest（AI-305）</h4>
+                  <p class="muted">按时间窗口汇总新增收藏，生成日报/周报/自定义时间窗口 Digest。</p>
+                  <div class="settings-form">
+                    <label>
+                      <span>时间窗口</span>
+                      <select id="aiDigestWindowTypeSelect">
+                        <option value="day">日报（近 24 小时）</option>
+                        <option value="week">周报（近 7 天）</option>
+                        <option value="custom_days">自定义天数</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>自定义天数</span>
+                      <input id="aiDigestDaysInput" type="number" min="1" max="30" value="7" />
+                    </label>
+                    <label>
+                      <span>样本上限</span>
+                      <input id="aiDigestMaxItemsInput" type="number" min="10" max="200" value="80" />
+                    </label>
+                    <div class="settings-actions">
+                      <button type="button" class="ghost" id="aiDigestRunBtn">生成 AI Digest</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-panel-subsection">
+                  <h4>阅读优先级建议（AI-306）</h4>
+                  <p class="muted">根据时效性、提醒、兴趣偏好和内容特征，给出“先读什么”的建议列表。</p>
+                  <div class="settings-form">
+                    <label>
+                      <span>视图范围</span>
+                      <select id="aiReadingPriorityViewSelect">
+                        <option value="all">全部书签</option>
+                        <option value="inbox">收件箱</option>
+                        <option value="favorites">收藏</option>
+                        <option value="archive">归档</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>集合 ID（可选）</span>
+                      <input id="aiReadingPriorityFolderIdInput" placeholder="留空表示不限定集合" />
+                    </label>
+                    <label>
+                      <span>仅未读</span>
+                      <select id="aiReadingPriorityOnlyUnreadSelect">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>包含归档</span>
+                      <select id="aiReadingPriorityIncludeArchivedSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>返回数量</span>
+                      <input id="aiReadingPriorityLimitInput" type="number" min="3" max="20" value="10" />
+                    </label>
+                    <label>
+                      <span>候选池上限</span>
+                      <input id="aiReadingPriorityCandidateLimitInput" type="number" min="10" max="120" value="60" />
+                    </label>
+                    <div class="settings-actions">
+                      <button type="button" class="ghost" id="aiReadingPriorityRunBtn">生成阅读优先级建议</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="settings-panel-subsection">
+                  <h4>AI 规则动作引擎（AI-401）</h4>
+                  <p class="muted">触发器：新增书签 / 抓取 metadata 完成。动作：打标签 / 摘要 / 推荐集合（可自动移动）。</p>
+                  <div class="settings-form">
+                    <label>
+                      <span>启用规则引擎</span>
+                      <select id="aiRulesEnabledSelect">
+                        <option value="false">关闭</option>
+                        <option value="true">开启</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>触发：新增书签</span>
+                      <select id="aiRulesTriggerBookmarkCreatedSelect">
+                        <option value="true">开启</option>
+                        <option value="false">关闭</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>触发：metadata 抓取完成</span>
+                      <select id="aiRulesTriggerMetadataFetchedSelect">
+                        <option value="false">关闭</option>
+                        <option value="true">开启</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="settings-form">
+                    <label>
+                      <span>条件：跳过归档书签</span>
+                      <select id="aiRulesSkipIfArchivedSelect">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>条件：有标签则跳过</span>
+                      <select id="aiRulesSkipIfTaggedSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>条件：有备注则跳过</span>
+                      <select id="aiRulesSkipIfHasNoteSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>条件：仅未读</span>
+                      <select id="aiRulesOnlyUnreadSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="settings-form">
+                    <label>
+                      <span>动作：自动打标签</span>
+                      <select id="aiRulesActionAutoTagEnabledSelect">
+                        <option value="true">开启</option>
+                        <option value="false">关闭</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>打标签写回模式</span>
+                      <select id="aiRulesActionAutoTagApplyModeSelect">
+                        <option value="merge">合并</option>
+                        <option value="replace">替换</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>动作：生成摘要</span>
+                      <select id="aiRulesActionSummaryEnabledSelect">
+                        <option value="false">关闭</option>
+                        <option value="true">开启</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>摘要写入模式</span>
+                      <select id="aiRulesActionSummaryNoteModeSelect">
+                        <option value="if_empty">仅备注为空时写入</option>
+                        <option value="append">追加到备注</option>
+                        <option value="replace">替换备注</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>动作：推荐集合</span>
+                      <select id="aiRulesActionRecommendFolderEnabledSelect">
+                        <option value="false">关闭</option>
+                        <option value="true">开启</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>自动移动到推荐集合</span>
+                      <select id="aiRulesActionRecommendFolderAutoMoveSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="aiRulesLoadConfigBtn">刷新规则配置</button>
+                    <button type="button" class="ghost" id="aiRulesSaveConfigBtn">保存规则配置</button>
+                    <button type="button" class="ghost" id="aiRulesListRunsBtn">查看规则运行日志</button>
+                  </div>
+                  <div class="settings-form">
+                    <label>手动执行书签 ID<input id="aiRulesManualBookmarkIdInput" placeholder="bm_..." /></label>
+                    <label>
+                      <span>模拟触发器</span>
+                      <select id="aiRulesManualTriggerSelect">
+                        <option value="manual">manual</option>
+                        <option value="bookmark_created">bookmark_created</option>
+                        <option value="metadata_fetched">metadata_fetched</option>
+                      </select>
+                    </label>
+                    <div class="settings-actions">
+                      <button type="button" class="ghost" id="aiRulesManualRunBtn">手动执行规则</button>
+                    </div>
+                  </div>
+                  <pre id="aiRulesOutput"></pre>
+                </div>
+
+                <div class="settings-panel-subsection">
+                  <h4>历史库 AI 回填任务（AI-402）</h4>
+                  <p class="muted">对已有书签分批执行 AI 规则（打标签/摘要/推荐集合），支持暂停/恢复。执行逻辑复用 AI-401 规则引擎。</p>
+                  <div class="settings-form">
+                    <label>
+                      <span>视图范围</span>
+                      <select id="aiBackfillViewSelect">
+                        <option value="all">全部书签</option>
+                        <option value="inbox">收件箱</option>
+                        <option value="favorites">收藏</option>
+                        <option value="archive">归档</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>集合 ID（可选）</span>
+                      <input id="aiBackfillFolderIdInput" placeholder="留空表示不限定集合" />
+                    </label>
+                    <label>
+                      <span>包含子集合</span>
+                      <select id="aiBackfillIncludeDescendantsSelect">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>仅未读</span>
+                      <select id="aiBackfillOnlyUnreadSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>仅无标签</span>
+                      <select id="aiBackfillOnlyUntaggedSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>仅无备注</span>
+                      <select id="aiBackfillOnlyNoNoteSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>包含归档</span>
+                      <select id="aiBackfillIncludeArchivedSelect">
+                        <option value="false">否</option>
+                        <option value="true">是</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>排序</span>
+                      <select id="aiBackfillOrderSelect">
+                        <option value="updated_desc">最近更新优先</option>
+                        <option value="updated_asc">最早更新优先</option>
+                        <option value="newest">最新创建优先</option>
+                        <option value="oldest">最早创建优先</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>任务上限</span>
+                      <input id="aiBackfillLimitInput" type="number" min="1" max="2000" value="300" />
+                    </label>
+                    <label>
+                      <span>批大小</span>
+                      <input id="aiBackfillBatchSizeInput" type="number" min="1" max="50" value="10" />
+                    </label>
+                  </div>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="aiBackfillCreateBtn">创建回填任务</button>
+                    <button type="button" class="ghost" id="aiBackfillListBtn">查看回填任务</button>
+                  </div>
+                  <div class="settings-form">
+                    <label>任务 ID<input id="aiBackfillTaskIdInput" placeholder="ai_backfill_..." /></label>
+                    <div class="settings-actions">
+                      <button type="button" class="ghost" id="aiBackfillGetBtn">查看任务详情</button>
+                      <button type="button" class="ghost" id="aiBackfillPauseBtn">暂停任务</button>
+                      <button type="button" class="ghost" id="aiBackfillResumeBtn">恢复任务</button>
+                    </div>
+                  </div>
+                  <pre id="aiBackfillOutput"></pre>
+                </div>
+
+                <div class="settings-panel-subsection">
+                  <h4>新书签自动分类规则（AI-107）</h4>
+                  <p class="muted">新建书签成功后，按规则自动执行 AI 打标签和集合推荐（可先确认再执行）。</p>
+                  <div class="settings-form">
+                    <label>
+                      <span>启用新书签自动分类</span>
+                      <select id="aiAutoCreateEnabledSelect">
+                        <option value="false">关闭</option>
+                        <option value="true">开启</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>执行前确认</span>
+                      <select id="aiAutoCreateRequireConfirmSelect">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>自动打标签</span>
+                      <select id="aiAutoCreateAutoTagSelect">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>推荐集合</span>
+                      <select id="aiAutoCreateRecommendFolderSelect">
+                        <option value="true">是</option>
+                        <option value="false">否</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>自动移动到推荐集合</span>
+                      <select id="aiAutoCreateAutoMoveFolderSelect">
+                        <option value="false">否（仅给建议）</option>
+                        <option value="true">是（直接移动）</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
                 <div class="settings-form">
                   <label>书签 ID<input id="aiBookmarkIdInput" placeholder="bm_..." /></label>
+                  <label>
+                    <span>本次执行模式</span>
+                    <select id="aiRunModeSelect">
+                      <option value="autotag">自动打标签（写回）</option>
+                      <option value="suggest">仅生成建议</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>本次写回策略</span>
+                    <select id="aiRunApplyModeSelect">
+                      <option value="">使用默认配置</option>
+                      <option value="merge">合并</option>
+                      <option value="replace">替换</option>
+                    </select>
+                  </label>
                   <div class="settings-actions">
-                    <button type="button" class="ghost" id="aiSuggestBtn">生成建议</button>
+                    <button type="button" class="ghost" id="aiAutoTagBtn">执行 AI 自动打标签</button>
                     <button type="button" class="ghost" id="aiJobsBtn">查看 AI 任务</button>
                   </div>
                 </div>

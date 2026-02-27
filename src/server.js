@@ -11,8 +11,9 @@ const { registerReminderRoutes } = require('./routes/reminderRoutes');
 const { registerIoRoutes } = require('./routes/ioRoutes');
 const { registerAuthRoutes } = require('./routes/authRoutes');
 const { registerCollabRoutes } = require('./routes/collabRoutes');
-const { registerProductRoutes } = require('./routes/productRoutes');
+const { registerProductRoutes, entitlementForUser } = require('./routes/productRoutes');
 const { registerPluginRoutes } = require('./routes/pluginRoutes');
+const { registerChromeSyncRoutes } = require('./routes/chromeSyncRoutes');
 const { JsonStore, SQLiteStore } = require('./store');
 const { DbRepository } = require('./repositories/dbRepository');
 const { PluginManager } = require('./pluginManager');
@@ -27,6 +28,7 @@ const { AuthService } = require('./services/authService');
 const { createTenantBootstrapMiddleware } = require('./services/tenantScope');
 const { createAuthorizationMiddleware } = require('./services/permissionService');
 const { createJobQueueBroker } = require('./infra/jobQueue');
+const { AiRuleEngine } = require('./services/aiRuleEngine');
 
 function normalizeTags(raw) {
   if (!Array.isArray(raw)) return [];
@@ -119,6 +121,12 @@ function ensureDbShape(db) {
   db.brokenLinkTasks = Array.isArray(db.brokenLinkTasks) ? db.brokenLinkTasks : [];
   db.backups = Array.isArray(db.backups) ? db.backups : [];
   db.aiSuggestionJobs = Array.isArray(db.aiSuggestionJobs) ? db.aiSuggestionJobs : [];
+  db.aiProviderConfigs = db.aiProviderConfigs && typeof db.aiProviderConfigs === 'object' ? db.aiProviderConfigs : {};
+  db.aiBatchTasks = Array.isArray(db.aiBatchTasks) ? db.aiBatchTasks : [];
+  db.aiBackfillTasks = Array.isArray(db.aiBackfillTasks) ? db.aiBackfillTasks : [];
+  db.semanticIndex = Array.isArray(db.semanticIndex) ? db.semanticIndex : [];
+  db.aiRuleConfigs = db.aiRuleConfigs && typeof db.aiRuleConfigs === 'object' ? db.aiRuleConfigs : {};
+  db.aiRuleRuns = Array.isArray(db.aiRuleRuns) ? db.aiRuleRuns : [];
 
   for (const share of db.collectionShares) {
     share.id = String(share.id || `shr_${crypto.randomUUID()}`);
@@ -292,8 +300,13 @@ function applyBookmarkFilters(items, db, query) {
   if (query.read === 'false') out = out.filter((x) => !x.read);
 
   if (folderId && folderId !== 'all') {
-    const ids = collectDescendantIds(db.folders, folderId);
-    out = out.filter((x) => ids.has(x.folderId));
+    const recursive = query.recursive === 'true';
+    if (recursive) {
+      const ids = collectDescendantIds(db.folders, folderId);
+      out = out.filter((x) => ids.has(x.folderId));
+    } else {
+      out = out.filter((x) => String(x.folderId) === folderId);
+    }
   }
 
   if (tagsRaw) {
@@ -490,6 +503,7 @@ async function main() {
   const reminders = new ReminderManager({ dbRepo });
   reminders.start();
   const auth = new AuthService({ dbRepo, isProduction: config.isProduction });
+  const aiRules = new AiRuleEngine({ dbRepo, entitlementForUser });
 
   app.use(async (req, res, next) => {
     try {
@@ -564,6 +578,7 @@ async function main() {
     metadataTasks,
     objectStorage,
     extractAndPersistArticle,
+    aiRules,
     badRequest,
     notFound
   });
@@ -597,11 +612,15 @@ async function main() {
   registerProductRoutes(app, {
     dbRepo,
     objectStorage,
+    jobQueue,
+    aiRules,
     badRequest,
     notFound
   });
 
   registerPluginRoutes(app, { plugins });
+
+  registerChromeSyncRoutes(app, { dbRepo, badRequest, notFound });
 
   registerErrorStack(app);
 
