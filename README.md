@@ -98,7 +98,7 @@ docker pull ghcr.io/xiaochou164/bookmark:master
 ```bash
 docker run -d \
   --name bookmarktorain \
-  -p 3789:3000 \
+  -p 3789:3789 \
   -v ./data:/app/data \
   --restart unless-stopped \
   ghcr.io/xiaochou164/bookmark:master
