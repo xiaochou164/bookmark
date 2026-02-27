@@ -20,8 +20,45 @@ let previewMode = 'auto';
 let previewUiState = 'idle';
 let detailHighlightsBookmarkId = null;
 let detailHighlightsLoadSeq = 0;
+let detailRelatedBookmarksState = {
+  bookmarkId: '',
+  loading: false,
+  items: [],
+  summary: '',
+  confidence: 0,
+  error: ''
+};
+let aiQaDialogState = {
+  loading: false,
+  question: '',
+  answer: '',
+  sources: [],
+  insufficient: false,
+  confidence: 0,
+  error: '',
+  bookmarkId: '',
+  scope: 'auto',
+  limit: 6
+};
+let aiFolderSummaryDialogState = {
+  loading: false,
+  folderId: '',
+  result: null,
+  error: '',
+  suppressPersisted: false
+};
 let detailEditMode = false;
 let detailEditBookmarkId = null;
+let detailAiAutoTagRunning = false;
+let detailAiTitleCleanRunning = false;
+let detailAiSummaryRunning = false;
+let detailAiReaderSummaryRunning = false;
+let detailAiHighlightCandidatesRunning = false;
+let detailAiHighlightDigestRunning = false;
+let detailAiFolderRecommendRunning = false;
+let detailAiRelatedRunning = false;
+let detailAiQaRunning = false;
+let bulkAiAutoTagRunning = false;
 let ioTaskPollTimer = null;
 let ioActiveTaskId = null;
 let actionDialogSession = null;
@@ -84,9 +121,14 @@ let advancedSearchState = {
   type: '',
   favorite: '',
   archived: '',
+  semanticEnabled: false,
+  semanticMode: 'hybrid',
+  rerankEnabled: false,
+  rerankTopK: 36,
   saved: [],
   activeSavedId: '',
-  lastResultMeta: null
+  lastResultMeta: null,
+  lastAiParseMeta: null
 };
 const SEARCH_RECENT_STORAGE_KEY = 'rainboard.searchRecentQueries';
 const SEARCH_RECENT_LIMIT = 12;
@@ -286,18 +328,16 @@ function collectionTreeRowHtml(f, {
   level = 0
 } = {}) {
   return `<div class="tree-row" data-tree-row-folder="${f.id}" style="--tree-level:${Number(level || 0)}">
-    ${
-      hasChildren
-        ? `<button type="button" class="tree-expander ${collapsed ? 'collapsed' : ''}" data-folder-toggle="${f.id}" aria-label="${collapsed ? '展开集合' : '折叠集合'}" aria-expanded="${String(!collapsed)}">▾</button>`
-        : '<span class="tree-expander tree-expander-spacer" aria-hidden="true"></span>'
+    ${hasChildren
+      ? `<button type="button" class="tree-expander ${collapsed ? 'collapsed' : ''}" data-folder-toggle="${f.id}" aria-label="${collapsed ? '展开集合' : '折叠集合'}" aria-expanded="${String(!collapsed)}">▾</button>`
+      : '<span class="tree-expander tree-expander-spacer" aria-hidden="true"></span>'
     }
     <button class="tree-item ${active ? 'active' : ''}" data-folder="${f.id}" draggable="true">
       <span class="tree-item-inner">
-        ${
-          f.icon
-            ? `<span class="tree-folder-icon" aria-hidden="true">${escapeHtml(String(f.icon || ''))}</span>`
-            : `<span class="tree-color-dot" style="background:${escapeHtml(f.color)}"></span>`
-        }
+        ${f.icon
+      ? `<span class="tree-folder-icon" aria-hidden="true">${escapeHtml(String(f.icon || ''))}</span>`
+      : `<span class="tree-color-dot" style="background:${escapeHtml(f.color)}"></span>`
+    }
         <span class="tree-item-name">${escapeHtml(f.name)}</span>
         <span class="muted tree-item-count">${Number(badge || 0)}</span>
       </span>
@@ -659,9 +699,8 @@ function renderCollectionsTreeSection() {
     tree.dataset.virtualCount = String(visibleRows.length);
     tree.dataset.virtualStart = String(win.start);
     tree.dataset.virtualEnd = String(win.end);
-    tree.innerHTML = `${win.topPad ? `<div class="tree-virtual-spacer" style="height:${win.topPad}px" aria-hidden="true"></div>` : ''}${
-      slice.map((row) => `<div class="tree-node tree-node-flat" data-tree-node="${row.folder.id}">${collectionTreeRowHtml(row.folder, row)}</div>`).join('')
-    }${win.bottomPad ? `<div class="tree-virtual-spacer" style="height:${win.bottomPad}px" aria-hidden="true"></div>` : ''}`;
+    tree.innerHTML = `${win.topPad ? `<div class="tree-virtual-spacer" style="height:${win.topPad}px" aria-hidden="true"></div>` : ''}${slice.map((row) => `<div class="tree-node tree-node-flat" data-tree-node="${row.folder.id}">${collectionTreeRowHtml(row.folder, row)}</div>`).join('')
+      }${win.bottomPad ? `<div class="tree-virtual-spacer" style="height:${win.bottomPad}px" aria-hidden="true"></div>` : ''}`;
   } else {
     tree.classList.remove('is-virtualized');
     delete tree.dataset.virtualCount;
@@ -1060,6 +1099,14 @@ function renderHeaderMenuControls() {
     el.setAttribute('aria-checked', String(active));
   });
   byId('headerViewColumnsBtn')?.classList.toggle('hidden', bookmarkLayoutMode !== 'list');
+
+  const aiFolderSummaryItem = byId('headerMoreMenu')?.querySelector('[data-header-more-action="ai-folder-summary"]');
+  if (aiFolderSummaryItem) {
+    const folderId = String(state.filters.folderId || 'all');
+    const hasCollection = folderId && folderId !== 'all' && Boolean(getFolderById(folderId));
+    aiFolderSummaryItem.disabled = !hasCollection;
+    aiFolderSummaryItem.title = hasCollection ? '生成当前集合知识摘要' : '请先选择一个集合';
+  }
 }
 
 function getFolderById(folderId) {
@@ -1958,6 +2005,7 @@ function menuItemIconName(btn) {
   if (ds.headerMoreAction) {
     return ({
       export: 'file',
+      'ai-folder-summary': 'ai',
       plugin: 'refresh'
     }[String(ds.headerMoreAction)] || 'open');
   }
@@ -1978,6 +2026,14 @@ function menuItemIconName(btn) {
       'preview-web': 'web',
       'preview-reader': 'article',
       'copy-link': 'copy',
+      'ai-autotag': 'ai',
+      'ai-title-clean': 'ai',
+      'ai-summary': 'ai',
+      'ai-reader-summary': 'article',
+      'ai-highlight-digest': 'highlights',
+      'ai-folder-recommend': 'folder',
+      'ai-qa': 'ai',
+      'ai-related': 'ai',
       'toggle-edit': 'edit',
       delete: 'delete',
       restore: 'restore'
@@ -2302,7 +2358,11 @@ function advancedFiltersFromState() {
     domain: String(advancedSearchState.domain || '').trim(),
     type: String(advancedSearchState.type || '').trim(),
     favorite: String(advancedSearchState.favorite || '').trim(),
-    archived: String(advancedSearchState.archived || '').trim()
+    archived: String(advancedSearchState.archived || '').trim(),
+    semanticEnabled: Boolean(advancedSearchState.semanticEnabled),
+    semanticMode: String(advancedSearchState.semanticMode || 'hybrid'),
+    rerankEnabled: Boolean(advancedSearchState.rerankEnabled),
+    rerankTopK: Math.max(5, Math.min(80, Number(advancedSearchState.rerankTopK || 36) || 36))
   };
 }
 
@@ -2315,6 +2375,10 @@ function currentAdvancedSearchQueryPayload() {
     type: extra.type,
     favorite: extra.favorite,
     archived: extra.archived,
+    semantic: extra.semanticEnabled ? 'true' : '',
+    semanticMode: extra.semanticMode,
+    rerank: extra.rerankEnabled ? 'true' : '',
+    rerankTopK: extra.rerankTopK,
     view: state.filters.view,
     folderId: state.filters.folderId,
     sort: state.filters.sort,
@@ -2334,6 +2398,10 @@ function currentBookmarksQueryKey() {
       type: q.type || '',
       favorite: q.favorite || '',
       archived: q.archived || '',
+      semantic: q.semantic || '',
+      semanticMode: q.semanticMode || 'hybrid',
+      rerank: q.rerank || '',
+      rerankTopK: Number(q.rerankTopK || 36) || 36,
       view: q.view || 'all',
       folderId: q.folderId || 'all',
       sort: q.sort || 'newest',
@@ -2346,6 +2414,7 @@ function currentBookmarksQueryKey() {
     folderId: state.filters.folderId || 'all',
     tags: state.filters.tags || '',
     q: state.filters.q || '',
+    semantic: false,
     sort: state.filters.sort || 'newest',
     pageSize: Number(state.filters.pageSize || 24)
   });
@@ -2401,6 +2470,23 @@ function syncAdvancedSearchInputs() {
   if (byId('advancedSearchType')) byId('advancedSearchType').value = advancedSearchState.type || '';
   if (byId('advancedSearchFavorite')) byId('advancedSearchFavorite').value = advancedSearchState.favorite || '';
   if (byId('advancedSearchArchived')) byId('advancedSearchArchived').value = advancedSearchState.archived || '';
+  if (byId('advancedSearchSemanticEnabled')) byId('advancedSearchSemanticEnabled').checked = Boolean(advancedSearchState.semanticEnabled);
+  if (byId('advancedSearchSemanticMode')) {
+    const mode = ['hybrid', 'semantic'].includes(String(advancedSearchState.semanticMode || '')) ? String(advancedSearchState.semanticMode) : 'hybrid';
+    byId('advancedSearchSemanticMode').value = mode;
+  }
+  if (byId('advancedSearchRerankEnabled')) byId('advancedSearchRerankEnabled').checked = Boolean(advancedSearchState.rerankEnabled);
+  if (byId('advancedSearchRerankTopK')) {
+    const topK = Math.max(5, Math.min(80, Number(advancedSearchState.rerankTopK || 36) || 36));
+    const select = byId('advancedSearchRerankTopK');
+    if (![...select.options].some((o) => Number(o.value) === topK)) {
+      const opt = document.createElement('option');
+      opt.value = String(topK);
+      opt.textContent = String(topK);
+      select.appendChild(opt);
+    }
+    select.value = String(topK);
+  }
 
   const savedSelect = byId('advancedSearchSavedSelect');
   if (savedSelect) {
@@ -2437,7 +2523,40 @@ function syncAdvancedSearchInputs() {
   const resultBits = [];
   if (advancedSearchState.lastResultMeta) {
     if (advancedSearchState.lastResultMeta.usedFullText) resultBits.push('已使用全文索引');
+    if (advancedSearchState.lastResultMeta.usedSemantic) {
+      const modeText = String(advancedSearchState.lastResultMeta.semanticMode || 'hybrid') === 'semantic' ? '纯语义' : '混合语义';
+      resultBits.push(`已使用语义检索（${modeText}）`);
+      if (advancedSearchState.lastResultMeta.semanticProvider?.providerType) {
+        const providerType = String(advancedSearchState.lastResultMeta.semanticProvider.providerType);
+        const model = String(advancedSearchState.lastResultMeta.semanticProvider.model || '');
+        resultBits.push(`向量来源：${providerType}${model ? `/${model}` : ''}`);
+      }
+      if (advancedSearchState.lastResultMeta.semanticFallbackLocal) resultBits.push('语义向量使用本地回退');
+      if (Number(advancedSearchState.lastResultMeta.semanticIndexUpdated || 0) > 0) {
+        resultBits.push(`索引更新 ${Number(advancedSearchState.lastResultMeta.semanticIndexUpdated)} 条`);
+      }
+    }
+    if (advancedSearchState.lastResultMeta.usedAiRerank) {
+      const applied = Number(advancedSearchState.lastResultMeta.rerankAppliedCount || 0) || 0;
+      const topK = Number(advancedSearchState.lastResultMeta.rerankTopK || 0) || 0;
+      resultBits.push(`AI 重排：前 ${topK || '-'} 条（实际 ${applied} 条）`);
+      if (advancedSearchState.lastResultMeta.rerankProvider?.providerType) {
+        const providerType = String(advancedSearchState.lastResultMeta.rerankProvider.providerType);
+        const model = String(advancedSearchState.lastResultMeta.rerankProvider.model || '');
+        resultBits.push(`重排模型：${providerType}${model ? `/${model}` : ''}`);
+      }
+      if (advancedSearchState.lastResultMeta.rerankSummary) {
+        resultBits.push(String(advancedSearchState.lastResultMeta.rerankSummary).slice(0, 120));
+      }
+    }
     if (typeof advancedSearchState.lastResultMeta.total === 'number') resultBits.push(`${advancedSearchState.lastResultMeta.total} 条匹配`);
+  }
+  if (advancedSearchState.lastAiParseMeta?.sourceText) {
+    resultBits.push(`AI 解析：${advancedSearchState.lastAiParseMeta.sourceText}`);
+    if (advancedSearchState.lastAiParseMeta.reason) resultBits.push(advancedSearchState.lastAiParseMeta.reason);
+    if (Array.isArray(advancedSearchState.lastAiParseMeta.unsupported) && advancedSearchState.lastAiParseMeta.unsupported.length) {
+      resultBits.push(`未完全支持：${advancedSearchState.lastAiParseMeta.unsupported.join('、')}`);
+    }
   }
   meta.textContent = [chips.length ? `筛选条件：${chips.join(' · ')}` : '筛选条件：无', ...resultBits].join(' · ');
 }
@@ -2449,6 +2568,12 @@ function pullAdvancedSearchInputs() {
   advancedSearchState.type = String(byId('advancedSearchType')?.value || '').trim();
   advancedSearchState.favorite = String(byId('advancedSearchFavorite')?.value || '').trim();
   advancedSearchState.archived = String(byId('advancedSearchArchived')?.value || '').trim();
+  advancedSearchState.semanticEnabled = Boolean(byId('advancedSearchSemanticEnabled')?.checked);
+  advancedSearchState.semanticMode = ['hybrid', 'semantic'].includes(String(byId('advancedSearchSemanticMode')?.value || '').trim())
+    ? String(byId('advancedSearchSemanticMode')?.value || '').trim()
+    : 'hybrid';
+  advancedSearchState.rerankEnabled = Boolean(byId('advancedSearchRerankEnabled')?.checked);
+  advancedSearchState.rerankTopK = Math.max(5, Math.min(80, Number(byId('advancedSearchRerankTopK')?.value || 36) || 36));
 }
 
 async function loadSavedSearches() {
@@ -2490,14 +2615,59 @@ function applySavedSearchToUi(item = {}) {
   advancedSearchState.type = String(query.type || '').trim();
   advancedSearchState.favorite = String(query.favorite || '').trim();
   advancedSearchState.archived = String(query.archived || '').trim();
+  advancedSearchState.semanticEnabled = String(query.semantic || '') === 'true';
+  advancedSearchState.semanticMode = ['hybrid', 'semantic'].includes(String(query.semanticMode || '').trim())
+    ? String(query.semanticMode || '').trim()
+    : 'hybrid';
+  advancedSearchState.rerankEnabled = String(query.rerank || '') === 'true';
+  advancedSearchState.rerankTopK = Math.max(5, Math.min(80, Number(query.rerankTopK || 36) || 36));
   if (typeof query.view === 'string' && query.view) state.filters.view = query.view;
   if (typeof query.folderId === 'string' && query.folderId) state.filters.folderId = query.folderId;
   if (typeof query.sort === 'string' && query.sort) state.filters.sort = query.sort;
   advancedSearchState.activeSavedId = String(item.id || '');
+  advancedSearchState.lastAiParseMeta = null;
   byId('searchInput').value = state.filters.q;
   byId('sortSelect').value = state.filters.sort;
   syncAdvancedSearchInputs();
   renderSidebar();
+}
+
+function applyAiSearchParseToUi(result = {}, sourceText = '') {
+  const query = result?.query && typeof result.query === 'object' ? result.query : {};
+  const validView = ['all', 'inbox', 'favorites', 'archive', 'trash'];
+  const validSort = ['newest', 'updated', 'oldest', 'title'];
+  const validType = ['', 'web', 'pdf', 'image', 'video'];
+  const triBool = new Set(['', 'true', 'false']);
+
+  state.filters.q = String(query.q || '').trim();
+  state.filters.page = 1;
+  if (validView.includes(String(query.view || ''))) state.filters.view = String(query.view || '') || state.filters.view;
+  if (validSort.includes(String(query.sort || ''))) state.filters.sort = String(query.sort || '') || state.filters.sort;
+  if (typeof query.folderId === 'string' && query.folderId) state.filters.folderId = query.folderId;
+
+  advancedSearchState.enabled = true;
+  advancedSearchState.panelOpen = true;
+  advancedSearchState.activeSavedId = '';
+  advancedSearchState.tags = Array.isArray(query.tags) ? query.tags.join(',') : String(query.tags || '').trim();
+  advancedSearchState.domain = String(query.domain || '').trim();
+  advancedSearchState.type = validType.includes(String(query.type || '')) ? String(query.type || '') : '';
+  advancedSearchState.favorite = triBool.has(String(query.favorite || '')) ? String(query.favorite || '') : '';
+  advancedSearchState.archived = triBool.has(String(query.archived || '')) ? String(query.archived || '') : '';
+  advancedSearchState.semanticEnabled = false;
+  advancedSearchState.semanticMode = 'hybrid';
+  advancedSearchState.rerankEnabled = false;
+  advancedSearchState.rerankTopK = 36;
+  advancedSearchState.lastAiParseMeta = {
+    sourceText: String(sourceText || '').trim().slice(0, 80),
+    reason: String(result?.reason || '').trim().slice(0, 180),
+    unsupported: Array.isArray(result?.unsupported) ? result.unsupported.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 6) : [],
+    confidence: Math.max(0, Math.min(1, Number(result?.confidence) || 0))
+  };
+
+  const searchInput = byId('searchInput');
+  if (searchInput) searchInput.value = state.filters.q;
+  const sortSelect = byId('sortSelect');
+  if (sortSelect) sortSelect.value = state.filters.sort || 'newest';
 }
 
 async function openAuthDialog() {
@@ -2811,6 +2981,16 @@ async function fetchBookmarksPagePayload({ page = state.filters.page, pageSize =
     const payload = await api(`/api/product/search/query${qs ? `?${qs}` : ''}`);
     advancedSearchState.lastResultMeta = {
       usedFullText: Boolean(payload?.usedFullText),
+      usedSemantic: Boolean(payload?.usedSemantic),
+      semanticMode: String(payload?.semanticMode || ''),
+      semanticProvider: payload?.semanticProvider && typeof payload.semanticProvider === 'object' ? payload.semanticProvider : null,
+      semanticIndexUpdated: Number(payload?.semanticIndexUpdated || 0) || 0,
+      semanticFallbackLocal: Boolean(payload?.semanticFallbackLocal),
+      usedAiRerank: Boolean(payload?.usedAiRerank),
+      rerankProvider: payload?.rerankProvider && typeof payload.rerankProvider === 'object' ? payload.rerankProvider : null,
+      rerankTopK: Number(payload?.rerankTopK || 0) || 0,
+      rerankAppliedCount: Number(payload?.rerankAppliedCount || 0) || 0,
+      rerankSummary: String(payload?.rerankSummary || ''),
       total: Number(payload?.total || 0)
     };
     return payload;
@@ -3106,8 +3286,8 @@ function renderSidebar() {
   if (quickFiltersList) {
     quickFiltersList.innerHTML = quickFilterItems.length
       ? quickFilterItems.map((item) => {
-          const active = isQuickFilterActiveQuery(item.query) ? 'active' : '';
-          return `<div class="sidebar-row sidebar-filter-row ${active}" data-quick-filter-row="${escapeHtml(item.id)}" data-quick-filter-query="${escapeHtml(item.query)}">
+        const active = isQuickFilterActiveQuery(item.query) ? 'active' : '';
+        return `<div class="sidebar-row sidebar-filter-row ${active}" data-quick-filter-row="${escapeHtml(item.id)}" data-quick-filter-query="${escapeHtml(item.query)}">
             <button type="button" class="sidebar-row-main" data-quick-filter="${escapeHtml(item.id)}">
               <span class="sidebar-row-icon" aria-hidden="true">${iconSvg(item.icon || 'search')}</span>
               <span class="sidebar-row-title">${escapeHtml(item.label)}</span>
@@ -3115,7 +3295,7 @@ function renderSidebar() {
             </button>
             <button type="button" class="sidebar-row-more ghost" data-quick-filter-menu="${escapeHtml(item.id)}" title="更多" aria-label="更多">…</button>
           </div>`;
-        }).join('')
+      }).join('')
       : `<div class="sidebar-empty muted">暂无快速过滤</div>`;
 
     quickFiltersList.querySelectorAll('[data-quick-filter]').forEach((el) => {
@@ -3244,19 +3424,19 @@ function renderTagManager() {
   const previousSource = renameFrom.value;
   list.innerHTML = state.tags.length
     ? state.tags
-        .map(
-          (t) => `<button type="button" class="tag-admin-row ghost" data-tag-pick="${escapeHtml(t.name)}">
+      .map(
+        (t) => `<button type="button" class="tag-admin-row ghost" data-tag-pick="${escapeHtml(t.name)}">
             <span>#${escapeHtml(t.name)}</span>
             <span class="muted">${t.count}</span>
           </button>`
-        )
-        .join('')
+      )
+      .join('')
     : `<div class="muted">暂无标签。</div>`;
 
   renameFrom.innerHTML = state.tags.length
     ? state.tags
-        .map((t) => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)} (${t.count})</option>`)
-        .join('')
+      .map((t) => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)} (${t.count})</option>`)
+      .join('')
     : '<option value="">暂无标签</option>';
 
   if (previousSource && [...renameFrom.options].some((opt) => opt.value === previousSource)) {
@@ -3305,6 +3485,7 @@ function renderHeader() {
   renderBookmarkLayoutSwitch();
   renderListColumnsMenu();
   renderHeaderMenuControls();
+  renderAiFolderSummaryDialogUi();
 }
 
 function renderBookmarkLayoutSwitch() {
@@ -4098,10 +4279,7 @@ function renderCards() {
       store.setActiveId(id);
       renderCards();
       renderDetail();
-      const url = new URL('/settings.html', window.location.origin);
-      url.hash = 'settingsSectionProduct';
-      url.searchParams.set('bookmarkId', id);
-      window.location.assign(`${url.pathname}${url.search}${url.hash}`);
+      openAiQaDialog({ bookmarkId: id, scope: 'auto' });
     });
   });
 
@@ -4216,6 +4394,7 @@ function renderDetailFetchStatusSummary({ item = null, task = null } = {}) {
   else if (articleStatus === 'failed') chips.push('<span class="meta-chip danger">正文提取失败</span>');
   else if (articleStatus === 'extracting') chips.push('<span class="meta-chip info">正文提取中</span>');
   else if (!articleStatus && String(item?.url || '').trim()) chips.push('<span class="meta-chip type">可提取正文</span>');
+  if (item?.aiSuggestions?.readerSummary?.shortSummary) chips.push('<span class="meta-chip info">阅读摘要已生成</span>');
 
   if (previewActiveBookmarkId && String(previewActiveBookmarkId) === String(item.id || '')) {
     if (previewUiState === 'ready' && previewMode === 'reader') chips.push('<span class="meta-chip info">预览阅读模式中</span>');
@@ -4227,6 +4406,58 @@ function renderDetailFetchStatusSummary({ item = null, task = null } = {}) {
     const hasError = [metaStatus, articleStatus, taskStatus].some((s) => ['failed', 'retry_scheduled'].includes(String(s || '')));
     if (hasError) detailsEl.open = true;
   }
+}
+
+function renderDetailReaderSummaryUi(item = null) {
+  const infoEl = byId('detailReaderSummaryInfo');
+  const boxEl = byId('detailReaderSummaryBox');
+  const btn = byId('generateReaderSummaryBtn');
+  if (!infoEl || !boxEl) return;
+  if (!item) {
+    infoEl.textContent = '';
+    boxEl.classList.add('hidden');
+    boxEl.innerHTML = '';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'AI 阅读摘要';
+    }
+    return;
+  }
+  const articleStatus = String(item?.article?.status || '');
+  const hasArticle = articleStatus === 'success' && String(item?.article?.textContent || '').trim();
+  const summary = item?.aiSuggestions?.readerSummary && typeof item.aiSuggestions.readerSummary === 'object'
+    ? item.aiSuggestions.readerSummary
+    : null;
+  const generatedAt = Number(summary?.generatedAt || item?.aiSuggestions?.readerSummaryGeneratedAt || 0) || 0;
+  const provider = summary?.provider && typeof summary.provider === 'object' ? summary.provider : null;
+  const providerText = provider?.providerType ? `${provider.providerType}${provider.model ? `/${provider.model}` : ''}` : '';
+  const parts = [];
+  if (hasArticle) parts.push('阅读摘要：可生成');
+  else parts.push('阅读摘要：需先提取正文');
+  if (generatedAt) parts.push(`生成于：${new Date(generatedAt).toLocaleString()}`);
+  if (providerText) parts.push(`模型：${providerText}`);
+  infoEl.textContent = parts.join(' · ');
+
+  if (btn) {
+    btn.disabled = !hasArticle || detailAiOperationBusy() || Boolean(item?.deletedAt);
+    btn.textContent = detailAiReaderSummaryRunning ? 'AI 摘要生成中…' : 'AI 阅读摘要';
+    btn.setAttribute('aria-busy', String(Boolean(detailAiReaderSummaryRunning)));
+  }
+
+  const shortSummary = String(summary?.shortSummary || '').trim();
+  const whySave = String(summary?.whySave || '').trim();
+  const keyPoints = Array.isArray(summary?.keyPoints) ? summary.keyPoints.map((x) => String(x || '').trim()).filter(Boolean) : [];
+  if (!shortSummary && !whySave && !keyPoints.length) {
+    boxEl.classList.add('hidden');
+    boxEl.innerHTML = '';
+    return;
+  }
+  boxEl.classList.remove('hidden');
+  boxEl.innerHTML = `
+    ${shortSummary ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">短摘要</div><div class="detail-ai-reader-summary-text">${escapeHtml(shortSummary)}</div></div>` : ''}
+    ${keyPoints.length ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">关键要点</div><ul class="detail-ai-reader-summary-points">${keyPoints.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul></div>` : ''}
+    ${whySave ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">适合收藏理由</div><div class="detail-ai-reader-summary-text">${escapeHtml(whySave)}</div></div>` : ''}
+  `;
 }
 
 function setDetailPanelMoreMenuOpen(open) {
@@ -4288,12 +4519,14 @@ function updateDetailPanelHeadUi(item = null) {
   const nextBtn = byId('detailNextBtn');
   const webBtn = byId('detailPanelWebBtn');
   const readerBtn = byId('detailPanelReaderBtn');
+  const aiTagBtn = byId('detailHeaderAiTagBtn');
   const moreBtn = byId('detailPanelMoreBtn');
   const moreMenu = byId('detailPanelMoreMenu');
   const ids = detailPanelVisibleItems().map((x) => String(x.id));
   const idx = detailPanelActiveIndex();
   const hasItem = Boolean(item);
   const previewOpenForActive = Boolean(byId('previewDialog')?.open && previewActiveBookmarkId && String(previewActiveBookmarkId) === String(item?.id || ''));
+  const aiBusy = detailAiOperationBusy();
 
   if (modeBadge) modeBadge.textContent = hasItem ? (detailEditMode ? '编辑模式' : '查看模式') : '未选择';
   if (viewBtn) {
@@ -4320,6 +4553,14 @@ function updateDetailPanelHeadUi(item = null) {
     readerBtn.classList.toggle('active', hasItem && previewOpenForActive && previewMode === 'reader');
     readerBtn.setAttribute('aria-pressed', String(Boolean(hasItem && previewOpenForActive && previewMode === 'reader')));
   }
+  if (aiTagBtn) {
+    const canRun = hasItem && !Boolean(item?.deletedAt) && !aiBusy;
+    aiTagBtn.disabled = !canRun;
+    aiTagBtn.classList.toggle('active', Boolean(hasItem && detailAiAutoTagRunning));
+    aiTagBtn.setAttribute('aria-busy', String(Boolean(detailAiAutoTagRunning)));
+    aiTagBtn.title = detailAiAutoTagRunning ? 'AI 打标签进行中…' : (aiBusy ? 'AI 任务进行中…' : 'AI 自动打标签');
+    aiTagBtn.setAttribute('aria-label', detailAiAutoTagRunning ? 'AI 打标签进行中' : (aiBusy ? 'AI 任务进行中' : 'AI 自动打标签'));
+  }
   if (moreBtn) {
     moreBtn.disabled = !hasItem;
     moreBtn.classList.toggle('hidden', !hasItem);
@@ -4332,10 +4573,462 @@ function updateDetailPanelHeadUi(item = null) {
     }
     const deleteAction = moreMenu.querySelector('[data-detail-panel-more-action="delete"]');
     const restoreAction = moreMenu.querySelector('[data-detail-panel-more-action="restore"]');
+    const aiAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-autotag"]');
+    const aiTitleAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-title-clean"]');
+    const aiSummaryAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-summary"]');
+    const aiReaderSummaryAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-reader-summary"]');
+    const aiHighlightDigestAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-highlight-digest"]');
+    const aiFolderAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-folder-recommend"]');
+    const aiQaAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-qa"]');
+    const aiRelatedAction = moreMenu.querySelector('[data-detail-panel-more-action="ai-related"]');
     if (deleteAction) deleteAction.classList.toggle('hidden', !hasItem || Boolean(item?.deletedAt));
     if (restoreAction) restoreAction.classList.toggle('hidden', !hasItem || !Boolean(item?.deletedAt));
+    if (aiAction) aiAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
+    if (aiTitleAction) aiTitleAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
+    if (aiSummaryAction) aiSummaryAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
+    if (aiReaderSummaryAction) aiReaderSummaryAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
+    if (aiHighlightDigestAction) aiHighlightDigestAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
+    if (aiFolderAction) aiFolderAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
+    if (aiQaAction) aiQaAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
+    if (aiRelatedAction) aiRelatedAction.disabled = !hasItem || Boolean(item?.deletedAt) || aiBusy;
   }
   hydrateMenuItemIcons();
+}
+
+function detailAiOperationBusy() {
+  return Boolean(
+    detailAiAutoTagRunning
+    || detailAiTitleCleanRunning
+    || detailAiSummaryRunning
+    || detailAiReaderSummaryRunning
+    || detailAiHighlightCandidatesRunning
+    || detailAiHighlightDigestRunning
+    || detailAiFolderRecommendRunning
+    || detailAiRelatedRunning
+    || detailAiQaRunning
+  );
+}
+
+async function runAiAutoTagForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 打标签会刷新当前条目并覆盖未保存改动。是否继续？', {
+      title: 'AI 自动打标签',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  detailAiAutoTagRunning = true;
+  updateDetailPanelHeadUi(item);
+  try {
+    const out = await api(`/api/product/ai/autotag/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: true })
+    });
+    const finalTags = Array.isArray(out?.bookmark?.tags) ? out.bookmark.tags : [];
+    const suggested = Array.isArray(out?.job?.result?.suggestedTags) ? out.job.result.suggestedTags : [];
+    if (finalTags.length) {
+      const preview = finalTags.slice(0, 4).join(', ');
+      const more = finalTags.length > 4 ? ` 等 ${finalTags.length} 个标签` : '';
+      showToast(`AI 已自动打标签：${preview}${more}`, { timeoutMs: 3200 });
+    } else if (suggested.length) {
+      showToast(`AI 已生成建议标签：${suggested.join(', ')}`, { timeoutMs: 3200 });
+    } else {
+      showToast('AI 已执行，但未生成可用标签', { timeoutMs: 3200 });
+    }
+    await refreshAll();
+  } catch (err) {
+    showToast(err.message || 'AI 自动打标签失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiAutoTagRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    updateDetailPanelHeadUi(latest);
+  }
+}
+
+function isAiBatchTaskTerminalStatus(status) {
+  return new Set(['succeeded', 'failed', 'partial', 'cancelled']).has(String(status || ''));
+}
+
+function waitMs(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms || 0) || 0)));
+}
+
+async function pollAiBatchAutoTagTaskUntilTerminal(taskId, { timeoutMs = 10 * 60 * 1000, intervalMs = 900 } = {}) {
+  const startedAt = Date.now();
+  const tid = String(taskId || '').trim();
+  if (!tid) throw new Error('任务 ID 为空');
+  for (; ;) {
+    const out = await api(`/api/product/ai/batch/autotag/tasks/${encodeURIComponent(tid)}`);
+    const task = out?.task || null;
+    if (!task) throw new Error('批量 AI 任务不存在');
+    if (isAiBatchTaskTerminalStatus(task.status)) return task;
+    if (Date.now() - startedAt > timeoutMs) throw new Error('批量 AI 任务等待超时');
+    await waitMs(intervalMs);
+  }
+}
+
+async function runBulkAiAutoTagForSelection() {
+  if (bulkAiAutoTagRunning) return;
+  const selectedIds = [...state.selected].map(String).filter(Boolean);
+  if (!selectedIds.length) {
+    showToast('未选择任何条目', { timeoutMs: 2200 });
+    return;
+  }
+  const ok = await uiConfirm(`对已选 ${selectedIds.length} 条书签执行 AI 自动打标签？任务将在后台分批执行。`, {
+    title: '批量 AI 自动打标签',
+    confirmText: '开始',
+    cancelText: '取消'
+  });
+  if (!ok) return;
+
+  const btn = byId('bulkAiTagBtn');
+  bulkAiAutoTagRunning = true;
+  if (btn) {
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    btn.textContent = 'AI 打标签中…';
+  }
+
+  try {
+    const createOut = await api('/api/product/ai/batch/autotag/tasks', {
+      method: 'POST',
+      body: JSON.stringify({ bookmarkIds: selectedIds })
+    });
+    const task = createOut?.task || null;
+    const meta = createOut?.meta || {};
+    if (!task?.id) throw new Error('批量 AI 任务创建失败');
+
+    store.clearSelection();
+    renderHeader();
+
+    const queued = Number(meta.queued || task?.progress?.total || 0) || 0;
+    const skippedDeleted = Number(meta.skippedDeleted || 0) || 0;
+    const missing = Number(meta.missing || 0) || 0;
+    const skipText = [skippedDeleted ? `已跳过删除项 ${skippedDeleted}` : '', missing ? `缺失 ${missing}` : '']
+      .filter(Boolean)
+      .join('，');
+    showToast(
+      skipText ? `AI 批量打标签任务已启动（${queued} 条，${skipText}）` : `AI 批量打标签任务已启动（${queued} 条）`,
+      { timeoutMs: 2800 }
+    );
+
+    const finalTask = await pollAiBatchAutoTagTaskUntilTerminal(task.id);
+    const result = finalTask?.result || {};
+    const succeeded = Number(result.succeeded || 0) || 0;
+    const failed = Number(result.failed || 0) || 0;
+    const processed = Number(result.processed || 0) || 0;
+
+    await refreshAll();
+
+    if (String(finalTask.status) === 'succeeded') {
+      showToast(`AI 批量打标签完成：${succeeded}/${processed} 条成功`, { timeoutMs: 3200 });
+    } else if (String(finalTask.status) === 'partial') {
+      showToast(`AI 批量打标签部分完成：成功 ${succeeded}，失败 ${failed}`, { timeoutMs: 4200 });
+    } else {
+      const msg = finalTask?.error?.message || '批量 AI 打标签失败';
+      showToast(`AI 批量打标签失败：${msg}`, { timeoutMs: 5000 });
+    }
+  } catch (err) {
+    showToast(err.message || 'AI 批量打标签失败', { timeoutMs: 5000 });
+  } finally {
+    bulkAiAutoTagRunning = false;
+    if (btn) {
+      btn.disabled = false;
+      btn.removeAttribute('aria-busy');
+      btn.textContent = 'AI 打标签';
+    }
+  }
+}
+
+async function runAiTitleCleanForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 标题清洗会刷新当前条目并覆盖未保存改动。是否继续？', {
+      title: 'AI 标题清洗',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  detailAiTitleCleanRunning = true;
+  updateDetailPanelHeadUi(item);
+  try {
+    const out = await api(`/api/product/ai/title-clean/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: true })
+    });
+    const finalTitle = String(out?.bookmark?.title || '');
+    const suggestedTitle = String(out?.job?.result?.suggestedTitle || '');
+    const applied = Boolean(out?.job?.result?.applied);
+    const originalTitle = String(out?.job?.result?.originalTitle || item.title || '');
+    if (applied) {
+      showToast(`AI 标题已清洗：${finalTitle || suggestedTitle}`, { timeoutMs: 3200 });
+    } else if (suggestedTitle && suggestedTitle !== originalTitle) {
+      showToast(`AI 标题建议：${suggestedTitle}`, { timeoutMs: 3600 });
+    } else {
+      showToast('AI 未给出更合适的标题', { timeoutMs: 2600 });
+    }
+    await refreshAll();
+  } catch (err) {
+    showToast(err.message || 'AI 标题清洗失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiTitleCleanRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    updateDetailPanelHeadUi(latest);
+  }
+}
+
+async function runAiSummaryForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 生成摘要会刷新当前条目并覆盖未保存改动。是否继续？', {
+      title: 'AI 生成摘要',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  let noteMode = 'if_empty';
+  if (String(item.note || '').trim()) {
+    const replace = await uiConfirm('当前已有备注。是否用 AI 摘要替换现有备注？选择“取消”则仅在备注为空时写入（本次不会覆盖）。', {
+      title: 'AI 生成摘要',
+      confirmText: '替换备注',
+      cancelText: '仅空备注写入'
+    });
+    noteMode = replace ? 'replace' : 'if_empty';
+  }
+
+  detailAiSummaryRunning = true;
+  updateDetailPanelHeadUi(item);
+  try {
+    const out = await api(`/api/product/ai/summary/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: true, noteMode })
+    });
+    const result = out?.job?.result || {};
+    const applied = Boolean(result.applied);
+    const blockedReason = String(result.blockedReason || '');
+    const suggestedSummary = String(result.suggestedSummary || out?.suggestedSummary || '');
+    if (applied) {
+      showToast('AI 摘要已写入备注', { timeoutMs: 3000 });
+    } else if (blockedReason === 'note_exists') {
+      showToast('已有备注，未覆盖（按当前模式仅为空时写入）', { timeoutMs: 3800 });
+    } else if (suggestedSummary) {
+      showToast(`AI 摘要建议：${suggestedSummary.slice(0, 80)}${suggestedSummary.length > 80 ? '…' : ''}`, { timeoutMs: 4200 });
+    } else {
+      showToast('AI 未生成可用摘要', { timeoutMs: 2800 });
+    }
+    await refreshAll();
+  } catch (err) {
+    showToast(err.message || 'AI 生成摘要失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiSummaryRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    updateDetailPanelHeadUi(latest);
+  }
+}
+
+async function runAiReaderSummaryForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+  if (String(item?.article?.status || '') !== 'success' || !String(item?.article?.textContent || '').trim()) {
+    showToast('请先提取正文，再执行 AI 阅读摘要', { timeoutMs: 3200 });
+    return;
+  }
+
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 阅读摘要会刷新当前条目并覆盖未保存改动。是否继续？', {
+      title: 'AI 阅读摘要',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  detailAiReaderSummaryRunning = true;
+  renderDetailReaderSummaryUi(item);
+  updateDetailPanelHeadUi(item);
+  try {
+    const out = await api(`/api/product/ai/reader-summary/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: true })
+    });
+    const rs = out?.readerSummary || out?.bookmark?.aiSuggestions?.readerSummary || {};
+    const shortSummary = String(rs.shortSummary || '').trim();
+    showToast(shortSummary ? `AI 阅读摘要已生成：${shortSummary.slice(0, 60)}${shortSummary.length > 60 ? '…' : ''}` : 'AI 阅读摘要已生成', { timeoutMs: 3800 });
+    await refreshAll();
+  } catch (err) {
+    showToast(err.message || 'AI 阅读摘要失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiReaderSummaryRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    renderDetailReaderSummaryUi(latest);
+    updateDetailPanelHeadUi(latest);
+  }
+}
+
+async function runAiFolderRecommendForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 推荐集合可能会刷新当前条目并覆盖未保存改动。是否继续？', {
+      title: 'AI 推荐集合',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  detailAiFolderRecommendRunning = true;
+  updateDetailPanelHeadUi(item);
+  try {
+    const suggestOut = await api(`/api/product/ai/folder-recommend/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: false })
+    });
+    const recommendation = suggestOut?.recommendation || {};
+    const folderId = String(recommendation.folderId || '');
+    const folderName = String(recommendation.folderName || '');
+    const folderPath = String(recommendation.folderPath || '');
+    const reason = String(suggestOut?.reason || '');
+    const currentFolderId = String(item.folderId || 'root');
+    if (!folderId) {
+      showToast(reason ? `AI 未给出明确集合：${reason}` : 'AI 未给出明确集合推荐', { timeoutMs: 4200 });
+      return;
+    }
+    if (folderId === currentFolderId) {
+      showToast(`AI 推荐当前集合：${folderPath || folderName || '当前集合'}`, { timeoutMs: 3000 });
+      return;
+    }
+
+    const ok = await uiConfirm(
+      `AI 推荐移动到「${folderPath || folderName || folderId}」${reason ? `\n\n原因：${reason}` : ''}\n\n是否应用？`,
+      {
+        title: 'AI 推荐集合',
+        confirmText: '应用',
+        cancelText: '仅查看建议'
+      }
+    );
+    if (!ok) {
+      showToast(`AI 推荐集合：${folderPath || folderName || folderId}`, { timeoutMs: 3500 });
+      return;
+    }
+
+    const applyOut = await api(`/api/product/ai/folder-recommend/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: true, recommendation })
+    });
+    const finalRec = applyOut?.recommendation || recommendation;
+    showToast(`已移动到 AI 推荐集合：${finalRec.folderPath || finalRec.folderName || finalRec.folderId || folderId}`, { timeoutMs: 3500 });
+    await refreshAll();
+  } catch (err) {
+    showToast(err.message || 'AI 推荐集合失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiFolderRecommendRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    updateDetailPanelHeadUi(latest);
+  }
+}
+
+async function maybeRunAiAutoClassifyForCreatedBookmark(createdBookmark) {
+  const bookmarkId = String(createdBookmark?.id || '').trim();
+  if (!bookmarkId) return { ran: false };
+
+  let config;
+  try {
+    const out = await api('/api/product/ai/config');
+    config = out?.config || {};
+  } catch (err) {
+    return { ran: false, error: err };
+  }
+
+  const rules = config?.autoClassifyOnCreate || {};
+  if (!config?.enabled || !rules?.enabled) return { ran: false };
+
+  const doAutoTag = Boolean(rules.autoTag);
+  const doRecommendFolder = Boolean(rules.recommendFolder);
+  if (!doAutoTag && !doRecommendFolder) return { ran: false };
+
+  const actionLabels = [];
+  if (doAutoTag) actionLabels.push('自动打标签');
+  if (doRecommendFolder) actionLabels.push(rules.autoMoveRecommendedFolder ? '推荐并自动移动集合' : '推荐集合');
+
+  if (rules.requireConfirm !== false) {
+    const ok = await uiConfirm(`新书签已创建。是否执行 AI 自动分类（${actionLabels.join(' + ')}）？`, {
+      title: 'AI 自动分类（新书签）',
+      confirmText: '执行',
+      cancelText: '跳过'
+    });
+    if (!ok) return { ran: false, skipped: true };
+  }
+
+  const summary = [];
+  const errors = [];
+  let changed = false;
+
+  if (doAutoTag) {
+    try {
+      const out = await api(`/api/product/ai/autotag/${encodeURIComponent(bookmarkId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ apply: true })
+      });
+      const finalTags = Array.isArray(out?.bookmark?.tags) ? out.bookmark.tags : [];
+      if (finalTags.length) {
+        summary.push(`标签 ${finalTags.slice(0, 3).join(', ')}${finalTags.length > 3 ? '…' : ''}`);
+        changed = true;
+      } else {
+        summary.push('未生成可用标签');
+      }
+    } catch (err) {
+      errors.push(`自动打标签失败：${err.message || err}`);
+    }
+  }
+
+  if (doRecommendFolder) {
+    try {
+      const suggestOut = await api(`/api/product/ai/folder-recommend/${encodeURIComponent(bookmarkId)}`, {
+        method: 'POST',
+        body: JSON.stringify({ apply: false })
+      });
+      const recommendation = suggestOut?.recommendation || {};
+      const folderId = String(recommendation.folderId || '');
+      const folderText = recommendation.folderPath || recommendation.folderName || folderId;
+      if (!folderId) {
+        summary.push('未推荐集合');
+      } else if (rules.autoMoveRecommendedFolder) {
+        const applyOut = await api(`/api/product/ai/folder-recommend/${encodeURIComponent(bookmarkId)}`, {
+          method: 'POST',
+          body: JSON.stringify({ apply: true, recommendation })
+        });
+        const finalRec = applyOut?.recommendation || recommendation;
+        summary.push(`已移动到「${finalRec.folderPath || finalRec.folderName || finalRec.folderId || folderText}」`);
+        changed = true;
+      } else {
+        summary.push(`推荐集合：${folderText}`);
+      }
+    } catch (err) {
+      errors.push(`集合推荐失败：${err.message || err}`);
+    }
+  }
+
+  return { ran: true, changed, summary, errors };
 }
 
 async function runDetailPanelMoreAction(action) {
@@ -4357,6 +5050,38 @@ async function runDetailPanelMoreAction(action) {
     } catch (_err) {
       showToast('复制失败', { timeoutMs: 2500 });
     }
+    return;
+  }
+  if (act === 'ai-autotag') {
+    await runAiAutoTagForActiveBookmark();
+    return;
+  }
+  if (act === 'ai-title-clean') {
+    await runAiTitleCleanForActiveBookmark();
+    return;
+  }
+  if (act === 'ai-summary') {
+    await runAiSummaryForActiveBookmark();
+    return;
+  }
+  if (act === 'ai-reader-summary') {
+    await runAiReaderSummaryForActiveBookmark();
+    return;
+  }
+  if (act === 'ai-highlight-digest') {
+    await runAiHighlightDigestForActiveBookmark();
+    return;
+  }
+  if (act === 'ai-folder-recommend') {
+    await runAiFolderRecommendForActiveBookmark();
+    return;
+  }
+  if (act === 'ai-qa') {
+    openAiQaDialog({ bookmarkId: item.id, scope: 'auto' });
+    return;
+  }
+  if (act === 'ai-related') {
+    await runAiRelatedBookmarksForActiveBookmark();
     return;
   }
   if (act === 'preview-web') {
@@ -4464,11 +5189,10 @@ function renderHighlightsList(highlights = [], { bookmarkId = null } = {}) {
               <button type="button" class="ghost danger" data-hl-delete="${h.id}">删除</button>
             </div>
             <div class="annotation-list">
-          ${
-            条注释.length
-              ? 条注释
-                  .map(
-                    (a) => `<div class="annotation-item" data-annotation-id="${a.id}">
+          ${条注释.length
+          ? 条注释
+            .map(
+              (a) => `<div class="annotation-item" data-annotation-id="${a.id}">
                         <div>${escapeHtml(a.text || '')}</div>
                         <div class="muted">${a.updatedAt ? new Date(Number(a.updatedAt)).toLocaleString() : ''}</div>
                         <div class="annotation-actions">
@@ -4476,10 +5200,10 @@ function renderHighlightsList(highlights = [], { bookmarkId = null } = {}) {
                           <button type="button" class="ghost danger" data-ann-delete="${h.id}:${a.id}">删除</button>
                         </div>
                       </div>`
-                  )
-                  .join('')
-              : `<div class="muted">暂无注释。</div>`
-          }
+            )
+            .join('')
+          : `<div class="muted">暂无注释。</div>`
+        }
             </div>
           </div>
         </details>
@@ -4580,6 +5304,862 @@ function renderHighlightsList(highlights = [], { bookmarkId = null } = {}) {
       showToast('注释已删除', { timeoutMs: 2500 });
     });
   });
+}
+
+function renderDetailHighlightCandidatesUi(item = null) {
+  const infoEl = byId('detailHighlightCandidatesInfo');
+  const listEl = byId('detailHighlightCandidatesList');
+  const btn = byId('aiHighlightSuggestBtn');
+  if (!infoEl || !listEl) return;
+
+  const hasItem = Boolean(item && item.id);
+  const canRun = hasItem
+    && !Boolean(item?.deletedAt)
+    && String(item?.article?.status || '') === 'success'
+    && Boolean(String(item?.article?.textContent || '').trim());
+
+  if (btn) {
+    btn.disabled = !canRun || detailAiOperationBusy();
+    btn.textContent = detailAiHighlightCandidatesRunning ? 'AI 分析中…' : 'AI 推荐片段';
+    btn.setAttribute('aria-busy', String(Boolean(detailAiHighlightCandidatesRunning)));
+  }
+
+  if (!hasItem) {
+    infoEl.textContent = '';
+    listEl.classList.add('hidden');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const saved = item?.aiSuggestions?.highlightCandidates && typeof item.aiSuggestions.highlightCandidates === 'object'
+    ? item.aiSuggestions.highlightCandidates
+    : null;
+  const items = Array.isArray(saved?.items)
+    ? saved.items
+      .map((x) => ({
+        quote: String(x?.quote || '').trim(),
+        reason: String(x?.reason || '').trim(),
+        score: Math.max(0, Math.min(1, Number(x?.score) || 0))
+      }))
+      .filter((x) => x.quote)
+    : [];
+  const generatedAt = Number(saved?.generatedAt || 0) || 0;
+  const provider = saved?.provider && typeof saved.provider === 'object' ? saved.provider : null;
+  const providerText = provider?.providerType ? `${provider.providerType}${provider.model ? `/${provider.model}` : ''}` : '';
+
+  if (!canRun) {
+    infoEl.textContent = '需先提取正文，才能生成 AI 高亮候选。';
+  } else if (detailAiHighlightCandidatesRunning) {
+    infoEl.textContent = 'AI 正在从正文中挑选适合高亮的关键片段...';
+  } else if (items.length) {
+    const bits = [`AI 候选 ${items.length} 条`];
+    if (saved?.summary) bits.push(String(saved.summary).slice(0, 120));
+    if (generatedAt) bits.push(`生成于：${new Date(generatedAt).toLocaleString()}`);
+    if (providerText) bits.push(`模型：${providerText}`);
+    infoEl.textContent = bits.join(' · ');
+  } else {
+    infoEl.textContent = '点击“AI 推荐片段”生成高亮候选。';
+  }
+
+  if (!items.length) {
+    listEl.classList.add('hidden');
+    listEl.innerHTML = '';
+    return;
+  }
+
+  listEl.classList.remove('hidden');
+  listEl.innerHTML = `
+    <div class="detail-highlight-candidates-head">
+      <button type="button" class="ghost" data-ai-hl-apply-all>全部加入高亮</button>
+    </div>
+    <div class="detail-highlight-candidates-items">
+      ${items.map((row, idx) => `
+        <div class="detail-highlight-candidate">
+          <div class="detail-highlight-candidate-quote">${escapeHtml(row.quote)}</div>
+          <div class="detail-highlight-candidate-meta muted">
+            ${row.reason ? escapeHtml(row.reason) : 'AI 候选片段'}${Number.isFinite(row.score) && row.score > 0 ? ` · ${(row.score * 100).toFixed(0)}%` : ''}
+          </div>
+          <div class="detail-highlight-candidate-actions">
+            <button type="button" class="ghost" data-ai-hl-apply-one="${idx}">加入高亮</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  const bookmarkId = String(item.id || '');
+  const applyCandidate = async (candidate) => {
+    if (!bookmarkId || !candidate?.quote) return;
+    await api(`/api/bookmarks/${encodeURIComponent(bookmarkId)}/highlights`, {
+      method: 'POST',
+      body: JSON.stringify({
+        quote: String(candidate.quote || ''),
+        text: String(candidate.quote || ''),
+        note: candidate.reason ? `AI 候选：${String(candidate.reason || '').slice(0, 180)}` : ''
+      })
+    });
+  };
+
+  listEl.querySelectorAll('[data-ai-hl-apply-one]').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const idx = Number(el.getAttribute('data-ai-hl-apply-one'));
+      const candidate = items[idx];
+      if (!candidate) return;
+      try {
+        el.disabled = true;
+        await applyCandidate(candidate);
+        await refreshAll();
+        showToast('已加入高亮', { timeoutMs: 2200 });
+      } catch (err) {
+        showToast(err.message || '加入高亮失败', { timeoutMs: 4200 });
+      } finally {
+        el.disabled = false;
+      }
+    });
+  });
+
+  listEl.querySelector('[data-ai-hl-apply-all]')?.addEventListener('click', async (e) => {
+    if (!items.length) return;
+    const ok = await uiConfirm(`将 ${items.length} 条 AI 候选加入高亮？`, {
+      title: '应用 AI 高亮候选',
+      confirmText: '加入',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+    try {
+      e.currentTarget.disabled = true;
+      for (const candidate of items) await applyCandidate(candidate);
+      await refreshAll();
+      showToast(`已加入 ${items.length} 条高亮`, { timeoutMs: 2600 });
+    } catch (err) {
+      showToast(err.message || '批量加入高亮失败', { timeoutMs: 4200 });
+    } finally {
+      e.currentTarget.disabled = false;
+    }
+  });
+}
+
+function renderDetailHighlightDigestUi(item = null) {
+  const infoEl = byId('detailHighlightDigestInfo');
+  const boxEl = byId('detailHighlightDigestBox');
+  const btn = byId('aiHighlightDigestBtn');
+  if (!infoEl || !boxEl) return;
+
+  if (!item) {
+    infoEl.textContent = '';
+    boxEl.classList.add('hidden');
+    boxEl.innerHTML = '';
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'AI 高亮总结';
+      btn.removeAttribute('aria-busy');
+    }
+    return;
+  }
+
+  const highlights = Array.isArray(item.highlights) ? item.highlights : [];
+  const annotationsCount = highlights.reduce((sum, h) => sum + (Array.isArray(h?.annotations) ? h.annotations.length : 0), 0);
+  const canRun = highlights.length > 0 && !Boolean(item?.deletedAt);
+  const digest = item?.aiSuggestions?.highlightDigest && typeof item.aiSuggestions.highlightDigest === 'object'
+    ? item.aiSuggestions.highlightDigest
+    : null;
+  const generatedAt = Number(digest?.generatedAt || item?.aiSuggestions?.highlightDigestGeneratedAt || 0) || 0;
+  const provider = digest?.provider && typeof digest.provider === 'object' ? digest.provider : null;
+  const providerText = provider?.providerType ? `${provider.providerType}${provider.model ? `/${provider.model}` : ''}` : '';
+
+  if (btn) {
+    btn.disabled = !canRun || detailAiOperationBusy();
+    btn.textContent = detailAiHighlightDigestRunning ? 'AI 总结生成中…' : 'AI 高亮总结';
+    btn.setAttribute('aria-busy', String(Boolean(detailAiHighlightDigestRunning)));
+  }
+
+  const infoParts = [];
+  infoParts.push(canRun ? `高亮总结：可生成（${highlights.length} 条高亮 / ${annotationsCount} 条注释）` : '高亮总结：需先创建高亮');
+  if (generatedAt) infoParts.push(`生成于：${new Date(generatedAt).toLocaleString()}`);
+  if (providerText) infoParts.push(`模型：${providerText}`);
+  infoEl.textContent = infoParts.join(' · ');
+
+  const summary = String(digest?.summary || '').trim();
+  const themes = Array.isArray(digest?.themes) ? digest.themes.map((x) => String(x || '').trim()).filter(Boolean) : [];
+  const keyInsights = Array.isArray(digest?.keyInsights) ? digest.keyInsights.map((x) => String(x || '').trim()).filter(Boolean) : [];
+  const actionItems = Array.isArray(digest?.actionItems) ? digest.actionItems.map((x) => String(x || '').trim()).filter(Boolean) : [];
+  const openQuestions = Array.isArray(digest?.openQuestions) ? digest.openQuestions.map((x) => String(x || '').trim()).filter(Boolean) : [];
+  if (!summary && !themes.length && !keyInsights.length && !actionItems.length && !openQuestions.length) {
+    boxEl.classList.add('hidden');
+    boxEl.innerHTML = '';
+    return;
+  }
+
+  boxEl.classList.remove('hidden');
+  boxEl.innerHTML = `
+    ${summary ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">知识卡片摘要</div><div class="detail-ai-reader-summary-text">${escapeHtml(summary)}</div></div>` : ''}
+    ${themes.length ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">主题</div><div class="tag-list">${themes.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div></div>` : ''}
+    ${keyInsights.length ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">关键洞见</div><ul class="detail-ai-reader-summary-points">${keyInsights.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul></div>` : ''}
+    ${actionItems.length ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">行动项</div><ul class="detail-ai-reader-summary-points">${actionItems.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul></div>` : ''}
+    ${openQuestions.length ? `<div class="detail-ai-reader-summary-block"><div class="detail-ai-reader-summary-label">待追问问题</div><ul class="detail-ai-reader-summary-points">${openQuestions.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul></div>` : ''}
+  `;
+}
+
+function renderDetailRelatedBookmarksUi(item = null) {
+  const infoEl = byId('detailRelatedBookmarksInfo');
+  const listEl = byId('detailRelatedBookmarksList');
+  const btn = byId('refreshRelatedBookmarksBtn');
+  if (!infoEl || !listEl) return;
+
+  const hasItem = Boolean(item && item.id);
+  if (btn) {
+    btn.disabled = !hasItem || Boolean(item?.deletedAt) || detailAiOperationBusy();
+    btn.setAttribute('aria-busy', String(Boolean(detailAiRelatedRunning)));
+    btn.textContent = detailAiRelatedRunning ? 'AI 推荐中…' : 'AI 推荐';
+  }
+
+  if (!hasItem) {
+    infoEl.textContent = '';
+    listEl.innerHTML = '';
+    return;
+  }
+
+  const targetId = String(item.id);
+  if (String(detailRelatedBookmarksState.bookmarkId || '') !== targetId) {
+    infoEl.textContent = '点击“AI 推荐”生成相关书签。';
+    listEl.innerHTML = '<div class="muted">暂无推荐结果。</div>';
+    return;
+  }
+
+  if (detailRelatedBookmarksState.loading || detailAiRelatedRunning) {
+    infoEl.textContent = 'AI 正在分析当前书签并生成相关推荐...';
+    listEl.innerHTML = '<div class="muted">生成中，请稍候…</div>';
+    return;
+  }
+
+  if (detailRelatedBookmarksState.error) {
+    infoEl.textContent = `AI 推荐失败：${detailRelatedBookmarksState.error}`;
+    listEl.innerHTML = '<div class="muted">可点击“AI 推荐”重试。</div>';
+    return;
+  }
+
+  const rows = Array.isArray(detailRelatedBookmarksState.items) ? detailRelatedBookmarksState.items : [];
+  const summary = String(detailRelatedBookmarksState.summary || '').trim();
+  const confidence = Number(detailRelatedBookmarksState.confidence || 0);
+  const bits = [];
+  if (rows.length) bits.push(`${rows.length} 条推荐`);
+  if (summary) bits.push(summary);
+  if (confidence > 0) bits.push(`置信度 ${(confidence * 100).toFixed(0)}%`);
+  infoEl.textContent = bits.join(' · ') || '暂无推荐结果';
+
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="muted">AI 未找到明显相关的书签。</div>';
+    return;
+  }
+
+  listEl.innerHTML = rows.map((r) => {
+    const score = Number(r.score || 0);
+    const host = String(r.host || hostFromUrl(r.url || '') || '');
+    const timeText = (() => {
+      const bm = state.bookmarks.find((x) => String(x.id) === String(r.id)) || state.allBookmarks.find((x) => String(x.id) === String(r.id));
+      return bm ? bookmarkTimeText(bm) : '';
+    })();
+    const meta = [r.folderPath, host, timeText].filter(Boolean).join(' · ');
+    return `<button type="button" class="detail-related-item" data-related-bookmark-open="${escapeHtml(String(r.id))}">
+      <div class="detail-related-item-title-row">
+        <span class="detail-related-item-title">${escapeHtml(r.title || '(untitled)')}</span>
+        ${score > 0 ? `<span class="meta-chip info">${Math.round(score * 100)}%</span>` : ''}
+      </div>
+      <div class="detail-related-item-meta muted">${escapeHtml(meta)}</div>
+      ${r.reason ? `<div class="detail-related-item-reason">${escapeHtml(r.reason)}</div>` : ''}
+    </button>`;
+  }).join('');
+
+  listEl.querySelectorAll('[data-related-bookmark-open]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = String(el.dataset.relatedBookmarkOpen || '');
+      if (!id) return;
+      store.setActiveId(id);
+      renderCards();
+      renderDetail();
+    });
+  });
+}
+
+async function runAiRelatedBookmarksForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 相关推荐会刷新详情区域状态。是否继续？', {
+      title: 'AI 相关书签推荐',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  detailAiRelatedRunning = true;
+  detailRelatedBookmarksState = {
+    bookmarkId: String(item.id),
+    loading: true,
+    items: [],
+    summary: '',
+    confidence: 0,
+    error: ''
+  };
+  updateDetailPanelHeadUi(item);
+  renderDetailRelatedBookmarksUi(item);
+  try {
+    const out = await api(`/api/product/ai/related/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ limit: 8 })
+    });
+    detailRelatedBookmarksState = {
+      bookmarkId: String(item.id),
+      loading: false,
+      items: Array.isArray(out?.items) ? out.items : [],
+      summary: String(out?.summary || ''),
+      confidence: Math.max(0, Math.min(1, Number(out?.confidence) || 0)),
+      error: ''
+    };
+    renderDetailRelatedBookmarksUi(item);
+    const count = Array.isArray(out?.items) ? out.items.length : 0;
+    showToast(count ? `AI 已生成 ${count} 条相关书签推荐` : 'AI 未找到明显相关的书签', { timeoutMs: 3400 });
+  } catch (err) {
+    detailRelatedBookmarksState = {
+      bookmarkId: String(item.id),
+      loading: false,
+      items: [],
+      summary: '',
+      confidence: 0,
+      error: String(err.message || err)
+    };
+    renderDetailRelatedBookmarksUi(item);
+    showToast(err.message || 'AI 相关书签推荐失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiRelatedRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    updateDetailPanelHeadUi(latest);
+    if (latest) renderDetailRelatedBookmarksUi(latest);
+  }
+}
+
+async function runAiHighlightCandidatesForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+  if (String(item?.article?.status || '') !== 'success' || !String(item?.article?.textContent || '').trim()) {
+    showToast('请先提取正文，再生成高亮候选', { timeoutMs: 3200 });
+    return;
+  }
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 高亮候选会刷新当前条目并覆盖未保存改动。是否继续？', {
+      title: 'AI 高亮候选',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  detailAiHighlightCandidatesRunning = true;
+  renderDetailHighlightCandidatesUi(item);
+  updateDetailPanelHeadUi(item);
+  try {
+    const out = await api(`/api/product/ai/highlight-candidates/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+    const count = Array.isArray(out?.candidates) ? out.candidates.length : 0;
+    showToast(count ? `AI 已生成 ${count} 条高亮候选` : 'AI 未找到明显可高亮片段', { timeoutMs: 3400 });
+    await refreshAll();
+  } catch (err) {
+    showToast(err.message || 'AI 高亮候选生成失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiHighlightCandidatesRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    if (latest) renderDetailHighlightCandidatesUi(latest);
+    updateDetailPanelHeadUi(latest);
+  }
+}
+
+async function runAiHighlightDigestForActiveBookmark() {
+  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
+  if (!item || item.deletedAt) return;
+  if (detailAiOperationBusy()) return;
+  const highlights = Array.isArray(item.highlights) ? item.highlights : [];
+  if (!highlights.length) {
+    showToast('请先创建高亮，再生成 AI 高亮总结', { timeoutMs: 3200 });
+    return;
+  }
+
+  if (detailEditMode) {
+    const ok = await uiConfirm('当前处于编辑模式，AI 高亮总结会刷新当前条目并覆盖未保存改动。是否继续？', {
+      title: 'AI 高亮总结',
+      confirmText: '继续',
+      cancelText: '取消'
+    });
+    if (!ok) return;
+  }
+
+  detailAiHighlightDigestRunning = true;
+  renderDetailHighlightDigestUi(item);
+  updateDetailPanelHeadUi(item);
+  try {
+    const out = await api(`/api/product/ai/highlight-digest/${encodeURIComponent(String(item.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: true })
+    });
+    const digest = out?.highlightDigest || out?.bookmark?.aiSuggestions?.highlightDigest || {};
+    const summary = String(digest.summary || '').trim();
+    showToast(summary ? `AI 高亮总结已生成：${summary.slice(0, 60)}${summary.length > 60 ? '…' : ''}` : 'AI 高亮总结已生成', { timeoutMs: 3800 });
+    await refreshAll();
+  } catch (err) {
+    showToast(err.message || 'AI 高亮总结失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiHighlightDigestRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    if (latest) renderDetailHighlightDigestUi(latest);
+    updateDetailPanelHeadUi(latest);
+  }
+}
+
+function currentCollectionForAiSummary() {
+  const folderId = String(state.filters.folderId || 'all');
+  if (!folderId || folderId === 'all') return null;
+  return getFolderById(folderId);
+}
+
+function formatAiFolderSummaryText(result = null) {
+  const summary = result && typeof result === 'object' ? result : null;
+  if (!summary) return '';
+  const lines = [];
+  if (summary.folderPath || summary.folderName) lines.push(`集合：${summary.folderPath || summary.folderName}`);
+  if (summary.summary) {
+    lines.push('');
+    lines.push('摘要');
+    lines.push(String(summary.summary));
+  }
+  if (Array.isArray(summary.themes) && summary.themes.length) {
+    lines.push('');
+    lines.push(`主题：${summary.themes.join(' / ')}`);
+  }
+  if (Array.isArray(summary.commonTags) && summary.commonTags.length) {
+    lines.push(`常见标签：${summary.commonTags.join(', ')}`);
+  }
+  if (Array.isArray(summary.representativeSources) && summary.representativeSources.length) {
+    lines.push(`代表来源：${summary.representativeSources.join(', ')}`);
+  }
+  if (Array.isArray(summary.keyInsights) && summary.keyInsights.length) {
+    lines.push('');
+    lines.push('关键洞见');
+    summary.keyInsights.forEach((x) => lines.push(`- ${x}`));
+  }
+  if (Array.isArray(summary.notableBookmarks) && summary.notableBookmarks.length) {
+    lines.push('');
+    lines.push('代表书签');
+    summary.notableBookmarks.forEach((x) => lines.push(`- ${x.title || x.bookmarkId}${x.reason ? `：${x.reason}` : ''}`));
+  }
+  return lines.join('\n').trim();
+}
+
+function renderAiFolderSummaryDialogUi() {
+  const dialog = byId('aiFolderSummaryDialog');
+  if (!dialog) return;
+  const subtitleEl = byId('aiFolderSummarySubtitle');
+  const metaEl = byId('aiFolderSummaryMeta');
+  const contentEl = byId('aiFolderSummaryContent');
+  const runBtn = byId('aiFolderSummaryRunBtn');
+  const copyBtn = byId('aiFolderSummaryCopyBtn');
+  const clearBtn = byId('aiFolderSummaryClearBtn');
+  if (!subtitleEl || !metaEl || !contentEl || !runBtn || !copyBtn || !clearBtn) return;
+
+  const folder = currentCollectionForAiSummary();
+  const folderId = String(folder?.id || aiFolderSummaryDialogState.folderId || '');
+  const folderPath = folder?.path || folderName(folderId) || String(folder?.name || '');
+  const persisted = folder?.aiSuggestions?.collectionSummary && typeof folder.aiSuggestions.collectionSummary === 'object'
+    ? folder.aiSuggestions.collectionSummary
+    : null;
+  const result = aiFolderSummaryDialogState.result && String(aiFolderSummaryDialogState.folderId || '') === String(folderId)
+    ? aiFolderSummaryDialogState.result
+    : (aiFolderSummaryDialogState.suppressPersisted ? null : persisted);
+  const loading = Boolean(aiFolderSummaryDialogState.loading);
+  const error = String(aiFolderSummaryDialogState.error || '');
+  const hasFolder = Boolean(folder && folderId);
+
+  subtitleEl.textContent = hasFolder
+    ? `对集合「${folderPath || folder.name || folderId}」生成主题总结、常见标签与代表来源。`
+    : '请先在左侧选择一个集合，然后点击生成。';
+
+  const metaBits = [];
+  if (loading) metaBits.push('AI 正在分析集合内容...');
+  if (hasFolder) metaBits.push(`集合：${folderPath || folder.name || folderId}`);
+  if (result?.bookmarkCount) metaBits.push(`${Number(result.bookmarkCount)} 条书签`);
+  if (result?.descendantFolderCount) metaBits.push(`${Number(result.descendantFolderCount)} 个子集合`);
+  if (result?.generatedAt) metaBits.push(`生成于：${new Date(Number(result.generatedAt)).toLocaleString()}`);
+  if (result?.provider?.providerType) {
+    metaBits.push(`模型：${result.provider.providerType}${result.provider.model ? `/${result.provider.model}` : ''}`);
+  }
+  if (error) metaBits.unshift(`失败：${error}`);
+  metaEl.textContent = metaBits.join(' · ') || '暂无结果。';
+
+  runBtn.disabled = !hasFolder || loading;
+  runBtn.textContent = loading ? '生成中…' : '生成摘要';
+  runBtn.setAttribute('aria-busy', String(loading));
+  copyBtn.disabled = !String(formatAiFolderSummaryText(result)).trim();
+  clearBtn.disabled = loading && !result;
+
+  if (loading && !result) {
+    contentEl.innerHTML = `<div class="muted">AI 正在整理该集合的主题与来源结构，请稍候…</div>`;
+    return;
+  }
+  if (error && !result) {
+    contentEl.innerHTML = `<div class="muted">生成失败：${escapeHtml(error)}</div>`;
+    return;
+  }
+  if (!result) {
+    contentEl.innerHTML = `<div class="muted">暂无结果。</div>`;
+    return;
+  }
+
+  const themes = Array.isArray(result.themes) ? result.themes : [];
+  const commonTags = Array.isArray(result.commonTags) ? result.commonTags : [];
+  const sources = Array.isArray(result.representativeSources) ? result.representativeSources : [];
+  const notable = Array.isArray(result.notableBookmarks) ? result.notableBookmarks : [];
+  const topTags = Array.isArray(result.topTags) ? result.topTags : [];
+  const topHosts = Array.isArray(result.topHosts) ? result.topHosts : [];
+
+  contentEl.innerHTML = `
+    <section class="ai-folder-summary-panel">
+      <div class="ai-folder-summary-panel-title">主题摘要</div>
+      <div class="ai-folder-summary-text">${escapeHtml(String(result.summary || '暂无摘要'))}</div>
+    </section>
+    ${themes.length ? `<section class="ai-folder-summary-panel"><div class="ai-folder-summary-panel-title">主题</div><div class="tag-list">${themes.map((x) => `<span class="tag">${escapeHtml(String(x))}</span>`).join('')}</div></section>` : ''}
+    ${commonTags.length ? `<section class="ai-folder-summary-panel"><div class="ai-folder-summary-panel-title">常见标签</div><div class="tag-list">${commonTags.map((x) => `<span class="tag">${escapeHtml(String(x))}</span>`).join('')}</div></section>` : ''}
+    ${sources.length ? `<section class="ai-folder-summary-panel"><div class="ai-folder-summary-panel-title">代表来源</div><div class="ai-folder-summary-chip-list">${sources.map((x) => `<span class="meta-chip type">${escapeHtml(String(x))}</span>`).join('')}</div></section>` : ''}
+    ${notable.length ? `<section class="ai-folder-summary-panel"><div class="ai-folder-summary-panel-title">代表书签</div><div class="ai-folder-summary-list">${notable.map((x) => `<button type="button" class="ai-folder-summary-item" data-ai-folder-summary-open="${escapeHtml(String(x.bookmarkId || ''))}"><div class="ai-folder-summary-item-title">${escapeHtml(String(x.title || x.bookmarkId || ''))}</div>${x.reason ? `<div class="ai-folder-summary-item-reason muted">${escapeHtml(String(x.reason))}</div>` : ''}</button>`).join('')}</div></section>` : ''}
+    ${(topTags.length || topHosts.length) ? `<section class="ai-folder-summary-panel"><div class="ai-folder-summary-panel-title">统计参考</div>
+      ${topTags.length ? `<div class="ai-folder-summary-stat-block"><div class="muted">Top 标签</div><div class="ai-folder-summary-chip-list">${topTags.slice(0, 8).map((x) => `<span class="meta-chip">${escapeHtml(String(x.tag || ''))} · ${Number(x.count || 0)}</span>`).join('')}</div></div>` : ''}
+      ${topHosts.length ? `<div class="ai-folder-summary-stat-block"><div class="muted">Top 来源</div><div class="ai-folder-summary-chip-list">${topHosts.slice(0, 8).map((x) => `<span class="meta-chip">${escapeHtml(String(x.host || ''))} · ${Number(x.count || 0)}</span>`).join('')}</div></div>` : ''}
+    </section>` : ''}
+  `;
+
+  contentEl.querySelectorAll('[data-ai-folder-summary-open]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const bookmarkId = String(el.getAttribute('data-ai-folder-summary-open') || '').trim();
+      if (!bookmarkId) return;
+      store.setActiveId(bookmarkId);
+      renderCards();
+      renderDetail();
+      showToast('已定位到代表书签', { timeoutMs: 1800 });
+    });
+  });
+}
+
+function openAiFolderSummaryDialog() {
+  const dialog = byId('aiFolderSummaryDialog');
+  if (!dialog) return;
+  const folder = currentCollectionForAiSummary();
+  aiFolderSummaryDialogState = {
+    ...aiFolderSummaryDialogState,
+    folderId: String(folder?.id || ''),
+    error: '',
+    suppressPersisted: false,
+    result: (folder?.aiSuggestions?.collectionSummary && typeof folder.aiSuggestions.collectionSummary === 'object')
+      ? folder.aiSuggestions.collectionSummary
+      : null
+  };
+  renderAiFolderSummaryDialogUi();
+  if (!dialog.open) dialog.showModal();
+  if (folder && !aiFolderSummaryDialogState.result) {
+    void runAiFolderSummaryForCurrentCollection();
+  }
+}
+
+function closeAiFolderSummaryDialog() {
+  const dialog = byId('aiFolderSummaryDialog');
+  if (dialog?.open) dialog.close();
+}
+
+function clearAiFolderSummaryDialogResult() {
+  aiFolderSummaryDialogState = {
+    ...aiFolderSummaryDialogState,
+    loading: false,
+    result: null,
+    error: '',
+    suppressPersisted: true
+  };
+  renderAiFolderSummaryDialogUi();
+}
+
+async function runAiFolderSummaryForCurrentCollection() {
+  const folder = currentCollectionForAiSummary();
+  if (!folder) {
+    showToast('请先在左侧选择一个集合', { timeoutMs: 2600 });
+    return;
+  }
+  if (aiFolderSummaryDialogState.loading) return;
+  aiFolderSummaryDialogState = {
+    ...aiFolderSummaryDialogState,
+    folderId: String(folder.id),
+    loading: true,
+    error: '',
+    suppressPersisted: false
+  };
+  renderAiFolderSummaryDialogUi();
+  try {
+    const out = await api(`/api/product/ai/folder-summary/${encodeURIComponent(String(folder.id))}`, {
+      method: 'POST',
+      body: JSON.stringify({ apply: true })
+    });
+    aiFolderSummaryDialogState = {
+      ...aiFolderSummaryDialogState,
+      loading: false,
+      folderId: String(folder.id),
+      result: out?.collectionSummary || out?.folder?.aiSuggestions?.collectionSummary || null,
+      error: ''
+    };
+    renderAiFolderSummaryDialogUi();
+    await refreshAll();
+    const summary = String(aiFolderSummaryDialogState.result?.summary || '').trim();
+    showToast(summary ? `AI 集合摘要已生成：${summary.slice(0, 60)}${summary.length > 60 ? '…' : ''}` : 'AI 集合摘要已生成', { timeoutMs: 3800 });
+  } catch (err) {
+    aiFolderSummaryDialogState = {
+      ...aiFolderSummaryDialogState,
+      loading: false,
+      error: String(err.message || err)
+    };
+    renderAiFolderSummaryDialogUi();
+    showToast(err.message || 'AI 集合知识摘要失败', { timeoutMs: 4200 });
+  }
+}
+
+function getAiQaContextBookmark() {
+  const scope = String(aiQaDialogState.scope || 'auto');
+  if (scope === 'all') return null;
+  const preferredId = String(aiQaDialogState.bookmarkId || state.activeId || '').trim();
+  if (!preferredId) return null;
+  return state.bookmarks.find((x) => String(x.id) === preferredId)
+    || state.allBookmarks.find((x) => String(x.id) === preferredId)
+    || null;
+}
+
+function renderAiQaDialogUi() {
+  const dialog = byId('aiQaDialog');
+  if (!dialog) return;
+  const questionEl = byId('aiQaQuestion');
+  const scopeEl = byId('aiQaScope');
+  const limitEl = byId('aiQaLimit');
+  const askBtn = byId('aiQaAskBtn');
+  const copyBtn = byId('aiQaCopyAnswerBtn');
+  const clearBtn = byId('aiQaClearBtn');
+  const metaEl = byId('aiQaMeta');
+  const answerEl = byId('aiQaAnswer');
+  const sourcesEl = byId('aiQaSources');
+  if (!questionEl || !scopeEl || !limitEl || !askBtn || !copyBtn || !clearBtn || !metaEl || !answerEl || !sourcesEl) return;
+
+  if (questionEl.value !== String(aiQaDialogState.question || '')) {
+    questionEl.value = String(aiQaDialogState.question || '');
+  }
+  scopeEl.value = ['auto', 'all', 'current_only'].includes(String(aiQaDialogState.scope || 'auto'))
+    ? String(aiQaDialogState.scope || 'auto')
+    : 'auto';
+  limitEl.value = String(Math.max(1, Math.min(10, Number(aiQaDialogState.limit) || 6)));
+
+  const ctx = getAiQaContextBookmark();
+  const scope = String(aiQaDialogState.scope || 'auto');
+  const loading = Boolean(aiQaDialogState.loading);
+  const canAsk = !loading && !detailAiOperationBusy() && String(questionEl.value || '').trim().length > 0;
+  askBtn.disabled = !canAsk;
+  askBtn.setAttribute('aria-busy', String(loading));
+  askBtn.textContent = loading ? '问答中…' : '开始问答';
+  copyBtn.disabled = !String(aiQaDialogState.answer || '').trim();
+  clearBtn.disabled = loading && !String(aiQaDialogState.answer || '').trim();
+
+  const metaBits = [];
+  if (scope === 'all') metaBits.push('范围：全部书签');
+  else if (scope === 'current_only') metaBits.push(ctx ? `范围：仅当前书签（${ctx.title || ctx.id}）` : '范围：仅当前书签（未选中）');
+  else metaBits.push(ctx ? `范围：当前书签优先（${ctx.title || ctx.id}）` : '范围：全部书签（当前未选中书签）');
+  if (Number(aiQaDialogState.confidence || 0) > 0) metaBits.push(`置信度 ${(Number(aiQaDialogState.confidence) * 100).toFixed(0)}%`);
+  if (aiQaDialogState.insufficient) metaBits.push('信息可能不足');
+  if (loading) metaBits.unshift('AI 正在分析书签内容...');
+  else if (aiQaDialogState.error) metaBits.unshift(`失败：${aiQaDialogState.error}`);
+  metaEl.textContent = metaBits.filter(Boolean).join(' · ') || '输入问题后点击“开始问答”。';
+
+  if (aiQaDialogState.answer) {
+    answerEl.textContent = String(aiQaDialogState.answer || '');
+    answerEl.classList.remove('muted');
+  } else if (loading) {
+    answerEl.textContent = '正在生成回答，请稍候…';
+    answerEl.classList.add('muted');
+  } else if (aiQaDialogState.error) {
+    answerEl.textContent = `问答失败：${aiQaDialogState.error}`;
+    answerEl.classList.add('muted');
+  } else {
+    answerEl.textContent = '暂无回答。';
+    answerEl.classList.add('muted');
+  }
+
+  const sources = Array.isArray(aiQaDialogState.sources) ? aiQaDialogState.sources : [];
+  if (!sources.length) {
+    sourcesEl.innerHTML = `<div class="muted">${loading ? '等待 AI 返回出处…' : '暂无出处。'}</div>`;
+    return;
+  }
+  sourcesEl.innerHTML = sources.map((src, idx) => {
+    const id = String(src?.id || '');
+    const title = String(src?.title || '(untitled)');
+    const host = String(src?.host || hostFromUrl(src?.url || '') || '');
+    const folderPath = String(src?.folderPath || '');
+    const score = Math.max(0, Math.min(1, Number(src?.score) || 0));
+    const reason = String(src?.reason || '');
+    const excerpt = String(src?.excerpt || '').trim();
+    const meta = [folderPath, host].filter(Boolean).join(' · ');
+    return `<button type="button" class="ai-qa-source-item" data-ai-qa-source-open="${escapeHtml(id)}">
+      <div class="ai-qa-source-row">
+        <span class="ai-qa-source-index">${idx + 1}</span>
+        <span class="ai-qa-source-title">${escapeHtml(title)}</span>
+        ${score > 0 ? `<span class="meta-chip info">${Math.round(score * 100)}%</span>` : ''}
+      </div>
+      ${meta ? `<div class="ai-qa-source-meta muted">${escapeHtml(meta)}</div>` : ''}
+      ${reason ? `<div class="ai-qa-source-reason">${escapeHtml(reason)}</div>` : ''}
+      ${excerpt ? `<div class="ai-qa-source-excerpt">${escapeHtml(excerpt)}</div>` : ''}
+    </button>`;
+  }).join('');
+
+  sourcesEl.querySelectorAll('[data-ai-qa-source-open]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const id = String(el.dataset.aiQaSourceOpen || '').trim();
+      if (!id) return;
+      store.setActiveId(id);
+      aiQaDialogState.bookmarkId = id;
+      renderCards();
+      renderDetail();
+      renderAiQaDialogUi();
+    });
+  });
+}
+
+function openAiQaDialog({ bookmarkId = null, question = '', scope = null } = {}) {
+  const dialog = byId('aiQaDialog');
+  if (!dialog) return;
+  const prevBookmarkId = String(aiQaDialogState.bookmarkId || '');
+  const prevScope = String(aiQaDialogState.scope || 'auto');
+  const incomingBookmarkId = String(bookmarkId || state.activeId || '').trim();
+  if (incomingBookmarkId) aiQaDialogState.bookmarkId = incomingBookmarkId;
+  if (typeof question === 'string' && question) aiQaDialogState.question = question;
+  if (scope) aiQaDialogState.scope = String(scope);
+  if (!String(aiQaDialogState.scope || '').trim()) aiQaDialogState.scope = 'auto';
+  const currentBookmarkId = String(aiQaDialogState.bookmarkId || '');
+  const currentScope = String(aiQaDialogState.scope || 'auto');
+  if (currentBookmarkId !== prevBookmarkId || currentScope !== prevScope) {
+    aiQaDialogState = {
+      ...aiQaDialogState,
+      answer: '',
+      sources: [],
+      insufficient: false,
+      confidence: 0,
+      error: ''
+    };
+  }
+  renderAiQaDialogUi();
+  if (!dialog.open) dialog.showModal();
+  queueMicrotask(() => byId('aiQaQuestion')?.focus?.());
+}
+
+function closeAiQaDialog() {
+  const dialog = byId('aiQaDialog');
+  if (dialog?.open) dialog.close();
+}
+
+function clearAiQaDialogResult({ preserveQuestion = true } = {}) {
+  aiQaDialogState = {
+    ...aiQaDialogState,
+    loading: false,
+    question: preserveQuestion ? String(aiQaDialogState.question || '') : '',
+    answer: '',
+    sources: [],
+    insufficient: false,
+    confidence: 0,
+    error: ''
+  };
+  renderAiQaDialogUi();
+}
+
+async function runAiQaFromDialog() {
+  if (detailAiOperationBusy()) return;
+  const question = String(byId('aiQaQuestion')?.value || '').trim();
+  if (!question) {
+    showToast('请输入问题', { timeoutMs: 2500 });
+    byId('aiQaQuestion')?.focus?.();
+    return;
+  }
+  const scope = String(byId('aiQaScope')?.value || 'auto');
+  const limit = Math.max(1, Math.min(10, Number(byId('aiQaLimit')?.value || 6) || 6));
+  const currentCtxId = String(aiQaDialogState.bookmarkId || state.activeId || '').trim();
+  if (scope === 'current_only' && !currentCtxId) {
+    showToast('“仅当前书签”需要先选中一条书签', { timeoutMs: 3000 });
+    return;
+  }
+
+  aiQaDialogState = {
+    ...aiQaDialogState,
+    loading: true,
+    question,
+    scope,
+    limit,
+    error: '',
+    answer: '',
+    sources: [],
+    insufficient: false,
+    confidence: 0,
+    bookmarkId: currentCtxId || aiQaDialogState.bookmarkId || ''
+  };
+  detailAiQaRunning = true;
+  renderAiQaDialogUi();
+  updateDetailPanelHeadUi(state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null);
+
+  try {
+    const body = {
+      question,
+      scope,
+      limit
+    };
+    if (scope === 'current_only' && currentCtxId) {
+      body.bookmarkId = currentCtxId;
+      body.bookmarkIds = [currentCtxId];
+    } else if (scope === 'auto' && currentCtxId) {
+      body.bookmarkId = currentCtxId;
+    }
+    const out = await api('/api/product/ai/qa', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    aiQaDialogState = {
+      ...aiQaDialogState,
+      loading: false,
+      answer: String(out?.answer || ''),
+      sources: Array.isArray(out?.sources) ? out.sources : [],
+      insufficient: Boolean(out?.insufficient),
+      confidence: Math.max(0, Math.min(1, Number(out?.confidence) || 0)),
+      error: ''
+    };
+    renderAiQaDialogUi();
+    const sourcesCount = Array.isArray(out?.sources) ? out.sources.length : 0;
+    showToast(sourcesCount ? `AI 已生成回答（引用 ${sourcesCount} 条出处）` : 'AI 已生成回答', { timeoutMs: 3400 });
+  } catch (err) {
+    aiQaDialogState = {
+      ...aiQaDialogState,
+      loading: false,
+      error: String(err.message || err),
+      answer: '',
+      sources: [],
+      insufficient: false,
+      confidence: 0
+    };
+    renderAiQaDialogUi();
+    showToast(err.message || 'AI 书签问答失败', { timeoutMs: 4200 });
+  } finally {
+    detailAiQaRunning = false;
+    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
+    updateDetailPanelHeadUi(latest);
+    renderDetailRelatedBookmarksUi(latest);
+  }
 }
 
 async function loadHighlightsForBookmark(bookmarkId, { force = false } = {}) {
@@ -4683,8 +6263,27 @@ function renderDetail() {
     detailMetadataTaskLatestId = null;
     detailHighlightsBookmarkId = null;
     byId('detailArticleInfo').textContent = '';
+    byId('detailReaderSummaryInfo').textContent = '';
+    byId('detailReaderSummaryBox').classList.add('hidden');
+    byId('detailReaderSummaryBox').innerHTML = '';
     byId('detailHighlightsInfo').textContent = '';
+    byId('detailHighlightCandidatesInfo').textContent = '';
+    byId('detailHighlightCandidatesList').classList.add('hidden');
+    byId('detailHighlightCandidatesList').innerHTML = '';
+    byId('detailHighlightDigestInfo').textContent = '';
+    byId('detailHighlightDigestBox').classList.add('hidden');
+    byId('detailHighlightDigestBox').innerHTML = '';
     byId('detailHighlightsList').innerHTML = '';
+    byId('detailRelatedBookmarksInfo').textContent = '';
+    byId('detailRelatedBookmarksList').innerHTML = '';
+    detailRelatedBookmarksState = {
+      bookmarkId: '',
+      loading: false,
+      items: [],
+      summary: '',
+      confidence: 0,
+      error: ''
+    };
     byId('detailReminderInfo').textContent = '';
     renderDetailFetchStatusSummary({ item: null });
     if (byId('detailSummaryKind')) byId('detailSummaryKind').textContent = '未选择';
@@ -4696,6 +6295,7 @@ function renderDetail() {
     updateDetailPanelHeadUi(null);
     renderDetailEditUi(null);
     applyDetailSectionUi();
+    renderAiQaDialogUi();
     return;
   }
 
@@ -4747,6 +6347,8 @@ function renderDetail() {
   updateDetailPanelHeadUi(item);
   renderDetailEditUi(item);
   applyDetailSectionUi();
+  renderAiQaDialogUi();
+  renderDetailRelatedBookmarksUi(item);
   const meta = item.metadata || {};
   const parts = [];
   if (meta.status) parts.push(`metadata: ${meta.status}`);
@@ -4761,6 +6363,9 @@ function renderDetail() {
   if (article.extractedAt) articleParts.push(`extracted: ${new Date(Number(article.extractedAt)).toLocaleString()}`);
   if (article.error) articleParts.push(`错误：${article.error}`);
   byId('detailArticleInfo').textContent = articleParts.join(' · ');
+  renderDetailReaderSummaryUi(item);
+  renderDetailHighlightCandidatesUi(item);
+  renderDetailHighlightDigestUi(item);
   renderDetailFetchStatusSummary({ item });
   if (detailHighlightsBookmarkId !== String(item.id)) {
     detailHighlightsBookmarkId = '';
@@ -4793,6 +6398,7 @@ function hydrateDetailHeaderIcons(item = null) {
     ['detailPanelMoreBtn', 'more', '更多操作'],
     ['detailHeaderOpenBtn', 'open', '打开'],
     ['detailHeaderPreviewBtn', 'preview', '预览'],
+    ['detailHeaderAiTagBtn', 'ai', 'AI 自动打标签'],
     ['detailHeaderEditBtn', 'edit', '编辑'],
     ['detailHeaderCancelEditBtn', 'close', '取消编辑'],
     ['detailHeaderDeleteBtn', 'delete', '删除'],
@@ -5212,10 +6818,10 @@ function bindActions() {
   byId('collectionDialog')?.addEventListener('close', () => clearFormValidation('collectionForm', 'collectionFormError'));
 
   window.addEventListener('focus', () => {
-    runAuthGuardCheck().catch(() => {});
+    runAuthGuardCheck().catch(() => { });
   });
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) runAuthGuardCheck().catch(() => {});
+    if (!document.hidden) runAuthGuardCheck().catch(() => { });
   });
 
   byId('bookmarkLayoutSwitch')?.addEventListener('click', (e) => {
@@ -5288,7 +6894,8 @@ function bindActions() {
     e.stopPropagation();
     const action = String(item.dataset.headerMoreAction || '');
     setHeaderMoreMenuOpen(false);
-    if (action === 'export') byId('importExportBtn')?.click();
+    if (action === 'export') byId('exportBtn')?.click();
+    if (action === 'ai-folder-summary') openAiFolderSummaryDialog();
     if (action === 'plugin') byId('pluginPanelBtn')?.click();
   });
   byId('addToolbarMenu')?.addEventListener('click', (e) => {
@@ -5300,9 +6907,10 @@ function bindActions() {
     setAddToolbarMenuOpen(false);
     if (action === 'bookmark') byId('addBookmarkBtn')?.click();
     if (action === 'collection') byId('newCollectionBtn')?.click();
-    if (action === 'io') byId('importExportBtn')?.click();
+    if (action === 'import') byId('importBtn')?.click();
+    if (action === 'export') byId('exportBtn')?.click();
     if (action === 'upload') {
-      byId('importExportBtn')?.click();
+      byId('importBtn')?.click();
       queueMicrotask(() => byId('ioImportFile')?.click());
     }
   });
@@ -5732,12 +7340,122 @@ function bindActions() {
     await loadBookmarks();
     renderSidebar();
   });
+  byId('advancedSearchSemanticEnabled')?.addEventListener('change', async () => {
+    pullAdvancedSearchInputs();
+    advancedSearchState.activeSavedId = '';
+    store.setFilter('page', 1);
+    await loadBookmarks();
+    renderSidebar();
+  });
+  byId('advancedSearchSemanticMode')?.addEventListener('change', async () => {
+    pullAdvancedSearchInputs();
+    advancedSearchState.activeSavedId = '';
+    store.setFilter('page', 1);
+    await loadBookmarks();
+    renderSidebar();
+  });
+  byId('advancedSearchRerankEnabled')?.addEventListener('change', async () => {
+    pullAdvancedSearchInputs();
+    advancedSearchState.activeSavedId = '';
+    store.setFilter('page', 1);
+    await loadBookmarks();
+    renderSidebar();
+  });
+  byId('advancedSearchRerankTopK')?.addEventListener('change', async () => {
+    pullAdvancedSearchInputs();
+    advancedSearchState.activeSavedId = '';
+    store.setFilter('page', 1);
+    if (isAdvancedSearchActive() && String(state.filters.q || '').trim() && advancedSearchState.rerankEnabled) {
+      await loadBookmarks();
+      renderSidebar();
+    } else {
+      syncAdvancedSearchInputs();
+    }
+  });
   byId('advancedSearchApplyBtn')?.addEventListener('click', async () => {
     pullAdvancedSearchInputs();
     advancedSearchState.activeSavedId = '';
     store.setFilter('page', 1);
     await loadBookmarks();
     renderSidebar();
+  });
+  byId('advancedSearchSemanticRebuildBtn')?.addEventListener('click', async () => {
+    const btn = byId('advancedSearchSemanticRebuildBtn');
+    try {
+      if (btn) {
+        btn.disabled = true;
+        btn.dataset.loading = '1';
+      }
+      const out = await api('/api/product/search/semantic/index/rebuild', {
+        method: 'POST',
+        body: JSON.stringify({})
+      });
+      const updated = Number(out?.updated || 0) || 0;
+      const indexed = Number(out?.indexed || 0) || 0;
+      const providerType = String(out?.provider?.providerType || '');
+      const suffix = providerType ? ` · ${providerType}` : '';
+      showToast(`语义索引已重建：${indexed} 条（更新 ${updated} 条）${suffix}`, { timeoutMs: 3800 });
+      if (isAdvancedSearchActive() && advancedSearchState.semanticEnabled && String(state.filters.q || '').trim()) {
+        await loadBookmarks();
+        renderSidebar();
+      }
+    } catch (err) {
+      showToast(err.message || '重建语义索引失败', { timeoutMs: 4200 });
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        delete btn.dataset.loading;
+      }
+    }
+  });
+  byId('advancedSearchAiParseBtn')?.addEventListener('click', async () => {
+    try {
+      let text = String(byId('searchInput')?.value || '').trim();
+      if (!text) {
+        text = await uiPrompt('输入自然语言搜索需求（例如：找最近收藏的天气 API 相关文章）', {
+          title: 'AI 解析搜索',
+          inputLabel: '自然语言搜索',
+          placeholder: '例如：找最近收藏的天气 API 相关文章',
+          required: true,
+          requiredMessage: '请输入自然语言搜索需求'
+        });
+      }
+      text = String(text || '').trim();
+      if (!text) return;
+      const btn = byId('advancedSearchAiParseBtn');
+      if (btn) {
+        btn.disabled = true;
+        btn.dataset.loading = '1';
+      }
+      const out = await api('/api/product/ai/search-to-filters', {
+        method: 'POST',
+        body: JSON.stringify({
+          text,
+          current: {
+            view: state.filters.view || 'all',
+            folderId: state.filters.folderId || 'all',
+            sort: state.filters.sort || 'newest'
+          }
+        })
+      });
+      applyAiSearchParseToUi(out, text);
+      syncAdvancedSearchInputs();
+      await loadBookmarks();
+      renderSidebar();
+      const unsupported = Array.isArray(out?.unsupported) ? out.unsupported.filter(Boolean) : [];
+      const confidence = Number(out?.confidence || 0);
+      const suffix = unsupported.length ? `；未完全支持：${unsupported.join('、')}` : '';
+      const confText = Number.isFinite(confidence) && confidence > 0 ? `（置信度 ${(confidence * 100).toFixed(0)}%）` : '';
+      showToast(`AI 已应用搜索筛选${confText}${suffix}`, { timeoutMs: 4500 });
+    } catch (err) {
+      showToast(err.message || 'AI 解析搜索失败', { timeoutMs: 4200 });
+    } finally {
+      const btn = byId('advancedSearchAiParseBtn');
+      if (btn) {
+        btn.disabled = false;
+        delete btn.dataset.loading;
+      }
+    }
   });
   byId('advancedSearchResetBtn')?.addEventListener('click', async () => {
     advancedSearchState.enabled = false;
@@ -5746,8 +7464,13 @@ function bindActions() {
     advancedSearchState.type = '';
     advancedSearchState.favorite = '';
     advancedSearchState.archived = '';
+    advancedSearchState.semanticEnabled = false;
+    advancedSearchState.semanticMode = 'hybrid';
+    advancedSearchState.rerankEnabled = false;
+    advancedSearchState.rerankTopK = 36;
     advancedSearchState.activeSavedId = '';
     advancedSearchState.lastResultMeta = null;
+    advancedSearchState.lastAiParseMeta = null;
     store.setFilter('q', '');
     store.setFilter('page', 1);
     byId('searchInput').value = '';
@@ -5997,10 +7720,57 @@ function bindActions() {
   });
 
   byId('askAiBtn')?.addEventListener('click', () => {
-    const url = new URL('/settings.html', window.location.origin);
-    url.hash = 'settingsSectionProduct';
-    if (state.activeId) url.searchParams.set('bookmarkId', String(state.activeId));
-    window.location.assign(`${url.pathname}${url.search}${url.hash}`);
+    openAiQaDialog({ bookmarkId: state.activeId || null, scope: 'auto' });
+  });
+  byId('aiQaAskBtn')?.addEventListener('click', async () => {
+    await runAiQaFromDialog();
+  });
+  byId('aiQaCopyAnswerBtn')?.addEventListener('click', async () => {
+    const text = String(aiQaDialogState.answer || '').trim();
+    if (!text) return;
+    const ok = await copyTextToClipboard(text);
+    showToast(ok ? '回答已复制' : text, { timeoutMs: ok ? 2200 : 5000 });
+  });
+  byId('aiQaClearBtn')?.addEventListener('click', () => {
+    aiQaDialogState.question = String(byId('aiQaQuestion')?.value || aiQaDialogState.question || '');
+    clearAiQaDialogResult({ preserveQuestion: true });
+  });
+  byId('aiQaCloseBtn')?.addEventListener('click', () => {
+    closeAiQaDialog();
+  });
+  byId('aiQaQuestion')?.addEventListener('input', (e) => {
+    aiQaDialogState.question = String(e.target?.value || '');
+    renderAiQaDialogUi();
+  });
+  byId('aiQaScope')?.addEventListener('change', (e) => {
+    aiQaDialogState.scope = String(e.target?.value || 'auto');
+    renderAiQaDialogUi();
+  });
+  byId('aiQaLimit')?.addEventListener('change', (e) => {
+    aiQaDialogState.limit = Math.max(1, Math.min(10, Number(e.target?.value || 6) || 6));
+    renderAiQaDialogUi();
+  });
+  byId('aiQaDialog')?.addEventListener('close', () => {
+    renderAiQaDialogUi();
+  });
+  byId('aiFolderSummaryRunBtn')?.addEventListener('click', async () => {
+    await runAiFolderSummaryForCurrentCollection();
+  });
+  byId('aiFolderSummaryClearBtn')?.addEventListener('click', () => {
+    clearAiFolderSummaryDialogResult();
+  });
+  byId('aiFolderSummaryCopyBtn')?.addEventListener('click', async () => {
+    const text = formatAiFolderSummaryText(aiFolderSummaryDialogState.result);
+    if (!String(text || '').trim()) return showToast('暂无可复制内容', { timeoutMs: 2200 });
+    const ok = await copyTextToClipboard(text);
+    showToast(ok ? '集合摘要已复制' : text, { timeoutMs: ok ? 2200 : 5000 });
+  });
+  byId('aiFolderSummaryCloseBtn')?.addEventListener('click', () => {
+    closeAiFolderSummaryDialog();
+  });
+  byId('aiFolderSummaryDialog')?.addEventListener('close', () => {
+    aiFolderSummaryDialogState = { ...aiFolderSummaryDialogState, loading: false, error: '' };
+    renderAiFolderSummaryDialogUi();
   });
 
   byId('newCollectionBtn').addEventListener('click', () => {
@@ -6018,7 +7788,7 @@ function bindActions() {
     if (!validateBookmarkCreateForm()) return;
     const tags = byId('newTags').value.split(',').map((x) => x.trim()).filter(Boolean);
     try {
-      await api('/api/bookmarks', {
+      const created = await api('/api/bookmarks', {
         method: 'POST',
         body: JSON.stringify({
           title: byId('newTitle').value,
@@ -6031,7 +7801,31 @@ function bindActions() {
       byId('bookmarkDialog').close();
       byId('bookmarkForm').reset();
       clearFormValidation('bookmarkForm', 'bookmarkFormError');
+      let aiAutoClassifyResult = null;
+      try {
+        aiAutoClassifyResult = await maybeRunAiAutoClassifyForCreatedBookmark(created);
+      } catch (err) {
+        aiAutoClassifyResult = { ran: false, error: err };
+      }
       await refreshAll();
+      if (created?.id) {
+        store.setActiveId(String(created.id));
+        renderDetail();
+      }
+      if (aiAutoClassifyResult?.ran) {
+        const summaryText = Array.isArray(aiAutoClassifyResult.summary) && aiAutoClassifyResult.summary.length
+          ? aiAutoClassifyResult.summary.join('；')
+          : 'AI 自动分类已执行';
+        if (aiAutoClassifyResult.errors?.length) {
+          showToast(`${summaryText}；部分失败：${aiAutoClassifyResult.errors[0]}`, { timeoutMs: 5200 });
+        } else {
+          showToast(`新书签已创建，${summaryText}`, { timeoutMs: 3800 });
+        }
+      } else if (aiAutoClassifyResult?.error) {
+        showToast(`书签已创建，但 AI 自动分类未执行：${aiAutoClassifyResult.error.message || aiAutoClassifyResult.error}`, { timeoutMs: 5000 });
+      } else {
+        showToast('书签已创建', { timeoutMs: 2400 });
+      }
     } catch (err) {
       setFormBannerError('bookmarkFormError', err.message || '创建书签失败');
     }
@@ -6117,6 +7911,14 @@ function bindActions() {
   byId('detailHeaderPreviewBtn')?.addEventListener('click', async () => {
     if (!state.activeId) return;
     byId('openPreviewBtn')?.click();
+  });
+  byId('detailHeaderAiTagBtn')?.addEventListener('click', async () => {
+    if (!state.activeId) return;
+    await runAiAutoTagForActiveBookmark();
+  });
+  byId('refreshRelatedBookmarksBtn')?.addEventListener('click', async () => {
+    if (!state.activeId) return;
+    await runAiRelatedBookmarksForActiveBookmark();
   });
   byId('detailPrevBtn')?.addEventListener('click', () => {
     if (!state.activeId) return;
@@ -6270,6 +8072,9 @@ function bindActions() {
   byId('extractArticleBtn').addEventListener('click', async () => {
     await extractArticleForActiveBookmark({ openReaderAfter: false });
   });
+  byId('generateReaderSummaryBtn')?.addEventListener('click', async () => {
+    await runAiReaderSummaryForActiveBookmark();
+  });
 
   byId('addHighlightBtn').addEventListener('click', async () => {
     if (!state.activeId) return;
@@ -6304,6 +8109,12 @@ function bindActions() {
     if (!state.activeId) return;
     await loadHighlightsForBookmark(state.activeId, { force: true });
     showToast('高亮列表已刷新', { timeoutMs: 2000 });
+  });
+  byId('aiHighlightSuggestBtn')?.addEventListener('click', async () => {
+    await runAiHighlightCandidatesForActiveBookmark();
+  });
+  byId('aiHighlightDigestBtn')?.addEventListener('click', async () => {
+    await runAiHighlightDigestForActiveBookmark();
   });
 
   byId('refreshFetchStatusBtn').addEventListener('click', async () => {
@@ -6378,10 +8189,10 @@ function bindActions() {
     showToast(`已收藏 ${out.affected || ids.length} 条`, {
       undoHandler: revertIds.length
         ? async () => {
-            await postBulk({ ids: revertIds, action: 'favorite', value: false });
-            await refreshAll();
-            showToast(`撤销完成（${revertIds.length} 条)`, { timeoutMs: 3000 });
-          }
+          await postBulk({ ids: revertIds, action: 'favorite', value: false });
+          await refreshAll();
+          showToast(`撤销完成（${revertIds.length} 条)`, { timeoutMs: 3000 });
+        }
         : null
     });
   });
@@ -6396,12 +8207,16 @@ function bindActions() {
     showToast(`已归档 ${out.affected || ids.length} 条`, {
       undoHandler: revertIds.length
         ? async () => {
-            await postBulk({ ids: revertIds, action: 'archive', value: false });
-            await refreshAll();
-            showToast(`撤销完成（${revertIds.length} 条)`, { timeoutMs: 3000 });
-          }
+          await postBulk({ ids: revertIds, action: 'archive', value: false });
+          await refreshAll();
+          showToast(`撤销完成（${revertIds.length} 条)`, { timeoutMs: 3000 });
+        }
         : null
     });
+  });
+
+  byId('bulkAiTagBtn').addEventListener('click', async () => {
+    await runBulkAiAutoTagForSelection();
   });
 
   byId('bulkDeleteBtn').addEventListener('click', async () => {
@@ -6421,10 +8236,10 @@ function bindActions() {
     showToast(`已删除 ${out.affected || ids.length} 条`, {
       undoHandler: restorableIds.length
         ? async () => {
-            await postBulk({ ids: restorableIds, action: 'restore' });
-            await refreshAll();
-            showToast(`撤销完成（${restorableIds.length} 条)`, { timeoutMs: 3000 });
-          }
+          await postBulk({ ids: restorableIds, action: 'restore' });
+          await refreshAll();
+          showToast(`撤销完成（${restorableIds.length} 条)`, { timeoutMs: 3000 });
+        }
         : null
     });
   });
@@ -6447,13 +8262,13 @@ function bindActions() {
     showToast(`已移动 ${out.affected || ids.length} 条`, {
       undoHandler: byPrevFolder.size
         ? async () => {
-            for (const [prevFolderId, restoreIds] of byPrevFolder.entries()) {
-              if (!restoreIds.length) continue;
-              await postBulk({ ids: restoreIds, action: 'move', folderId: prevFolderId });
-            }
-            await refreshAll();
-            showToast('移动已撤销', { timeoutMs: 3000 });
+          for (const [prevFolderId, restoreIds] of byPrevFolder.entries()) {
+            if (!restoreIds.length) continue;
+            await postBulk({ ids: restoreIds, action: 'move', folderId: prevFolderId });
           }
+          await refreshAll();
+          showToast('移动已撤销', { timeoutMs: 3000 });
+        }
         : null
     });
   });
@@ -6474,18 +8289,27 @@ function bindActions() {
     byId('tagManagerDialog').showModal();
   });
 
-  byId('importExportBtn').addEventListener('click', async () => {
+  byId('importBtn')?.addEventListener('click', () => {
     populateIoFolderSelects();
-    await loadIoTasks();
-    byId('ioTaskOutput').textContent = '就绪';
-    byId('ioDialog').showModal();
+    byId('importDialog').showModal();
   });
 
-  byId('ioCloseBtn').addEventListener('click', () => {
-    byId('ioDialog').close();
+  byId('exportBtn')?.addEventListener('click', async () => {
+    await loadIoTasks();
+    byId('ioTaskOutput').textContent = '就绪';
+    byId('exportDialog').showModal();
+  });
+
+  byId('importCloseBtn')?.addEventListener('click', () => {
+    byId('importDialog').close();
+  });
+
+  byId('exportCloseBtn')?.addEventListener('click', () => {
+    byId('exportDialog').close();
     stopIoTaskPoll();
   });
-  byId('ioDialog').addEventListener('close', () => {
+
+  byId('exportDialog')?.addEventListener('close', () => {
     stopIoTaskPoll();
   });
 
@@ -6751,6 +8575,87 @@ function bindActions() {
       renderTagManager();
     } catch (err) {
       byId('tagManagerOutput').textContent = err.message;
+    }
+  });
+
+  byId('aiTagStandardizeBtn')?.addEventListener('click', async () => {
+    const output = byId('tagManagerOutput');
+    try {
+      output.textContent = 'AI 正在分析标签并生成标准化建议...';
+      const suggestOut = await api('/api/product/ai/tags/standardize', {
+        method: 'POST',
+        body: JSON.stringify({ apply: false })
+      });
+      output.textContent = JSON.stringify(suggestOut, null, 2);
+      const suggestions = Array.isArray(suggestOut?.suggestions) ? suggestOut.suggestions : [];
+      if (!suggestions.length) {
+        showToast('AI 未给出可应用的标签标准化建议', { timeoutMs: 3200 });
+        return;
+      }
+      const ok = await uiConfirm(`AI 生成了 ${suggestions.length} 条标签标准化建议。是否立即应用（批量合并标签）？`, {
+        title: 'AI 标签标准化建议',
+        confirmText: '应用建议',
+        cancelText: '仅查看建议'
+      });
+      if (!ok) {
+        showToast(`AI 已生成 ${suggestions.length} 条标签标准化建议`, { timeoutMs: 3200 });
+        return;
+      }
+      output.textContent = '正在应用 AI 标签标准化建议...';
+      const applyOut = await api('/api/product/ai/tags/standardize', {
+        method: 'POST',
+        body: JSON.stringify({ apply: true, suggestions })
+      });
+      output.textContent = JSON.stringify(applyOut, null, 2);
+      await refreshAll();
+      renderTagManager();
+      const appliedGroups = Number(applyOut?.applyResult?.appliedGroups || 0) || 0;
+      const affectedBookmarks = Number(applyOut?.applyResult?.affectedBookmarks || 0) || 0;
+      showToast(`已应用 ${appliedGroups} 条标签标准化建议（影响 ${affectedBookmarks} 条书签）`, { timeoutMs: 3800 });
+    } catch (err) {
+      output.textContent = err.message || String(err);
+      showToast(err.message || 'AI 标签标准化失败', { timeoutMs: 4200 });
+    }
+  });
+
+  byId('aiTagLocalizeBtn')?.addEventListener('click', async () => {
+    const output = byId('tagManagerOutput');
+    try {
+      output.textContent = 'AI 正在识别标签语言并生成本地化统一建议...';
+      const suggestOut = await api('/api/product/ai/tags/localize', {
+        method: 'POST',
+        body: JSON.stringify({ apply: false })
+      });
+      output.textContent = JSON.stringify(suggestOut, null, 2);
+      const suggestions = Array.isArray(suggestOut?.suggestions) ? suggestOut.suggestions : [];
+      if (!suggestions.length) {
+        showToast('AI 未给出可应用的标签本地化建议', { timeoutMs: 3200 });
+        return;
+      }
+      const preferChinese = suggestOut?.strategy?.preferChinese !== false;
+      const ok = await uiConfirm(`AI 生成了 ${suggestions.length} 条标签本地化建议（目标策略：${preferChinese ? '优先中文' : '保留英文优先'}）。是否立即应用？`, {
+        title: 'AI 标签本地化建议',
+        confirmText: '应用建议',
+        cancelText: '仅查看建议'
+      });
+      if (!ok) {
+        showToast(`AI 已生成 ${suggestions.length} 条标签本地化建议`, { timeoutMs: 3200 });
+        return;
+      }
+      output.textContent = '正在应用 AI 标签本地化建议...';
+      const applyOut = await api('/api/product/ai/tags/localize', {
+        method: 'POST',
+        body: JSON.stringify({ apply: true, suggestions })
+      });
+      output.textContent = JSON.stringify(applyOut, null, 2);
+      await refreshAll();
+      renderTagManager();
+      const appliedGroups = Number(applyOut?.applyResult?.appliedGroups || 0) || 0;
+      const affectedBookmarks = Number(applyOut?.applyResult?.affectedBookmarks || 0) || 0;
+      showToast(`已应用 ${appliedGroups} 条标签本地化建议（影响 ${affectedBookmarks} 条书签）`, { timeoutMs: 4000 });
+    } catch (err) {
+      output.textContent = err.message || String(err);
+      showToast(err.message || 'AI 标签本地化失败', { timeoutMs: 4200 });
     }
   });
 }
