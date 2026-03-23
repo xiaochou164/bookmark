@@ -1,8 +1,5 @@
 import { api } from './js/api.mjs';
-
-function byId(id) {
-  return document.getElementById(id);
-}
+import { byId, escapeHtml as esc, safeUrl } from './js/utils.mjs';
 
 function currentPath() {
   return `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -14,14 +11,7 @@ function goLogin() {
   window.location.replace(`${url.pathname}${url.search}`);
 }
 
-function esc(input = '') {
-  return String(input)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+
 
 const view = {
   me: null,
@@ -357,7 +347,7 @@ function renderPublicLinks() {
         <div class="muted">${esc(p.description || '')}</div>
         <div class="muted">${esc(publicUrl)}</div>
         <div class="auth-token-row">
-          <a href="${esc(publicUrl)}" target="_blank" rel="noopener">打开</a>
+          <a href="${esc(safeUrl(publicUrl))}" target="_blank" rel="noopener">打开</a>
           <div>
             <button type="button" class="ghost" data-public-toggle="${esc(p.id)}">${p.enabled ? '停用' : '启用'}</button>
             <button type="button" class="ghost danger" data-public-delete="${esc(p.id)}">删除</button>
@@ -435,7 +425,7 @@ function renderBackups() {
       <div class="auth-token-row"><strong>${esc(b.id)}</strong><span class="muted">${b.createdAt ? new Date(Number(b.createdAt)).toLocaleString() : ''}</span></div>
       <div class="muted">${esc(JSON.stringify(b.summary || {}))}</div>
       <div class="auth-token-row">
-        <div class="muted">${b.file?.url ? `<a href="${esc(b.file.url)}" target="_blank" rel="noopener">下载</a>` : ''}</div>
+        <div class="muted">${b.file?.url ? `<a href="${esc(safeUrl(b.file.url))}" target="_blank" rel="noopener">下载</a>` : ''}</div>
         <button type="button" class="ghost" data-backup-restore="${esc(b.id)}">恢复</button>
       </div>
     </div>

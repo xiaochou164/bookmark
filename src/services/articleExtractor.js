@@ -1,5 +1,6 @@
 const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
+const { isSafeUrl } = require('../utils/url');
 const { safeSegment } = require('./objectStorage');
 
 function metaContent(doc, selectors = []) {
@@ -9,6 +10,16 @@ function metaContent(doc, selectors = []) {
     if (value) return value;
   }
   return '';
+}
+
+function safeUrl(url) {
+  const s = String(url || '').trim();
+  if (!s) return 'about:blank';
+  if (s.startsWith('/') || s.startsWith('#')) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^mailto:/i.test(s)) return s;
+  if (/^tel:/i.test(s)) return s;
+  return 'unsafe:' + s;
 }
 
 function escapeHtml(input = '') {
@@ -53,7 +64,7 @@ function readerDocumentHtml(article = {}, meta = {}) {
     <div class="meta">
       ${siteName ? `<div>${escapeHtml(siteName)}</div>` : ''}
       ${byline ? `<div>By ${escapeHtml(byline)}</div>` : ''}
-      ${sourceUrl ? `<div><a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceUrl)}</a></div>` : ''}
+      ${sourceUrl ? `<div><a href="${escapeHtml(safeUrl(sourceUrl))}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceUrl)}</a></div>` : ''}
     </div>
     ${excerpt ? `<p class="excerpt">${escapeHtml(excerpt)}</p>` : ''}
     <article>${content}</article>
@@ -67,21 +78,24 @@ async function extractArticleFromUrl(targetUrl, { timeoutMs = 15_000 } = {}) {
   if (!sourceUrl) throw new Error('url is required');
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 15_000));
-  let res;
-  try {
-    res = await fetch(sourceUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RainboardBot/0.1 (+article-extractor)',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      }
-    });
-  } finally {
-    clearTimeout(timer);
-  }
+    const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 15_000));
+    if (!isSafeUrl(sourceUrl)) {
+      throw new Error(`Invalid or unsafe URL: ${sourceUrl}`);
+    }
+    let res;
+    try {
+      res = await fetch(sourceUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'RainboardBot/0.1 (+article-extractor)',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+      });
+    } finally {
+      clearTimeout(timer);
+    }
   const finalUrl = String(res.url || sourceUrl);
   const contentType = String(res.headers.get('content-type') || '');
   const html = await res.text();

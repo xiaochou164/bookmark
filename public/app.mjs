@@ -1,5 +1,5 @@
 import { quickViews } from './js/constants.mjs';
-import { byId, escapeHtml, hostFromUrl } from './js/utils.mjs';
+import { byId, escapeHtml, hostFromUrl, safeUrl } from './js/utils.mjs';
 import { api, queryString } from './js/api.mjs';
 import { createAppStore } from './js/stateStore.mjs';
 
@@ -4180,6 +4180,23 @@ function renderCards() {
     });
   });
 
+  root.querySelectorAll('[data-open-out]').forEach((el) => {
+    el.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = el.dataset.openOut;
+      const bm = state.bookmarks.find((x) => x.id === id) || state.allBookmarks.find((x) => x.id === id);
+      if (!bm) return;
+      const url = safeUrl(bm.url);
+      if (url.startsWith('unsafe:')) {
+        showToast('无法打开不安全的链接', { timeoutMs: 3000 });
+        return;
+      }
+      window.open(url, '_blank', 'noopener');
+      api(`/api/bookmarks/${id}/opened`, { method: 'POST' }).catch(() => {});
+    });
+  });
+
   root.querySelectorAll('img[data-row-thumb-img]').forEach((img) => {
     const thumbBtn = img.closest('.bookmark-row-thumb');
     if (!thumbBtn) return;
@@ -4232,7 +4249,12 @@ function renderCards() {
       const id = el.dataset.open;
       const bm = state.bookmarks.find((x) => x.id === id) || state.allBookmarks.find((x) => x.id === id);
       if (!bm) return;
-      window.open(bm.url, '_blank', 'noopener');
+      const url = safeUrl(bm.url);
+      if (url.startsWith('unsafe:')) {
+        showToast('无法打开不安全的链接', { timeoutMs: 3000 });
+        return;
+      }
+      window.open(url, '_blank', 'noopener');
       await api(`/api/bookmarks/${id}/opened`, { method: 'POST' });
       await refreshAll();
     });
@@ -4243,7 +4265,12 @@ function renderCards() {
       const id = el.dataset.openCurrent;
       const bm = state.bookmarks.find((x) => x.id === id) || state.allBookmarks.find((x) => x.id === id);
       if (!bm) return;
-      window.location.assign(String(bm.url || ''));
+      const url = safeUrl(bm.url);
+      if (url.startsWith('unsafe:')) {
+        showToast('无法打开不安全的链接', { timeoutMs: 3000 });
+        return;
+      }
+      window.location.assign(url);
     });
   });
 

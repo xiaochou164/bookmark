@@ -1,5 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { isSafeUrl } = require('../utils/url');
 
 function safeSegment(input, fallback = 'item') {
   const raw = String(input || '').trim();
@@ -82,6 +83,9 @@ class LocalObjectStorage {
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
+    if (!isSafeUrl(url)) {
+      throw new Error(`Invalid or unsafe URL: ${url}`);
+    }
     let res;
     try {
       res = await fetch(url, { signal: controller.signal, redirect: 'follow' });

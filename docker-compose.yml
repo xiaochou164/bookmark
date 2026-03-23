@@ -1,0 +1,22 @@
+services:
+  rainboard:
+    build: .
+    container_name: rainboard
+    ports:
+      - "3789:3789"
+    environment:
+      - NODE_ENV=production
+      - RB_PORT=3789
+      # - RB_SECRET=change-this-to-a-secure-random-string
+    volumes:
+      - rainboard-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3789/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  rainboard-data:

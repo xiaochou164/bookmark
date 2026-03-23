@@ -9,7 +9,17 @@ function sanitizeRole(role = 'viewer') {
   return 'viewer';
 }
 
-function escapeHtml(input = '') {
+function safeUrl(url) {
+  const s = String(url || '').trim();
+  if (!s) return 'about:blank';
+  if (s.startsWith('/') || s.startsWith('#')) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^mailto:/i.test(s)) return s;
+  if (/^tel:/i.test(s)) return s;
+  return 'unsafe:' + s;
+}
+
+function esc(input = '') {
   return String(input)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -17,6 +27,7 @@ function escapeHtml(input = '') {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
 
 function registerCollabRoutes(app, deps) {
   const { dbRepo, badRequest, notFound } = deps;
@@ -389,6 +400,13 @@ function registerCollabRoutes(app, deps) {
           .replace(/"/g,'&quot;')
           .replace(/'/g,'&#39;');
       }
+      function safeUrl(u){
+        var s = String(u || '').trim();
+        if (!s) return 'about:blank';
+        if (s.indexOf('/') === 0 || s.indexOf('#') === 0) return s;
+        if (/^https?:\/\//i.test(s)) return s;
+        return 'unsafe:' + s;
+      }
       try {
         const resp = await fetch('/public/c/' + encodeURIComponent(token) + '.json');
         const data = await resp.json();
@@ -407,13 +425,13 @@ function registerCollabRoutes(app, deps) {
           var tags = Array.isArray(b.tags) ? b.tags.slice(0,4) : [];
           var excerpt = (b.note || (b.metadata && b.metadata.description) || '').trim();
           return '<article class=\"card public-share-card\">'
-            + (cover ? '<div class=\"card-cover\"><img src=\"' + esc(cover) + '\" alt=\"cover\" loading=\"lazy\" /></div>' : '')
+            + (cover ? '<div class=\"card-cover\"><img src=\"' + esc(safeUrl(cover)) + '\" alt=\"cover\" loading=\"lazy\" /></div>' : '')
             + '<div class=\"card-top\"><div class=\"host\">' + esc(host || '网页') + '</div></div>'
             + '<div class=\"card-body\">'
             + '<div class=\"card-title\">' + esc(b.title || '(未命名)') + '</div>'
             + (excerpt ? '<div class=\"card-note\">' + esc(excerpt) + '</div>' : '')
             + (tags.length ? '<div class=\"card-tags\">' + tags.map(function(t){ return '<span class=\"card-tag\">#' + esc(t) + '</span>'; }).join('') + '</div>' : '')
-            + '<div class=\"card-actions\"><a class=\"ghost button-link\" href=\"' + esc(b.url) + '\" target=\"_blank\" rel=\"noopener\">打开</a></div>'
+            + '<div class=\"card-actions\"><a class=\"ghost button-link\" href=\"' + esc(safeUrl(b.url)) + '\" target=\"_blank\" rel=\"noopener\">打开</a></div>'
             + '</div></article>';
         }).join('');
         if (!(data.bookmarks || []).length) {

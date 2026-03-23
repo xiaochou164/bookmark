@@ -1,3 +1,5 @@
+const { isSafeUrl } = require('../utils/url');
+
 function decodeEntities(input = '') {
   return String(input)
     .replace(/&amp;/gi, '&')
@@ -72,6 +74,9 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
   const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
   let res;
   try {
+    if (!isSafeUrl(url)) {
+      throw new Error(`Invalid or unsafe URL: ${url}`);
+    }
     res = await fetch(url, {
       method: 'GET',
       redirect: 'follow',
