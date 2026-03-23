@@ -78,8 +78,7 @@ function normalizeUrl(input) {
 }
 
 function chromeDateToUnix(dateAdded) {
-  const chromeEpochOffset = 11644473600000000;
-  return (Number(dateAdded || 0) - chromeEpochOffset) / 1000000;
+  return Number(dateAdded || 0);
 }
 
 async function getSettings() {
@@ -1068,7 +1067,8 @@ async function collectChromeBookmarksByFolder() {
               url: child.url,
               title: (child.title || '').trim() || '(untitled)',
               chromeId: child.id,
-              chromeParentId: child.parentId
+              chromeParentId: child.parentId,
+              createdAt: Number(child.dateAdded || Date.now())
             });
           }
         }
@@ -1101,7 +1101,8 @@ async function collectChromeBookmarksByFolder() {
         url: bm.url,
         title: (bm.title || '').trim() || '(untitled)',
         chromeId: bm.id,
-        chromeParentId: bm.parentId
+        chromeParentId: bm.parentId,
+        createdAt: Number(bm.dateAdded || Date.now())
       });
     }
   }

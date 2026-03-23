@@ -457,7 +457,8 @@ function registerBookmarkRoutes(app, deps) {
       const render = {
         mode: kind === 'image' ? 'image' : kind === 'video' && embedYouTube ? 'iframe' : kind === 'video' ? 'video' : 'iframe',
         url: kind === 'video' && embedYouTube ? embedYouTube : String(item.url || ''),
-        sandboxed: kind === 'web' || (kind === 'video' && embedYouTube)
+        sandboxed: kind === 'web' || (kind === 'video' && embedYouTube),
+        frameRestricted: Boolean(metadata.frameRestricted)
       };
 
       const preview = {

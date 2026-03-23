@@ -144,6 +144,7 @@ function registerChromeSyncRoutes(app, deps) {
                         title: String(bm.title || '').trim() || '(untitled)',
                         folderName,
                         chromeId: String(bm.chromeId || ''),
+                        createdAt: Number(bm.createdAt || 0),
                     });
                 }
             }
@@ -159,12 +160,19 @@ function registerChromeSyncRoutes(app, deps) {
             const toDeleteInChrome = [];
 
             await dbRepo.update((db) => {
-                // Build DB alive-bookmark index (this user, not deleted)
+                // Build DB alive-bookmark index and deleted index
                 const dbByUrl = new Map();
+                const dbDeletedByUrl = new Map();
                 for (const bm of db.bookmarks) {
-                    if (!hasOwner(bm, userId) || bm.deletedAt || !bm.url) continue;
+                    if (!hasOwner(bm, userId) || !bm.url) continue;
                     const normed = normalizeUrl(bm.url);
-                    if (normed && !dbByUrl.has(normed)) dbByUrl.set(normed, bm);
+                    if (!normed) continue;
+                    
+                    if (bm.deletedAt) {
+                        if (!dbDeletedByUrl.has(normed)) dbDeletedByUrl.set(normed, bm);
+                    } else {
+                        if (!dbByUrl.has(normed)) dbByUrl.set(normed, bm);
+                    }
                 }
 
                 // 1. Chrome → DB: add bookmarks from Chrome that are missing in DB
@@ -173,6 +181,28 @@ function registerChromeSyncRoutes(app, deps) {
                         stats.skippedDuplicate++;
                         continue;
                     }
+                    
+                    // Check if it was deleted in DB
+                    const dbDeleted = dbDeletedByUrl.get(normed);
+                    if (dbDeleted) {
+                        const chromeAge = Number(chromeBm.createdAt || 0);
+                        const dbDeletedAge = Number(dbDeleted.deletedAt || 0);
+                        // If Chrome bookmark is old (created before or at the time of deletion), it should remain deleted.
+                        // We do NOT recreate it here. It will be instructed to be deleted from Chrome in step 3.
+                        if (chromeAge <= dbDeletedAge || chromeAge < Date.now() - 365 * 24 * 60 * 60 * 1000) {
+                            continue;
+                        }
+                        
+                        // Otherwise, it was recently added to Chrome natively AFTER we deleted it in DB.
+                        // Recover it (drop deletedAt)
+                        dbDeleted.deletedAt = null;
+                        dbDeleted.updatedAt = now;
+                        dbByUrl.set(normed, dbDeleted);
+                        dbDeletedByUrl.delete(normed); // Remove from deleted so we don't delete from Chrome
+                        stats.createdInDb++; // Count as recreation
+                        continue;
+                    }
+
                     const folder = ensureFolderForUser(db, chromeBm.folderName, userId, now);
                     const newBm = {
                         id: `bm_${crypto.randomUUID()}`,
@@ -231,22 +261,18 @@ function registerChromeSyncRoutes(app, deps) {
                 }
 
                 // 3. DB 已删除的书签：找到 Chrome 中仍存在的，告知 Chrome 删除（以云端删除记录为准）
-                const dbDeletedByUrl = new Map();
-                for (const bm of db.bookmarks) {
-                    if (!hasOwner(bm, userId) || !bm.deletedAt || !bm.url) continue;
-                    const normed = normalizeUrl(bm.url);
-                    if (normed && !dbDeletedByUrl.has(normed))
-                        dbDeletedByUrl.set(normed, bm);
-                }
-                for (const [normed, chromeBm] of chromeByUrl.entries()) {
-                    if (dbDeletedByUrl.has(normed)) {
-                        toDeleteInChrome.push({
-                            chromeId: chromeBm.chromeId,
-                            url: chromeBm.url,
-                            title: chromeBm.title,
-                            folderName: chromeBm.folderName,
-                        });
-                        stats.toDeleteInChrome++;
+                if (deleteSync) {
+                    for (const [normed, chromeBm] of chromeByUrl.entries()) {
+                        const dbDeleted = dbDeletedByUrl.get(normed);
+                        if (dbDeleted) {
+                            toDeleteInChrome.push({
+                                chromeId: chromeBm.chromeId,
+                                url: chromeBm.url,
+                                title: chromeBm.title,
+                                folderName: chromeBm.folderName,
+                            });
+                            stats.toDeleteInChrome++;
+                        }
                     }
                 }
 

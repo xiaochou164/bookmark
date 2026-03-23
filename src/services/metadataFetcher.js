@@ -119,7 +119,10 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
     siteName: ogSiteName || '',
     image: toAbsoluteUrl(finalUrl, ogImage),
     favicon: toAbsoluteUrl(finalUrl, iconHref),
-    hostname
+    hostname,
+    frameRestricted: (res.headers.get('x-frame-options') || '').toUpperCase() === 'DENY' || 
+                     (res.headers.get('x-frame-options') || '').toUpperCase() === 'SAMEORIGIN' || 
+                     (res.headers.get('content-security-policy') || '').toLowerCase().includes('frame-ancestors')
   };
 }
 

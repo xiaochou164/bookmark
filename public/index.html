@@ -824,18 +824,22 @@
         <div id="authStatusText" class="muted">未登录</div>
 
         <div id="authGuestPanel" class="auth-section">
-          <label>邮箱<input id="authEmail" type="email" autocomplete="username" /></label>
-          <label>密码<input id="authPassword" type="password" autocomplete="current-password" /></label>
-          <div class="dialog-actions" style="justify-content:flex-start">
-            <button type="button" id="authLoginBtn">登录</button>
-          </div>
+          <form onsubmit="event.preventDefault();">
+            <label>邮箱<input id="authEmail" type="email" autocomplete="username" /></label>
+            <label>密码<input id="authPassword" type="password" autocomplete="current-password" /></label>
+            <div class="dialog-actions" style="justify-content:flex-start">
+              <button type="button" id="authLoginBtn">登录</button>
+            </div>
+          </form>
           <hr />
-          <label>昵称<input id="authRegisterName" autocomplete="name" /></label>
-          <label>邮箱<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
-          <label>密码<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
-          <div class="dialog-actions" style="justify-content:flex-start">
-            <button type="button" id="authRegisterBtn" class="ghost">注册</button>
-          </div>
+          <form onsubmit="event.preventDefault();">
+            <label>昵称<input id="authRegisterName" autocomplete="name" /></label>
+            <label>邮箱<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
+            <label>密码<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
+            <div class="dialog-actions" style="justify-content:flex-start">
+              <button type="button" id="authRegisterBtn" class="ghost">注册</button>
+            </div>
+          </form>
         </div>
 
         <div id="authUserPanel" class="auth-section hidden">

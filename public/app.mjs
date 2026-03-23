@@ -3563,7 +3563,9 @@ function cardMetadataStatusHtml(item) {
 }
 
 function bookmarkFaviconUrl(item) {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostFromUrl(item.url))}&sz=64`;
+  const host = hostFromUrl(item?.url || '');
+  if (!host) return '/favicon.svg';
+  return `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`;
 }
 
 function bookmarkCoverUrl(item) {
@@ -6598,9 +6600,9 @@ function render预览Dialog() {
   const mode = useReader ? 'iframe' : String(p?.render?.mode || 'iframe');
   const url = useReader ? String(p.reader.renderUrl || '') : String(p?.render?.url || '');
 
-  if (!url) {
+  if (!url || Boolean(p?.render?.frameRestricted)) {
     byId('previewFallback').classList.remove('hidden');
-    setPreviewUiState('fallback', '当前条目没有可嵌入预览，已降级为打开原文。');
+    setPreviewUiState('fallback', !url ? '当前条目没有可嵌入预览，已降级为打开原文。' : '目标网站的安全策略（X-Frame-Options / CSP）禁止嵌入展示，请直接打开原文。');
     return;
   }
 
@@ -7579,9 +7581,9 @@ function bindActions() {
     }
     await openAuthDialog();
   });
-  byId('sidebarStatusSyncBtn')?.addEventListener('click', () => {
-    if (!authState.authenticated) {
-      redirectToLoginPage();
+  byId('sidebarStatusSyncBtn')?.addEventListener('click', async () => {
+    if (!(await runAuthGuardCheck({ force: true }))) {
+      redirectToLoginPage({ next: '/plugin.html' });
       return;
     }
     window.location.assign('/plugin.html');
@@ -8267,7 +8269,11 @@ function bindActions() {
     });
   });
 
-  byId('pluginPanelBtn').addEventListener('click', () => {
+  byId('pluginPanelBtn')?.addEventListener('click', async () => {
+    if (!(await runAuthGuardCheck({ force: true }))) {
+      redirectToLoginPage({ next: '/plugin.html' });
+      return;
+    }
     window.location.assign('/plugin.html');
   });
 

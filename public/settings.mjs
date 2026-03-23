@@ -84,6 +84,9 @@ function setActiveSettingsNav(sectionKey) {
     btn.classList.toggle('active', String(btn.getAttribute('data-settings-target')) === key);
     btn.setAttribute('aria-current', String(btn.getAttribute('data-settings-target')) === key ? 'true' : 'false');
   });
+  document.querySelectorAll('[data-settings-section]').forEach((sec) => {
+    sec.classList.toggle('settings-section-hidden', String(sec.getAttribute('data-settings-section')) !== key);
+  });
 }
 
 function scrollToSettingsSection(sectionKey, { updateHash = true } = {}) {
