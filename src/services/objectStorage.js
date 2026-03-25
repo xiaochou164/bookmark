@@ -1,6 +1,7 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const { isSafeUrl } = require('../utils/url');
+const { ensureUrlIsSafe } = require('../utils/url');
+const { readBodyWithLimit } = require('../utils/http');
 
 function safeSegment(input, fallback = 'item') {
   const raw = String(input || '').trim();
@@ -80,25 +81,20 @@ class LocalObjectStorage {
   async fetchAndStore(bucket, sourceUrl, { keyPrefix = '', keyBase = '', timeoutMs = 10_000, maxBytes = 5 * 1024 * 1024 } = {}) {
     const url = String(sourceUrl || '').trim();
     if (!url) throw new Error('sourceUrl is required');
+    await ensureUrlIsSafe(url);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-    if (!isSafeUrl(url)) {
-      throw new Error(`Invalid or unsafe URL: ${url}`);
-    }
     let res;
     try {
       res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
     } finally {
       clearTimeout(timer);
     }
-    if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+    if (!res.ok) throw new Error(`fetch failed: HTTP ${res.status}`);
+
     const contentType = String(res.headers.get('content-type') || '');
-    const arrayBuffer = await res.arrayBuffer();
-    const buf = Buffer.from(arrayBuffer);
-    if (buf.length > Number(maxBytes || 0)) {
-      throw new Error(`object too large: ${buf.length}`);
-    }
+    const buf = await readBodyWithLimit(res, Number(maxBytes || 0) || 5 * 1024 * 1024);
 
     const base = safeSegment(keyBase || `obj-${Date.now()}`, 'obj');
     const prefix = String(keyPrefix || '').replace(/^\/+|\/+$/g, '');

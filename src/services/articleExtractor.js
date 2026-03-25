@@ -1,7 +1,10 @@
 const { JSDOM } = require('jsdom');
 const { Readability } = require('@mozilla/readability');
-const { isSafeUrl } = require('../utils/url');
+const { ensureUrlIsSafe } = require('../utils/url');
+const { readBodyWithLimit } = require('../utils/http');
 const { safeSegment } = require('./objectStorage');
+
+const MAX_ARTICLE_BYTES = 1024 * 1024; // 1 MB cap for article extraction
 
 function metaContent(doc, selectors = []) {
   for (const sel of selectors) {
@@ -76,29 +79,30 @@ function readerDocumentHtml(article = {}, meta = {}) {
 async function extractArticleFromUrl(targetUrl, { timeoutMs = 15_000 } = {}) {
   const sourceUrl = String(targetUrl || '').trim();
   if (!sourceUrl) throw new Error('url is required');
+  await ensureUrlIsSafe(sourceUrl);
 
   const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 15_000));
-    if (!isSafeUrl(sourceUrl)) {
-      throw new Error(`Invalid or unsafe URL: ${sourceUrl}`);
-    }
-    let res;
-    try {
-      res = await fetch(sourceUrl, {
-        method: 'GET',
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'RainboardBot/0.1 (+article-extractor)',
-          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
-      });
-    } finally {
-      clearTimeout(timer);
-    }
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 15_000));
+  let res;
+  try {
+    res = await fetch(sourceUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'RainboardBot/0.1 (+article-extractor)',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+      }
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    throw new Error(`article fetch failed: HTTP ${res.status}`);
+  }
   const finalUrl = String(res.url || sourceUrl);
   const contentType = String(res.headers.get('content-type') || '');
-  const html = await res.text();
+  const html = await readBodyWithLimit(res, MAX_ARTICLE_BYTES, { encoding: 'utf8' });
   if (!contentType.toLowerCase().includes('html')) {
     throw new Error(`unsupported content-type: ${contentType || 'unknown'}`);
   }

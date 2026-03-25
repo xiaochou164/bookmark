@@ -1,4 +1,7 @@
-const { isSafeUrl } = require('../utils/url');
+const { ensureUrlIsSafe } = require('../utils/url');
+const { readBodyWithLimit } = require('../utils/http');
+
+const MAX_FETCH_BYTES = 512 * 1024; // 512 KB cap for metadata fetches
 
 function decodeEntities(input = '') {
   return String(input)
@@ -69,14 +72,12 @@ function toAbsoluteUrl(baseUrl, maybeUrl) {
 async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
   const url = String(targetUrl || '').trim();
   if (!url) throw new Error('url is required');
+  await ensureUrlIsSafe(url);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
   let res;
   try {
-    if (!isSafeUrl(url)) {
-      throw new Error(`Invalid or unsafe URL: ${url}`);
-    }
     res = await fetch(url, {
       method: 'GET',
       redirect: 'follow',
@@ -90,10 +91,13 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
     clearTimeout(timer);
   }
 
+  if (!res.ok) {
+    throw new Error(`metadata fetch failed: HTTP ${res.status}`);
+  }
+
   const contentType = String(res.headers.get('content-type') || '');
   const finalUrl = res.url || url;
-  const bodyText = await res.text();
-  const html = String(bodyText || '');
+  const html = await readBodyWithLimit(res, MAX_FETCH_BYTES, { encoding: 'utf8' });
 
   const ogTitle = extractMetaContent(html, { property: 'og:title' });
   const ogDescription = extractMetaContent(html, { property: 'og:description' });
