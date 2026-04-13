@@ -61,6 +61,14 @@ function serializeCookie(name, value, { maxAgeSeconds = null, httpOnly = true, s
   return parts.join('; ');
 }
 
+function sessionCookiePolicy(isProduction) {
+  const secure = Boolean(isProduction);
+  return {
+    secure,
+    sameSite: secure ? 'None' : 'Lax'
+  };
+}
+
 function sessionCookieValue(sessionId, secret) {
   return `${SESSION_TOKEN_PREFIX}.${sessionId}.${secret}`;
 }
@@ -407,9 +415,8 @@ class AuthService {
     return serializeCookie(SESSION_COOKIE_NAME, '', {
       maxAgeSeconds: 0,
       httpOnly: true,
-      sameSite: 'Lax',
       path: '/',
-      secure: this.isProduction
+      ...sessionCookiePolicy(this.isProduction)
     });
   }
 
@@ -417,9 +424,8 @@ class AuthService {
     return serializeCookie(SESSION_COOKIE_NAME, cookieValue, {
       maxAgeSeconds,
       httpOnly: true,
-      sameSite: 'Lax',
       path: '/',
-      secure: this.isProduction
+      ...sessionCookiePolicy(this.isProduction)
     });
   }
 

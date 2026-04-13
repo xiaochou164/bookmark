@@ -135,71 +135,27 @@
 </head>
 
 <body>
-  <h1>Bookmark Raindrop Sync 设置</h1>
+  <h1>Rainboard Sync 设置</h1>
 
-  <h2>同步后端</h2>
-  <div class="row">
-    <div class="group">
-      <label for="syncBackend">同步方式</label>
-      <select id="syncBackend">
-        <option value="cloud">云端 API（推荐）</option>
-        <option value="direct">扩展直连 Raindrop（兼容模式）</option>
-      </select>
-    </div>
-    <div class="group">
-      <label for="cloudApiBaseUrl">云端 API 地址</label>
-      <input id="cloudApiBaseUrl" type="text" placeholder="http://localhost:3789" />
-    </div>
+  <h2>云端连接</h2>
+  <div class="group">
+    <label for="cloudApiBaseUrl">Rainboard 地址</label>
+    <input id="cloudApiBaseUrl" type="text" placeholder="https://rainboard.82fr9qxfqc8554.workers.dev" />
   </div>
-  <div class="small">云端模式下：扩展通过你的 Rainboard Cloud 服务触发 Raindrop 插件任务，不再由扩展直接执行同步逻辑。</div>
+  <div class="small">插件通过这个 Rainboard 服务完成 Chrome ↔ 云书签 双向同步。默认已指向当前线上 Cloudflare 部署。</div>
 
   <div class="token-row">
     <div class="group">
-      <label for="cloudApiToken">Rainboard API Token (用于连接系统认证)</label>
+      <label for="cloudApiToken">Rainboard API Token</label>
       <input id="cloudApiToken" type="password" placeholder="手动输入或点击自动获取" />
     </div>
     <button id="autoFetchTokenBtn" class="btn btn-lite" type="button"
       style="background:#d4edda;color:#155724;font-weight:bold;">✨ 一键自动识别</button>
     <button id="testCloudBtn" class="btn btn-lite" type="button">测试连接</button>
-    <button id="pullCloudConfigBtn" class="btn btn-lite" type="button">从云端拉取配置</button>
-  </div>
-
-  <div class="token-row" style="margin-top: 10px;">
-    <div class="group">
-      <label for="raindropToken">Raindrop API Token (用于书签通讯)</label>
-      <input id="raindropToken" type="password" placeholder="输入从 Raindrop 手动获取的 token" />
-    </div>
-    <button id="refreshCollectionsBtn" class="btn btn-lite" type="button">拉取 Collection</button>
-  </div>
-
-  <h2>映射规则（多 Collection）</h2>
-  <div class="small">每条映射表示：一个 Raindrop Collection 同步到一个 Chrome 顶层文件夹。</div>
-  <div class="group">
-    <label for="topLevelAutoSync">默认顶级同步到同名顶级文件夹</label>
-    <input id="topLevelAutoSync" type="checkbox" checked />
-    <div class="small">开启后自动生成映射：Raindrop 顶级 collection -> 同名 Chrome 顶级文件夹（手动映射优先）。</div>
-  </div>
-  <div class="mapping-tools">
-    <button id="refreshFoldersBtn" class="btn btn-lite" type="button">刷新Chrome文件夹</button>
-    <button id="addMappingBtn" class="btn btn-lite" type="button">新增映射</button>
-  </div>
-  <div id="mappingList"></div>
-
-  <h2>自动同步</h2>
-  <div class="row">
-    <div class="group">
-      <label for="autoSyncEnabled">启用自动同步</label>
-      <input id="autoSyncEnabled" type="checkbox" checked />
-    </div>
-    <div class="group">
-      <label for="autoSyncMinutes">同步间隔（分钟，>=5）</label>
-      <input id="autoSyncMinutes" type="number" min="5" value="15" />
-    </div>
   </div>
 
   <h2>云书签双向同步（Chrome ↔ Rainboard）</h2>
-  <div class="small" style="margin-bottom:10px;">将 Chrome 书签与 Rainboard 本地书签数据库双向同步（需云端模式）。Chrome 有的→写入 Rainboard
-    DB；Rainboard 有的→推送到 Chrome。</div>
+  <div class="small" style="margin-bottom:10px;">Chrome 有的会写入 Rainboard；Rainboard 有的会推送到 Chrome。</div>
   <div class="row">
     <div class="group">
       <label for="rbAutoSyncEnabled">启用自动同步（Chrome ↔ Rainboard）</label>
@@ -218,7 +174,6 @@
 
   <div class="actions">
     <button id="saveBtn" class="btn">保存设置</button>
-    <button id="manualSyncBtn" class="btn btn-lite" type="button">手动同步一次（Raindrop Apply）</button>
   </div>
   <div id="msg"></div>
 

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 DEFAULT_DB_NAME="${CF_D1_DB_NAME:-rainboard}"
+DEFAULT_MIGRATION_FILE="${CF_D1_MIGRATION_FILE:-migrations/0001_cloudflare_core.sql}"
 
 resolve_db_name_from_wrangler() {
   local config_file="wrangler.toml"
@@ -28,13 +29,13 @@ if [[ "${1:-}" == "local" || "${1:-}" == "remote" ]]; then
   TARGET="$1"
   DB_NAME="$(resolve_db_name_from_wrangler || true)"
   DB_NAME="${DB_NAME:-$DEFAULT_DB_NAME}"
-  MIGRATION_FILE="${2:-migrations/0001_folders.sql}"
+  MIGRATION_FILE="${2:-$DEFAULT_MIGRATION_FILE}"
 else
   DB_NAME="${1:-}"
   DB_NAME="${DB_NAME:-$(resolve_db_name_from_wrangler || true)}"
   DB_NAME="${DB_NAME:-$DEFAULT_DB_NAME}"
   TARGET="${2:-local}" # local|remote
-  MIGRATION_FILE="${3:-migrations/0001_folders.sql}"
+  MIGRATION_FILE="${3:-$DEFAULT_MIGRATION_FILE}"
 fi
 
 if [[ ! -f "$MIGRATION_FILE" ]]; then

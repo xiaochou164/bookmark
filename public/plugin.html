@@ -25,19 +25,9 @@
             </div>
 
             <div class="settings-nav-block">
-                <div class="settings-nav-title">配置</div>
-                <div class="settings-nav-pages">
-                    <button type="button" class="settings-nav-page" data-plugin-target="config">插件配置</button>
-                    <button type="button" class="settings-nav-page" data-plugin-target="scheduler">调度器</button>
-                </div>
-            </div>
-
-            <div class="settings-nav-block">
                 <div class="settings-nav-title">运行</div>
                 <div class="settings-nav-pages">
-                    <button type="button" class="settings-nav-page" data-plugin-target="run">执行同步</button>
-                    <button type="button" class="settings-nav-page" data-plugin-target="history">任务历史</button>
-                    <button type="button" class="settings-nav-page" data-plugin-target="audit">审计日志</button>
+                    <button type="button" class="settings-nav-page" data-plugin-target="run">Chrome 同步</button>
                     <button type="button" class="settings-nav-page" data-plugin-target="devices">设备列表</button>
                     <button type="button" class="settings-nav-page" data-plugin-target="health">健康状态</button>
                 </div>
@@ -54,8 +44,8 @@
         <section class="settings-page-card">
             <div class="settings-page-header">
                 <div class="settings-page-header-main">
-                    <h1>Raindrop 同步插件</h1>
-                    <p class="muted">管理 Raindrop 书签同步插件的配置、调度与运行任务。</p>
+                    <h1>云书签同步</h1>
+                    <p class="muted">查看 Chrome ↔ Rainboard 云书签同步说明、设备状态与健康信息。</p>
                 </div>
                 <div class="settings-page-header-actions">
                     <a class="ghost button-link" href="/">返回主界面</a>
@@ -66,126 +56,16 @@
 
             <div class="settings-sections">
 
-                <!-- 插件配置 -->
-                <section id="pluginSectionConfig" class="settings-section" data-plugin-section="config">
-                    <div class="settings-section-head">
-                        <div>
-                            <h2>插件配置</h2>
-                            <p class="muted">设置 Raindrop API Token 与集合映射规则。</p>
-                        </div>
-                    </div>
-                    <div class="settings-section-grid">
-                        <section class="settings-panel">
-                            <h3>基本设置</h3>
-                            <div class="settings-form">
-                                <label>Raindrop API Token
-                                    <input id="pluginToken" type="password" placeholder="输入从 Raindrop 获取的 Token" />
-                                </label>
-                                <label
-                                    style="display:flex;align-items:center;flex-direction:row;gap:10px;cursor:pointer">
-                                    <input type="checkbox" id="pluginTopLevel" />
-                                    <span>顶级集合自动映射（同名文件夹）</span>
-                                </label>
-                                <div class="settings-actions">
-                                    <button type="button" id="savePluginCfgBtn">保存配置</button>
-                                    <button type="button" class="ghost" id="pluginLoadConfigBtn">重新加载</button>
-                                </div>
-                            </div>
-                            <pre id="pluginOutput"></pre>
-                        </section>
-
-                        <section class="settings-panel settings-panel-span-2">
-                            <h3>映射规则（JSON 数组）</h3>
-                            <p class="muted">每条映射表示：Raindrop collection ID → Chrome 顶层文件夹名。</p>
-                            <div class="settings-form">
-                                <label>映射配置
-                                    <textarea id="pluginMappings" rows="10"
-                                        placeholder='[{"collectionId": 123, "folderName": "工作"}]'></textarea>
-                                </label>
-                            </div>
-                        </section>
-                    </div>
-                </section>
-
-                <!-- 调度器 -->
-                <section id="pluginSectionScheduler" class="settings-section" data-plugin-section="scheduler">
-                    <div class="settings-section-head">
-                        <div>
-                            <h2>调度器</h2>
-                            <p class="muted">配置自动同步的触发间隔与时间窗。</p>
-                        </div>
-                    </div>
-                    <div class="settings-section-grid">
-                        <section class="settings-panel">
-                            <h3>调度设置</h3>
-                            <div class="settings-form">
-                                <label
-                                    style="display:flex;align-items:center;flex-direction:row;gap:10px;cursor:pointer">
-                                    <input type="checkbox" id="pluginScheduleEnabled" />
-                                    <span>启用调度器</span>
-                                </label>
-                                <label
-                                    style="display:flex;align-items:center;flex-direction:row;gap:10px;cursor:pointer">
-                                    <input type="checkbox" id="pluginSchedulePaused" />
-                                    <span>暂停调度</span>
-                                </label>
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                                    <label>间隔（分钟）
-                                        <input id="pluginScheduleInterval" type="number" min="1" value="15" />
-                                    </label>
-                                    <label>最大并发数
-                                        <input id="pluginScheduleMaxConcurrent" type="number" min="1" max="10"
-                                            value="1" />
-                                    </label>
-                                </div>
-                                <label
-                                    style="display:flex;align-items:center;flex-direction:row;gap:10px;cursor:pointer">
-                                    <input type="checkbox" id="pluginScheduleWindowEnabled" />
-                                    <span>启用运行时间窗</span>
-                                </label>
-                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                                    <label>开始小时（0-24）
-                                        <input id="pluginScheduleWindowStart" type="number" min="0" max="24"
-                                            value="0" />
-                                    </label>
-                                    <label>结束小时（0-24）
-                                        <input id="pluginScheduleWindowEnd" type="number" min="0" max="24" value="24" />
-                                    </label>
-                                </div>
-                                <div class="settings-actions">
-                                    <button type="button" id="pluginScheduleSaveBtn">保存调度</button>
-                                    <button type="button" class="ghost" id="pluginScheduleLoadBtn">重新加载</button>
-                                    <button type="button" class="ghost" id="pluginSchedulePauseBtn">暂停</button>
-                                    <button type="button" class="ghost" id="pluginScheduleResumeBtn">恢复</button>
-                                    <button type="button" class="ghost" id="pluginScheduleTickBtn">立即触发</button>
-                                </div>
-                            </div>
-                            <pre id="pluginScheduleOutput"></pre>
-                        </section>
-                    </div>
-                </section>
-
                 <!-- 执行同步 -->
                 <section id="pluginSectionRun" class="settings-section" data-plugin-section="run">
                     <div class="settings-section-head">
                         <div>
-                            <h2>执行同步</h2>
-                            <p class="muted">手动触发同步任务或预演变更，查看实时任务进度。</p>
+                            <h2>Chrome ↔ Rainboard</h2>
+                            <p class="muted">当前服务端页面仅展示 Chrome ↔ Rainboard 云书签同步说明与云端书签数据。</p>
                         </div>
                     </div>
                     <div class="settings-section-grid">
-                        <section class="settings-panel">
-                            <h3>Raindrop ↔ 云书签 DB</h3>
-                            <div class="settings-actions">
-                                <button type="button" id="runPluginBtn">▶ 执行同步</button>
-                                <button type="button" class="ghost" id="previewPluginBtn">预演（Dry Run）</button>
-                                <button type="button" class="ghost" id="pluginRetryBtn">重试最近失败</button>
-                                <button type="button" class="ghost" id="pluginReplayBtn">重放最近任务</button>
-                            </div>
-                            <pre id="pluginRunOutput"></pre>
-                        </section>
-
-                        <section class="settings-panel">
+                        <section class="settings-panel settings-panel-span-2">
                             <h3>Chrome 书签 ↔ 云书签 DB</h3>
                             <p class="muted">将当前页面服务器上的书签与 Chrome 书签进行双向同步。需通过 Chrome 插件触发，或使用下方按钮获取同步状态。</p>
                             <div class="settings-form">
@@ -209,42 +89,6 @@
                                     </ul>
                                 </div>
                             </div>
-                        </section>
-                    </div>
-                </section>
-
-                <!-- 任务历史 -->
-                <section id="pluginSectionHistory" class="settings-section" data-plugin-section="history">
-                    <div class="settings-section-head">
-                        <div>
-                            <h2>任务历史</h2>
-                            <p class="muted">最近 20 条同步任务与运行记录。</p>
-                        </div>
-                    </div>
-                    <div class="settings-section-grid">
-                        <section class="settings-panel settings-panel-span-2">
-                            <div class="settings-actions">
-                                <button type="button" class="ghost" id="pluginHistoryBtn">刷新历史</button>
-                            </div>
-                            <pre id="pluginHistory"></pre>
-                        </section>
-                    </div>
-                </section>
-
-                <!-- 审计日志 -->
-                <section id="pluginSectionAudit" class="settings-section" data-plugin-section="audit">
-                    <div class="settings-section-head">
-                        <div>
-                            <h2>审计日志</h2>
-                            <p class="muted">同步任务的详细审计日志条目。</p>
-                        </div>
-                    </div>
-                    <div class="settings-section-grid">
-                        <section class="settings-panel settings-panel-span-2">
-                            <div class="settings-actions">
-                                <button type="button" class="ghost" id="pluginAuditBtn">刷新审计</button>
-                            </div>
-                            <pre id="pluginAudit"></pre>
                         </section>
                     </div>
                 </section>

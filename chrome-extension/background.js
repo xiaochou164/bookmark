@@ -1,5 +1,5 @@
 const API_BASE = 'https://api.raindrop.io/rest/v1';
-const DEFAULT_CLOUD_API_BASE = 'http://localhost:3789';
+const DEFAULT_CLOUD_API_BASE = 'https://rainboard.82fr9qxfqc8554.workers.dev';
 const TRASH_FOLDER = 'Raindrop Sync Trash';
 const LEASE_TTL_MS = 60 * 1000;
 const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -268,13 +268,6 @@ function flattenCollections(items, depth = 0, out = []) {
   return out;
 }
 
-async function listRaindropCollections(token) {
-  const payload = await raindropRequest(token, 'GET', '/collections');
-  const items = payload?.items || [];
-  const flattened = flattenCollections(items);
-  return [{ id: -1, title: 'Unsorted (-1)' }, ...flattened];
-}
-
 async function listRaindropTopLevelCollections(token) {
   const payload = await raindropRequest(token, 'GET', '/collections');
   const items = payload?.items || [];
@@ -306,16 +299,6 @@ async function getBookmarkBarId() {
     if (!fallback) throw new Error('Cannot locate a bookmark folder root');
     return fallback.id;
   }
-}
-
-async function listChromeTopFolders() {
-  const barId = await getBookmarkBarId();
-  const children = await chrome.bookmarks.getChildren(barId);
-  const names = children
-    .filter((n) => !n.url)
-    .map((n) => String(n.title || '').trim())
-    .filter((t) => t.length > 0);
-  return Array.from(new Set(names));
 }
 
 async function findOrCreateTopFolder(folderName) {
@@ -801,31 +784,6 @@ async function runSyncEntry({ manual = false, preview = false } = {}) {
   return cloudRunSync(cfg, { manual });
 }
 
-async function pushCloudPluginConfig(cfg, override = null) {
-  if (!isCloudBackend(cfg)) {
-    return { ok: true, mode: 'direct' };
-  }
-  const payload = override || {
-    raindropToken: String(cfg.raindropToken || '').trim(),
-    topLevelAutoSync: Boolean(cfg.topLevelAutoSync),
-    mappings: (cfg.mappings || []).map((m) => ({
-      id: m.id,
-      collectionId: Number(m.collectionId ?? -1),
-      folderName: String(m.chromeFolder || 'Raindrop Synced'),
-      deleteSync: Boolean(m.deleteSync)
-    }))
-  };
-  const result = await cloudRequest(cfg, 'PUT', '/api/plugins/raindropSync/config', payload);
-  return { ok: true, config: result };
-}
-
-async function listCollectionsByCloud(cfg, token) {
-  const t = String(token || cfg?.raindropToken || '').trim();
-  if (!t) throw new Error('Missing token');
-  const resp = await cloudRequest(cfg, 'POST', '/api/plugins/raindropSync/collections', { token: t });
-  return Array.isArray(resp.items) ? resp.items : [];
-}
-
 async function pingCloud(cfg) {
   const data = await cloudRequest(cfg, 'GET', '/api/health');
   return data;
@@ -834,7 +792,6 @@ async function pingCloud(cfg) {
 function extensionCapabilities() {
   return [
     'cloud-sync-dispatch',
-    'cloud-config-pull',
     'device-status-report',
     'chrome-bookmarks-access'
   ];
@@ -877,40 +834,6 @@ async function reportCloudDeviceStatus(cfg, deviceId, payload = {}) {
   if (!deviceId) throw new Error('Missing deviceId');
   const resp = await cloudRequest(cfg, 'POST', `/api/plugins/raindropSync/devices/${encodeURIComponent(deviceId)}/status`, payload);
   return { ok: true, item: resp?.item || null };
-}
-
-function applyCloudConfigBundleToExtension(bundle) {
-  const config = bundle?.config || {};
-  const schedule = bundle?.schedule || {};
-  const mappings = Array.isArray(config.mappings)
-    ? config.mappings.map((m, idx) => ({
-      id: String(m.id || `map_${idx}`),
-      collectionId: Number(m.collectionId ?? -1),
-      chromeFolder: String(m.folderName || m.chromeFolder || 'Raindrop Synced'),
-      deleteSync: Boolean(m.deleteSync)
-    }))
-    : [];
-
-  const patch = {
-    raindropToken: String(config.raindropToken || ''),
-    topLevelAutoSync: Boolean(config.topLevelAutoSync),
-    mappings
-  };
-
-  if (typeof schedule.enabled !== 'undefined') patch.autoSyncEnabled = Boolean(schedule.enabled);
-  if (typeof schedule.intervalMinutes !== 'undefined') patch.autoSyncMinutes = Math.max(5, Number(schedule.intervalMinutes || 15));
-  return patch;
-}
-
-async function pullCloudConfigToExtension(cfg) {
-  if (!isCloudBackend(cfg)) {
-    return { ok: false, error: 'Current backend is direct mode' };
-  }
-  const deviceId = await ensureDeviceId(cfg);
-  const bundle = await cloudRequest(cfg, 'GET', `/api/plugins/raindropSync/devices/${encodeURIComponent(deviceId)}/config`);
-  const patch = applyCloudConfigBundleToExtension(bundle);
-  await chrome.storage.local.set(patch);
-  return { ok: true, deviceId, bundleSummary: { configMeta: bundle?.configMeta || null, servedAt: bundle?.servedAt || null }, applied: patch };
 }
 
 async function runSync({ manual = false, preview = false } = {}) {
@@ -975,12 +898,6 @@ async function runSync({ manual = false, preview = false } = {}) {
 
 async function setupAlarm() {
   const cfg = await getSettings();
-  // Raindrop 自动同步
-  await chrome.alarms.clear('autoSync');
-  if (cfg.autoSyncEnabled) {
-    const periodInMinutes = Math.max(5, Number(cfg.autoSyncMinutes) || 15);
-    chrome.alarms.create('autoSync', { periodInMinutes });
-  }
   // Chrome ↔ Rainboard 自动同步
   await chrome.alarms.clear('autoSyncRainboard');
   if (cfg.rbAutoSyncEnabled) {
@@ -1020,13 +937,6 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'autoSync') {
-    try {
-      await runSyncEntry({ manual: false, preview: false });
-    } catch (err) {
-      await setSyncStatus({ ok: false, error: toSafeError(err) });
-    }
-  }
   if (alarm.name === 'autoSyncRainboard') {
     try {
       await syncWithRainboard({ preview: false });
@@ -1261,55 +1171,16 @@ async function syncWithRainboard({ preview = false } = {}) {
 
 // ── Message listener ─────────────────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg?.type === 'SYNC_NOW') {
-    runSyncEntry({ manual: true, preview: false })
-      .then((stats) => sendResponse({ ok: true, stats }))
-      .catch(async (err) => {
-        await setSyncStatus({ ok: false, error: toSafeError(err) });
-        sendResponse({ ok: false, error: toSafeError(err) });
-      });
-    return true;
-  }
-
-  if (msg?.type === 'PREVIEW_SYNC') {
-    runSyncEntry({ manual: true, preview: true })
-      .then((stats) => sendResponse({ ok: true, stats }))
-      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
-    return true;
-  }
-
   if (msg?.type === 'SETTINGS_CHANGED') {
     (async () => {
       await setupAlarm();
       const cfg = await getSettings();
       if (isCloudBackend(cfg)) {
-        await pushCloudPluginConfig(cfg);
         await registerCloudDevice(cfg, { reason: 'settings_changed', status: 'online' });
       }
       return { ok: true, backend: cfg.syncBackend || 'cloud' };
     })()
       .then((resp) => sendResponse(resp))
-      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
-    return true;
-  }
-
-  if (msg?.type === 'LIST_COLLECTIONS') {
-    getSettings()
-      .then(async (cfg) => {
-        const effectiveCfg = {
-          ...cfg,
-          syncBackend: typeof msg?.syncBackend !== 'undefined' ? String(msg.syncBackend) : cfg.syncBackend,
-          cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl,
-          cloudApiToken: typeof msg?.cloudApiToken !== 'undefined' ? String(msg.cloudApiToken) : cfg.cloudApiToken
-        };
-        const token = String(msg?.token || '').trim();
-        if (!token) throw new Error('Missing token');
-        if (isCloudBackend(effectiveCfg)) {
-          return listCollectionsByCloud(effectiveCfg, token);
-        }
-        return listRaindropCollections(token);
-      })
-      .then((collections) => sendResponse({ ok: true, collections }))
       .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
     return true;
   }
@@ -1332,25 +1203,6 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
-  if (msg?.type === 'PULL_CLOUD_CONFIG') {
-    (async () => {
-      const cfg = await getSettings();
-      const effectiveCfg = {
-        ...cfg,
-        syncBackend: typeof msg?.syncBackend !== 'undefined' ? String(msg.syncBackend) : cfg.syncBackend,
-        cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl,
-        cloudApiToken: typeof msg?.cloudApiToken !== 'undefined' ? String(msg.cloudApiToken) : cfg.cloudApiToken
-      };
-      const resp = await pullCloudConfigToExtension(effectiveCfg);
-      await setupAlarm();
-      await registerCloudDevice(await getSettings(), { reason: 'pull_cloud_config', status: 'online' });
-      return resp;
-    })()
-      .then((resp) => sendResponse(resp))
-      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
-    return true;
-  }
-
   if (msg?.type === 'AUTO_FETCH_TOKEN') {
     (async () => {
       try {
@@ -1366,11 +1218,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         const res = await fetch(`${url}/api/auth/tokens`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Cookie': `rb_session=${sessionCookie.value}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ name: 'Chrome Ext Auto Token' }),
-          credentials: 'omit'
+          credentials: 'include'
         });
 
         if (!res.ok) {
@@ -1384,29 +1235,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           return { ok: false, error: '令牌生成成功但内容解析失败' };
         }
 
-        // try to pull config using new token immediately to fast-track setup!
-        let hasConfig = false;
-        try {
-          const confRes = await fetch(`${url}/api/plugins/raindropSync/config`, {
-            headers: { 'Authorization': `Bearer ${newToken}` }
-          });
-          if (confRes.ok) hasConfig = true;
-        } catch (_ignore) { }
-
-        return { ok: true, token: newToken, autoPulledConfig: hasConfig };
+        return { ok: true, token: newToken };
       } catch (err) {
         return { ok: false, error: toSafeError(err) };
       }
     })()
       .then(resp => sendResponse(resp))
       .catch(err => sendResponse({ ok: false, error: toSafeError(err) }));
-    return true;
-  }
-
-  if (msg?.type === 'LIST_CHROME_TOP_FOLDERS') {
-    listChromeTopFolders()
-      .then((folders) => sendResponse({ ok: true, folders }))
-      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
     return true;
   }
 

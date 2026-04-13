@@ -6,10 +6,12 @@
 
 ## 当前状态（截至本仓库当前版本）
 
-- 后端：Express API（模块化 routes/services）
+- 后端：Cloudflare Worker API（生产主路径）
 - 前端：原生 Web 工作台（Raindrop 风格布局与交互）
-- 数据存储：默认 `SQLite`（可回退 `JSON`）
-- 队列：默认内存队列（可切换 `BullMQ/Redis`）
+- 数据存储：`Cloudflare D1`
+- 对象存储：`Cloudflare R2`
+- 队列：`Cloudflare Queues`
+- 调度：`Cloudflare Cron Triggers`
 - 插件系统：内置 `raindropSync`（预演、任务化执行、调度器、设备注册、健康面板）
 - 内容能力：metadata 抓取、文章提取（Readability）、预览 API、阅读模式
 - 高级能力：高亮/注释、提醒、导入导出任务、协作/公开页、产品化接口（套餐/配额/备份/AI 占位等）
@@ -62,148 +64,138 @@
 - 备份创建 / 恢复（任务接口）
 - AI 建议接口（占位实现）
 
-## 快速启动
+## 快速启动（Cloudflare-first）
 
 ```bash
 cd /Users/xiaochou164/Desktop/bookmarktorain
 npm install
-npm run db:sqlite:migrate
+npm run cf:d1:create
+npm run cf:d1:migrate:local
 npm start
 ```
 
 访问：
 
-- 主界面：`http://localhost:3789`
-- 登录页：`http://localhost:3789/login.html`
-- 设置页：`http://localhost:3789/settings.html`
+- 主界面：`http://127.0.0.1:8787`
+- 登录页：`http://127.0.0.1:8787/login.html`
+- 设置页：`http://127.0.0.1:8787/settings.html`
 
-## Docker 部署 (多架构兼容)
+## Cloudflare Workers 运行（生产主路径）
 
-基于 GitHub Actions 的自动构建环境，项目已打包为支持 x86/amd64 与 arm64 架构的容器镜像，可将其部署在树莓派、软路由、常规云服务器或你的 NAS 上。
+当前仓库默认以 Cloudflare 免费层为目标部署：
 
-### 1. 拉取镜像
-
-根据你当前的环境（默认会自动匹配机器对应架构）：
-
-```bash
-docker pull ghcr.io/xiaochou164/bookmark:master
-```
-
-*(如果拉取遇到 Private Packages 鉴权问题，请先在 Github 申请具有 `read:packages` 权限的 PAT Token 并执行 `docker login ghcr.io -u xiaochou164` 登录即可)*
-
-### 2. 运行容器
-
-运行前，建议通过 `-v` 挂载本地数据目录以便数据持久化：
-
-```bash
-docker run -d \
-  --name bookmarktorain \
-  -p 3789:3789 \
-  -v ./data:/app/data \
-  --restart unless-stopped \
-  ghcr.io/xiaochou164/bookmark:master
-```
-
-部署完成后，即可在浏览器访问：`http://服务器IP:3789`
-
-## Cloudflare Workers 运行（可部署）
-
-当前仓库已具备可直接部署到 Cloudflare Workers 的基础能力（含一键发布脚本）：
-
-- Worker 入口：`src/worker.js`
+- Worker 入口：`src/worker.mjs`
 - 静态资源：`public/`（通过 Workers assets 托管）
-- 已迁移 API：`GET /api/health`、`GET /api/state`
-- D1 路由（配置 DB 后可用）：`GET /api/folders`、`POST /api/folders`
+- 主数据库：`D1`
+- 对象存储：`R2`
+- 异步任务：`Queues`
+- 死信队列：`Queues DLQ`
+- 定时任务：`Cron Triggers`
 
-### 1) 本地语法/冒烟检查
+```bash
+npm run cf:check
+npm run cf:smoke
+npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
+npm run cf:d1:create
+npm run cf:d1:migrate:local
+npm run cf:dev
+```
+
+部署：
+
+```bash
+npm run cf:deploy
+# 或
+npm run cf:release
+```
+
+如果要把旧的本地 `SQLite/JSON` 数据导入到 D1：
+
+```bash
+npm run cf:migrate:data
+npx wrangler d1 execute rainboard --remote --file data/cf-import.sql
+```
+
+如果希望一键发布时连同本地数据一起导入：
+
+```bash
+npm run cf:release -- --import-local-data
+```
+
+说明：
+
+- 发布前请先登录 Cloudflare：`npx wrangler login`
+- `wrangler.toml` 已预留 `D1/R2/Queues/Cron` 绑定
+- 主任务队列默认是 `rainboard-tasks`，死信队列默认是 `rainboard-tasks-dlq`
+- Worker 侧任务默认记录 `attemptCount/maxAttempts`，Cron 会对卡住的任务做补偿重投
+- 导入脚本会把现有 `JSON/SQLite app_state` 转换成 D1 可执行 SQL
+- `/api/assets/*` 现在优先从 R2 读取对象
+
+## 验收与现状
+
+当前 Cloudflare-first 迁移已经达到“主路径可部署、主界面核心 API 可运行、长任务可入队和恢复”的阶段。
+
+- 验收清单：`docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`
+- 迁移 TODO：`docs/CLOUDFLARE_WORKERS_MIGRATION_TODO.md`
+- 远端验收与失败恢复演练：`docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`
+
+最低本地验收命令：
 
 ```bash
 npm run cf:check
 npm run cf:smoke
 ```
 
-### 2) 初始化 D1（首次）
+远端 Worker 基础验收：
 
 ```bash
-npm run cf:d1:create
+npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
 ```
 
-该命令现在会自动：
+这两条通过时，当前仓库至少已经覆盖：
 
-- 创建 D1（若同名数据库已存在则自动复用）
-- 将 `database_id` 写入 `wrangler.toml` 的 `[[d1_databases]]` 配置（无需手工编辑）
+- Worker 入口与静态资源托管
+- D1 / R2 / Queues / DLQ / Cron 主路径
+- auth / bookmarks / folders / tags / reminders
+- metadata / article / preview / highlights
+- plugin tasks / io tasks / ai tasks / backup tasks
+- collab shares / public links / `/public/c/:token(.json)`
 
-### 3) 执行 D1 迁移
+## 本地旧数据迁移
 
-```bash
-npm run cf:d1:migrate:local
-npm run cf:d1:migrate:remote
-```
-
-### 4) 本地预览与部署
-
-```bash
-npm run cf:dev
-npm run cf:deploy
-```
-
-### 5) 一键发布（推荐）
-
-首次或后续发布都可直接执行（幂等，D1 存在会自动复用）：
-
-```bash
-npm run cf:release
-```
-
-该脚本会串行执行：`cf:check` -> `cf:smoke` -> `cf:d1:create`（自动写回 `wrangler.toml`）-> 本地/远端 D1 迁移 -> `wrangler deploy`。
-
-说明：
-
-- Node/Express 启动链路保持不变（`npm start`），可并行回归。
-- 未迁移的 `/api/*` 路由会返回标准化 `501 NOT_MIGRATED`。
-- 迁移拆解见 `docs/CLOUDFLARE_WORKERS_MIGRATION_TODO.md`。
-- 执行发布前请确保已登录 Cloudflare：`npx wrangler login`。
-
-## 数据存储与运行模式
-
-默认使用 `SQLite`：
+旧的本地状态仍可用于迁移：
 
 - 数据库文件：`/Users/xiaochou164/Desktop/bookmarktorain/data/db.sqlite`
 - 对象存储目录（本地）：`/Users/xiaochou164/Desktop/bookmarktorain/data/objects`
 
-支持切换回 JSON（调试/兼容）：
+常用命令：
 
 ```bash
-DB_BACKEND=json npm start
-```
-
-SQLite 迁移与导入脚本：
-
-```bash
-npm run db:sqlite:migrate
-npm run db:sqlite:import-json
+npm run db:sqlite:migrate        # 维护旧 SQLite
+npm run db:sqlite:import-json    # JSON -> SQLite
+npm run cf:migrate:data          # SQLite/JSON -> D1 SQL
 ```
 
 ## 常用环境变量
 
-- `PORT`（默认 `3789`）
-- `HOST`（默认 `0.0.0.0`）
-- `DB_BACKEND`：`sqlite` / `json`（默认 `sqlite`）
-- `SQLITE_FILE`：SQLite 文件路径
-- `DATA_FILE`：JSON 文件路径（JSON 模式）
-- `QUEUE_BACKEND`：`memory` / `bullmq`（默认 `memory`）
-- `REDIS_URL`：BullMQ 模式下 Redis 连接串
-- `QUEUE_PREFIX`：队列前缀（默认 `rainboard`）
-- `OBJECT_STORAGE_BACKEND`：当前默认 `local`
-- `OBJECT_STORAGE_DIR`：本地对象存储目录
+- `CF_D1_DB_NAME`：D1 数据库名称（默认 `rainboard`）
+- `CF_D1_MIGRATION_FILE`：D1 迁移文件（默认 `migrations/0001_cloudflare_core.sql`）
+- `DATA_FILE`：旧 JSON 状态文件路径
+- `SQLITE_FILE`：旧 SQLite 状态文件路径
+- `CF_MIGRATION_SQL_FILE`：生成的 D1 导入 SQL 文件路径
 
 ## 主要脚本命令
 
 ```bash
-npm start                # 启动服务
-npm run dev              # watch 模式启动
-npm run db:sqlite:migrate
-npm run db:sqlite:import-json
+npm start
+npm run cf:check
+npm run cf:smoke
+npm run cf:d1:create
+npm run cf:d1:migrate:local
+npm run cf:d1:migrate:remote
+npm run cf:migrate:data
+npm run cf:deploy
+npm run cf:release
 ```
 
 ## 主要 API（示例）
@@ -254,6 +246,39 @@ npm run db:sqlite:import-json
 - `POST /api/io/tasks`
 - `GET /api/io/tasks`
 - `POST /api/io/tasks/:taskId/retry`
+- `POST /api/product/backups`
+- `GET /api/product/backups`
+- `POST /api/product/backups/:backupId/restore`
+
+AI 与任务治理：
+
+- `GET /api/product/ai/config`
+- `PUT /api/product/ai/config`
+- `POST /api/product/ai/test`
+- `GET /api/product/ai/jobs`
+- `GET /api/product/ai/jobs/:jobId`
+- `POST /api/product/ai/jobs/:jobId/retry`
+- `POST /api/product/ai/batch/autotag/tasks`
+- `GET /api/product/ai/batch/autotag/tasks/:taskId`
+- `POST /api/product/ai/batch/autotag/tasks/:taskId/retry`
+- `POST /api/product/ai/backfill/tasks`
+- `GET /api/product/ai/backfill/tasks`
+- `GET /api/product/ai/backfill/tasks/:taskId`
+- `POST /api/product/ai/backfill/tasks/:taskId/pause`
+- `POST /api/product/ai/backfill/tasks/:taskId/resume`
+- `POST /api/product/ai/backfill/tasks/:taskId/retry`
+- `POST /api/product/ai/rules/run`
+- `GET /api/product/ai/rules/runs`
+
+搜索与扫描：
+
+- `POST /api/product/search/index/rebuild`
+- `POST /api/product/search/semantic/index/rebuild`
+- `GET /api/product/dedupe/scan`
+- `POST /api/product/ai/dedupe/semantic-scan`
+- `POST /api/product/broken-links/scan`
+- `GET /api/product/broken-links/tasks`
+- `POST /api/product/broken-links/tasks/:taskId/retry`
 
 协作与公开页：
 
@@ -293,4 +318,6 @@ npm run db:sqlite:import-json
 
 - 当前项目以“功能/交互/信息架构对标 Raindrop”为目标，不直接复制品牌与商标资源。
 - 当前未建立完整自动化测试体系（已有较多命令级/冒烟验证与开发日志记录）。
-- `BullMQ`/`Redis` 为可选增强；默认内存队列可直接运行。
+- 生产主路径已不再依赖 `BullMQ` / `Redis` / 本地磁盘；Cloudflare Worker + D1 + R2 + Queues + Cron 是当前默认部署模型。
+- AI / 扫描 / 恢复类长任务默认会记录任务状态、尝试次数与重试入口；Cron 会对卡住的任务做补偿重投。
+- 当前仍在持续增强的重点主要是更深的 `article` 云端提取、外部资源探测精度，以及更完整的失败治理与集成测试覆盖。

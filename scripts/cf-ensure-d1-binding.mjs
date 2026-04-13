@@ -178,6 +178,20 @@ function extractDatabaseId(payload) {
   return '';
 }
 
+function extractDatabaseIdFromText(text) {
+  const raw = String(text || '');
+  const patterns = [
+    /database_id\s*[:=]\s*([0-9a-f-]{36})/i,
+    /database id\s*[:=]\s*([0-9a-f-]{36})/i,
+    /\b([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\b/i
+  ];
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return '';
+}
+
 function findDatabaseByName(payload, dbName) {
   if (Array.isArray(payload)) {
     return payload.find((row) => {
@@ -321,13 +335,13 @@ function getDatabaseIdFromWrangler({ dbName, skipCreate }) {
   let createFailureStatus = null;
 
   if (!skipCreate) {
-    const createRes = runWrangler(['d1', 'create', dbName, '--json']);
+    const createRes = runWrangler(['d1', 'create', dbName, '--binding', 'DB', '--update-config']);
     const createPayload = parseFirstJson(createRes.stdout) || parseFirstJson(createRes.stderr);
     if (createRes.status === 0) {
-      const id = extractDatabaseId(createPayload);
+      const id = extractDatabaseId(createPayload) || extractDatabaseIdFromText(`${createRes.stdout}\n${createRes.stderr}`);
       if (!id) {
         throw new Error(
-          `Failed to parse database_id from "wrangler d1 create ${dbName} --json" output.\n${createRes.stdout || createRes.stderr}`
+          `Failed to parse database_id from "wrangler d1 create ${dbName}" output.\n${createRes.stdout || createRes.stderr}`
         );
       }
       return { id, source: 'create' };

@@ -4046,14 +4046,31 @@ function skeletonCardsHtml() {
 function emptyCardsStateHtml() {
   if (bookmarksLoadError) {
     return `<div class="empty-state error">
+      <div class="empty-state-eyebrow">加载状态</div>
       <div class="empty-state-title">加载书签失败</div>
       <div class="muted">${escapeHtml(bookmarksLoadError)}</div>
       <div class="empty-state-actions"><button type="button" class="ghost" id="cardsRetryBtn">重试</button></div>
     </div>`;
   }
+  const hints = [];
+  if (String(state.filters.q || '').trim()) hints.push(`搜索：${String(state.filters.q || '').trim()}`);
+  if (String(state.filters.tags || '').trim()) hints.push(`标签：${String(state.filters.tags || '').trim()}`);
+  if (String(state.filters.folderId || 'all') !== 'all') hints.push(`集合：${folderName(state.filters.folderId)}`);
+  if (String(state.filters.view || 'all') !== 'all') {
+    const viewLabel = quickViews.find((x) => x.key === String(state.filters.view || 'all'))?.label || '当前视图';
+    hints.push(`视图：${viewLabel}`);
+  }
+  if (isAdvancedSearchActive()) hints.push('高级搜索已启用');
+  const hasScopedFilters = hints.length > 0;
   return `<div class="empty-state">
+    <div class="empty-state-eyebrow">Rainboard</div>
     <div class="empty-state-title">当前视图暂无书签</div>
-    <div class="muted">你可以切换筛选、切换集合，或新建书签。</div>
+    <div class="muted">你可以切换筛选、切换集合，或直接添加新的收藏内容。</div>
+    ${hints.length ? `<div class="empty-state-hints">${hints.map((hint) => `<span class="empty-state-hint">${escapeHtml(hint)}</span>`).join('')}</div>` : ''}
+    <div class="empty-state-actions">
+      <button type="button" class="ghost" id="emptyStateCreateBtn">添加书签</button>
+      <button type="button" class="ghost" id="emptyStateResetBtn">${hasScopedFilters ? '回到全部书签' : '刷新当前视图'}</button>
+    </div>
   </div>`;
 }
 
@@ -4153,6 +4170,36 @@ function renderCards() {
     root.innerHTML = emptyCardsStateHtml();
     byId('cardsRetryBtn')?.addEventListener('click', async () => {
       await loadBookmarks();
+    });
+    byId('emptyStateCreateBtn')?.addEventListener('click', () => {
+      byId('addBookmarkBtn')?.click();
+    });
+    byId('emptyStateResetBtn')?.addEventListener('click', async () => {
+      advancedSearchState.enabled = false;
+      advancedSearchState.tags = '';
+      advancedSearchState.domain = '';
+      advancedSearchState.type = '';
+      advancedSearchState.favorite = '';
+      advancedSearchState.archived = '';
+      advancedSearchState.semanticEnabled = false;
+      advancedSearchState.semanticMode = 'hybrid';
+      advancedSearchState.rerankEnabled = false;
+      advancedSearchState.rerankTopK = 36;
+      advancedSearchState.activeSavedId = '';
+      advancedSearchState.lastResultMeta = null;
+      advancedSearchState.lastAiParseMeta = null;
+      store.setFilter('q', '');
+      store.setFilter('tags', '');
+      store.setFilter('folderId', 'all');
+      store.setFilter('view', 'all');
+      store.setFilter('page', 1);
+      const searchInput = byId('searchInput');
+      if (searchInput) searchInput.value = '';
+      syncAdvancedSearchInputs();
+      await loadBookmarks();
+      renderSidebar();
+      renderHeader();
+      renderCards();
     });
     return;
   }

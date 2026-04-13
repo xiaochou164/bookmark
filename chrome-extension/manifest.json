@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Bookmark Raindrop Sync",
+  "name": "Bookmark Rainboard Sync",
   "version": "0.2.7",
-  "description": "Bidirectional sync between Chrome bookmarks and a Raindrop collection.",
+  "description": "Bidirectional sync between Chrome bookmarks and Rainboard cloud bookmarks.",
   "permissions": [
     "bookmarks",
     "storage",
@@ -10,7 +10,6 @@
     "cookies"
   ],
   "host_permissions": [
-    "https://api.raindrop.io/*",
     "http://localhost/*",
     "http://127.0.0.1/*",
     "https://*/*"
@@ -20,7 +19,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Raindrop Sync",
+    "default_title": "Rainboard Sync",
     "default_popup": "popup.html"
   },
   "options_page": "options.html"
