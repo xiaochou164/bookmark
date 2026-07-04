@@ -5129,7 +5129,7 @@ body {
 
 @media (max-width: 1280px) {
   .detail-panel-backdrop {
-    display: none !important;
+    display: none;
   }
 }
 

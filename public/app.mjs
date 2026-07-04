@@ -28,6 +28,8 @@ let detailRelatedBookmarksState = {
   confidence: 0,
   error: ''
 };
+let mobileSidebarOpen = false;
+let mobileSidebarReturnFocus = null;
 let aiQaDialogState = {
   loading: false,
   question: '',
@@ -3655,7 +3657,7 @@ function cardHtml(item) {
   const previewTitle = `<button type="button" class="card-title-link" data-preview-card="${item.id}" title="打开预览">${escapeHtml(item.title)}</button>`;
   const timeText = bookmarkTimeText(item);
 
-  return `<article class="card ${active} ${selectedClass}" data-id="${item.id}">
+  return `<article class="card ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
     ${cover}
     <div class="card-top">
       <div class="card-top-row">
@@ -3729,7 +3731,7 @@ function listRowHtml(item) {
          <span class="bookmark-row-thumb-fallback-icon">${iconSvg(kindIcon)}</span>
          <img class="bookmark-row-thumb-favicon" alt="" src="${bookmarkFaviconUrl(item)}" width="16" height="16" loading="lazy" />
        </span>`;
-  return `<article class="bookmark-row ${active} ${selectedClass}" data-id="${item.id}">
+  return `<article class="bookmark-row ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
     <label class="bookmark-row-select"><input type="checkbox" data-select="${item.id}" ${selected}/> <span>选择</span></label>
     <button type="button" class="bookmark-row-thumb ${coverUrl ? 'has-cover is-loading' : 'no-cover'}" data-preview-card="${item.id}" title="打开预览" data-thumb-kind="${escapeHtml(inferItemKind(item))}">
       ${thumbInner}
@@ -3765,7 +3767,7 @@ function headlineHtml(item) {
   const timeText = bookmarkTimeText(item);
   const kind = kindLabel(inferItemKind(item));
   const folderLabel = folderName(item.folderId || 'root');
-  return `<article class="bookmark-headline ${active} ${selectedClass}" data-id="${item.id}">
+  return `<article class="bookmark-headline ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
     <label class="bookmark-headline-select"><input type="checkbox" data-select="${item.id}" ${selected}/></label>
     <img alt="icon" src="${bookmarkFaviconUrl(item)}" width="16" height="16" />
     <button type="button" class="bookmark-headline-title" data-preview-card="${item.id}" title="打开预览">${escapeHtml(item.title)}</button>
@@ -3802,7 +3804,7 @@ function moodboardHtml(item) {
         <img alt="icon" src="${bookmarkFaviconUrl(item)}" width="28" height="28" />
         <div>${escapeHtml(host || '网页')}</div>
       </div>`;
-  return `<article class="bookmark-board ${moodboardSizeClass(item)} ${active} ${selectedClass}" data-id="${item.id}">
+  return `<article class="bookmark-board ${moodboardSizeClass(item)} ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
     <button type="button" class="bookmark-board-media" data-preview-card="${item.id}" title="打开预览">${bg}</button>
     <div class="bookmark-board-overlay">
       <div class="bookmark-board-top">
@@ -3865,10 +3867,50 @@ function focusableElementsWithin(root) {
   return Array.from(root.querySelectorAll(selector)).filter(isVisibleFocusable);
 }
 
+function setMobileSidebarOpen(open, { restoreFocus = true } = {}) {
+  mobileSidebarOpen = Boolean(open) && window.innerWidth <= 920;
+  const shell = document.querySelector('.shell');
+  const sidebar = document.querySelector('.shell .sidebar');
+  const trigger = byId('mobileSidebarBtn');
+  const backdrop = byId('mobileSidebarBackdrop');
+  if (mobileSidebarOpen) mobileSidebarReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : trigger;
+  shell?.classList.toggle('sidebar-open', mobileSidebarOpen);
+  document.body.classList.toggle('sidebar-drawer-open', mobileSidebarOpen);
+  trigger?.setAttribute('aria-expanded', String(mobileSidebarOpen));
+  trigger?.setAttribute('aria-label', mobileSidebarOpen ? '关闭导航' : '打开导航');
+  backdrop?.classList.toggle('hidden', !mobileSidebarOpen);
+  sidebar?.setAttribute('aria-hidden', String(!mobileSidebarOpen && window.innerWidth <= 920));
+  if (mobileSidebarOpen) {
+    requestAnimationFrame(() => focusableElementsWithin(sidebar)[0]?.focus());
+  } else if (restoreFocus) {
+    mobileSidebarReturnFocus?.focus?.();
+    mobileSidebarReturnFocus = null;
+  }
+}
+
+function trapMobileSidebarTabFocus(event) {
+  if (event.key !== 'Tab' || !mobileSidebarOpen || window.innerWidth > 920 || hasModalOpen()) return false;
+  const sidebar = document.querySelector('.shell .sidebar');
+  const focusables = focusableElementsWithin(sidebar);
+  if (!focusables.length) return false;
+  const first = focusables[0];
+  const last = focusables[focusables.length - 1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+    return true;
+  }
+  if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  return false;
+}
+
 function isDetailDrawerFocusTrapActive() {
   if (!state.activeId) return false;
   if (hasModalOpen()) return false;
-  if (window.innerWidth < 1281) return false;
   const shell = document.querySelector('.shell');
   return Boolean(shell?.classList.contains('detail-panel-open'));
 }
@@ -4211,6 +4253,14 @@ function renderCards() {
       store.setActiveId(el.dataset.id);
       renderCards();
       renderDetail();
+    });
+    el.addEventListener('keydown', (e) => {
+      if (!['Enter', ' '].includes(e.key) || e.target !== el) return;
+      e.preventDefault();
+      store.setActiveId(el.dataset.id);
+      renderCards();
+      renderDetail();
+      requestAnimationFrame(() => byId('detailCloseBtn')?.focus());
     });
   });
 
@@ -6316,6 +6366,20 @@ function startMetadataTaskPoll(taskId, bookmarkId) {
   }, 1500);
 }
 
+function closeDetailPanel({ restoreFocus = true } = {}) {
+  const previousId = String(state.activeId || '');
+  if (!previousId) return;
+  store.setActiveId(null);
+  renderCards();
+  renderDetail();
+  if (restoreFocus) {
+    requestAnimationFrame(() => {
+      const origin = document.querySelector(`[data-id="${CSS.escape(previousId)}"]`);
+      if (origin instanceof HTMLElement) origin.focus();
+    });
+  }
+}
+
 function renderDetail() {
   const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
   const form = byId('detailForm');
@@ -7175,6 +7239,8 @@ function bindActions() {
     }
   });
   window.addEventListener('resize', () => {
+    if (window.innerWidth > 920 && mobileSidebarOpen) setMobileSidebarOpen(false, { restoreFocus: false });
+    document.querySelector('.shell .sidebar')?.setAttribute('aria-hidden', String(window.innerWidth <= 920 && !mobileSidebarOpen));
     if (collectionContextMenuState.open) positionCollectionContextMenu();
     if (systemViewContextMenuState.open) setSystemViewContextMenuOpen(false);
     if (collectionsHeaderMenuState.open) setCollectionsHeaderMenuOpen(false);
@@ -7197,10 +7263,12 @@ function bindActions() {
     scheduleCollectionsTreeVirtualRender();
   }, { capture: true, passive: true });
   document.addEventListener('keydown', (e) => {
+    if (trapMobileSidebarTabFocus(e)) return;
     if (trapDetailDrawerTabFocus(e)) return;
     if (handleMenuArrowNavigation(e)) return;
     if (e.key === 'Escape') {
       let closedTransient = false;
+      if (mobileSidebarOpen) { setMobileSidebarOpen(false); closedTransient = true; }
       if (headerSortMenuOpen) { setHeaderSortMenuOpen(false); closedTransient = true; }
       if (headerViewMenuOpen) { setHeaderViewMenuOpen(false); closedTransient = true; }
       if (headerMoreMenuOpen) { setHeaderMoreMenuOpen(false); closedTransient = true; }
@@ -7216,9 +7284,7 @@ function bindActions() {
       if (tagContextMenuState.open) { setTagContextMenuOpen(false); closedTransient = true; }
       if (detailPanelMoreMenuOpen) { setDetailPanelMoreMenuOpen(false); closedTransient = true; }
       if (!closedTransient && !hasModalOpen() && state.activeId && !isTypingContext(e.target)) {
-        store.setActiveId(null);
-        renderCards();
-        renderDetail();
+        closeDetailPanel();
       }
       return;
     }
@@ -7316,6 +7382,12 @@ function bindActions() {
         showToast(err.message || '删除失败', { timeoutMs: 4000 });
       });
     }
+  });
+  byId('mobileSidebarBtn')?.addEventListener('click', () => setMobileSidebarOpen(!mobileSidebarOpen));
+  byId('mobileSidebarBackdrop')?.addEventListener('click', () => setMobileSidebarOpen(false));
+  document.querySelector('.shell .sidebar')?.addEventListener('click', (event) => {
+    if (window.innerWidth > 920 || !mobileSidebarOpen) return;
+    if (event.target.closest('button, a, [role="menuitem"]')) setMobileSidebarOpen(false);
   });
 
   byId('searchInput').addEventListener('focus', () => {
@@ -8032,16 +8104,10 @@ function bindActions() {
     });
   });
   byId('detailCloseBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    store.setActiveId(null);
-    renderCards();
-    renderDetail();
+    closeDetailPanel();
   });
   byId('detailPanelBackdrop')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    store.setActiveId(null);
-    renderCards();
-    renderDetail();
+    closeDetailPanel();
   });
   byId('detailForm')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-detail-section-toggle]');
@@ -9023,6 +9089,7 @@ async function init() {
   if (window.location.pathname === '/login.html') return;
   setSavedSearchesUiVisible(SAVED_SEARCHES_UI_ENABLED);
   bindActions();
+  setMobileSidebarOpen(false, { restoreFocus: false });
   hydrateWorkbenchHeaderIcons();
   byId('sortSelect').value = state.filters.sort;
   byId('pageSizeSelect').value = String(state.filters.pageSize);

@@ -829,3 +829,9 @@
 - 待办：`UI-AUD-004`，推进 `UI-AUD-003/006/007`
 - 内容：断点收敛至 `640/920/1180/1280px` 矩阵（`1281px` 仅作为相邻 min-width 边界）；移除页面级横向溢出隐藏；将旧颜色、边框与 z-index 变量映射至新 token；UI 静态门禁新增非标准断点和 `html overflow-x:hidden` 禁止规则。
 - 验证：`npm run ui:check` 显示 off-matrix breakpoints 为 none；本地检查、Worker smoke、远端 smoke 均通过。
+
+## 2026-07-04 UI/UX 治理工作台（移动 Drawer）
+
+- 待办：`UI-AUD-103`，推进 `UI-AUD-501`
+- 内容：平板/手机侧栏改为左侧 Drawer，详情改为右侧 Drawer；新增导航按钮、独立遮罩、Esc 关闭、焦点陷阱和焦点回收；四种书签视图条目增加键盘焦点及 Enter/Space 打开详情。
+- 验证：JS 语法、UI 静态门禁、Worker smoke 和远端 smoke 通过。

@@ -13,7 +13,7 @@
 
 <body>
   <div class="shell">
-    <aside class="sidebar">
+    <aside class="sidebar" id="mobileSidebar">
       <div class="sidebar-account" id="sidebarAccountArea">
         <button type="button" id="sidebarAccountBtn" class="sidebar-account-btn" aria-haspopup="menu"
           aria-expanded="false">
@@ -97,9 +97,12 @@
       </div>
     </aside>
 
+    <button type="button" id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop hidden" aria-label="关闭导航"></button>
+
     <main class="main">
       <header class="toolbar">
         <div class="toolbar-left">
+          <button type="button" id="mobileSidebarBtn" class="ghost mobile-sidebar-toggle" aria-label="打开导航" aria-controls="mobileSidebar" aria-expanded="false">☰</button>
           <div class="search-wrap">
             <span id="searchLeadingIcon" class="search-leading-icon" aria-hidden="true"></span>
             <input id="searchInput" type="search" placeholder="搜索标题、链接、备注、标签..." role="combobox"
