@@ -68,6 +68,13 @@ if [[ "$HEALTH_OK" != "true" || "$HEALTH_RUNTIME" != "cloudflare-workers" ]]; th
   exit 1
 fi
 
+OPENAPI_JSON="$(request_json GET /openapi.json)"
+OPENAPI_VERSION="$(printf '%s' "$OPENAPI_JSON" | json_get "data.openapi")"
+if [[ "$OPENAPI_VERSION" != "3.1.0" ]]; then
+  echo "openapi check failed: $OPENAPI_JSON" >&2
+  exit 1
+fi
+
 echo "[2/7] register"
 REGISTER_JSON="$(request_json POST /api/auth/register "{\"email\":\"$SMOKE_EMAIL\",\"password\":\"$SMOKE_PASSWORD\",\"displayName\":\"Smoke\"}")"
 REGISTER_OK="$(printf '%s' "$REGISTER_JSON" | json_get "data.ok")"

@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import openapiSpec from '../docs/openapi.json' with { type: 'json' };
 import {
   normalizeAiProviderConfigInput,
   publicAiProviderConfig,
@@ -6569,6 +6570,11 @@ export default {
     const requestId = crypto.randomUUID();
     const url = new URL(request.url);
     try {
+      if (url.pathname === '/openapi.json') {
+        return jsonResponse(openapiSpec, {
+          headers: { 'cache-control': 'public, max-age=300' }
+        });
+      }
       if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/public/')) {
         return await handleApi(request, env, url, requestId);
       }

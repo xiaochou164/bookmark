@@ -15,6 +15,11 @@ async function run() {
   assert.equal(healthJson.ok, true, 'health payload should include ok=true');
   assert.equal(healthJson.runtime, 'cloudflare-workers', 'health runtime mismatch');
 
+  const openapiRes = await worker.fetch(createRequest('/openapi.json'), {});
+  assert.equal(openapiRes.status, 200, 'openapi spec should return 200');
+  const openapiJson = await openapiRes.json();
+  assert.equal(openapiJson.openapi, '3.1.0', 'openapi version mismatch');
+
   const stateNoAuthRes = await worker.fetch(createRequest('/api/state'), { DB: createMockDb() });
   assert.equal(stateNoAuthRes.status, 401, 'state should require auth');
 
