@@ -6446,6 +6446,13 @@ body {
   background: transparent;
 }
 
+/*
+ * Layout safety fallbacks must stay below the component rules in cascade
+ * priority. This block used to be unlayered and overrode the established
+ * desktop/mobile dimensions, which made the workbench look like two layout
+ * systems were active at once.
+ */
+@layer layout-safety {
 /* Layout stabilization: keep dense tool surfaces readable at every width. */
 html {
   overflow-x: hidden;
@@ -7259,4 +7266,5 @@ button.ghost,
   .cards.layout-list .bookmark-row-actions {
     justify-content: flex-start;
   }
+}
 }
