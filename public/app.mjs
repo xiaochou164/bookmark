@@ -3613,17 +3613,13 @@ function bookmarkActionButtonsHtml(item, { compact = false, iconOnly = false } =
   const btnClass = `ghost${iconOnly ? ' icon-action-btn' : ''}`;
   const out = [];
   if (!compact) {
-    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-open-current', id: item.id, label: '直接打开', icon: 'click', iconOnly, className: btnClass }));
     out.push(bookmarkActionButtonHtml({ dataAttr: 'data-open', id: item.id, label: '新标签页打开', icon: 'open', iconOnly, className: btnClass }));
     out.push(bookmarkActionButtonHtml({ dataAttr: 'data-preview-card', id: item.id, label: '预览模式', icon: 'preview', iconOnly, className: btnClass }));
-    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-preview-web', id: item.id, label: 'Web 预览', icon: 'web', iconOnly, className: btnClass }));
-    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-copy-link', id: item.id, label: '复制链接', icon: 'copy', iconOnly, className: btnClass }));
-    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-ask-item', id: item.id, label: '询问', icon: 'ai', iconOnly, className: btnClass }));
   }
   out.push(bookmarkActionButtonHtml({ dataAttr: 'data-favorite', id: item.id, label: item.favorite ? '取消收藏' : '收藏', icon: item.favorite ? 'unfavorite' : 'favorite', iconOnly, className: btnClass }));
   if (!compact) {
-    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-edit-tags', id: item.id, label: '标签', icon: 'tag', iconOnly, className: btnClass }));
-    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-edit-item', id: item.id, label: '编辑', icon: 'edit', iconOnly, className: btnClass }));
+    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-row-more', id: item.id, label: '更多操作', icon: 'more', iconOnly, className: btnClass }));
+    return out.join('');
   }
   out.push(bookmarkActionButtonHtml({ dataAttr: 'data-delete', id: item.id, label: '删除', icon: 'delete', iconOnly, className: `ghost${iconOnly ? ' icon-action-btn danger' : ' danger'}`, hidden: Boolean(item.deletedAt) }));
   out.push(bookmarkActionButtonHtml({ dataAttr: 'data-restore', id: item.id, label: '恢复', icon: 'restore', iconOnly, className: btnClass, hidden: !item.deletedAt }));
@@ -4274,6 +4270,22 @@ function renderCards() {
       renderCards();
       renderDetail();
       await open预览Dialog(id, { preferredMode: 'auto' });
+    });
+  });
+
+  root.querySelectorAll('[data-row-more]').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = el.dataset.rowMore;
+      if (!id) return;
+      store.setActiveId(id);
+      renderCards();
+      renderDetail();
+      requestAnimationFrame(() => {
+        setDetailPanelMoreMenuOpen(true);
+        byId('detailPanelMoreBtn')?.focus();
+      });
     });
   });
 

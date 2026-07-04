@@ -91,6 +91,42 @@
   display: none;
 }
 
+#settingsBtn,
+#authBtn {
+  display: none;
+}
+
+.toolbar {
+  grid-template-columns: minmax(240px, 1fr) auto;
+  align-items: center;
+}
+
+.toolbar-right {
+  flex-wrap: nowrap;
+}
+
+.cards.layout-list .bookmark-row-side {
+  min-width: 180px;
+}
+
+.cards.layout-list .bookmark-row-actions {
+  overflow: visible;
+}
+
+.cards.layout-list .bookmark-row-actions > * {
+  display: inline-flex;
+}
+
+@media (max-width: 1180px) {
+  .toolbar-ask-btn {
+    width: var(--control-h-md);
+    min-width: var(--control-h-md);
+    padding-inline: 0;
+    overflow: hidden;
+    color: transparent;
+  }
+}
+
 @media (max-width: 920px) {
   body.sidebar-drawer-open {
     overflow: hidden;
