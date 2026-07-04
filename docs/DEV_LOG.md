@@ -823,3 +823,9 @@
 - 内容：建立分层 CSS 入口与 tokens/base/components/utilities 目录，将原大文件降为 legacy 层；新增 `npm run ui:check` 静态 UI 门禁；收敛本轮新增断点；实现主应用可恢复错误页、登录页移动端表单优先、Tab 语义/键盘基础与全局 reduced-motion。
 - 验证：`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、远端 smoke 全部通过；生产浏览器确认登录页无横向溢出、Tab ARIA 与状态 live region 正常。
 - 后续：继续迁移 legacy 核心组件，降低 199 个重复选择器基线并完成剩余 P0 工作台布局。
+
+## 2026-07-04 UI/UX 治理 Sprint A（第二批）
+
+- 待办：`UI-AUD-004`，推进 `UI-AUD-003/006/007`
+- 内容：断点收敛至 `640/920/1180/1280px` 矩阵（`1281px` 仅作为相邻 min-width 边界）；移除页面级横向溢出隐藏；将旧颜色、边框与 z-index 变量映射至新 token；UI 静态门禁新增非标准断点和 `html overflow-x:hidden` 禁止规则。
+- 验证：`npm run ui:check` 显示 off-matrix breakpoints 为 none；本地检查、Worker smoke、远端 smoke 均通过。

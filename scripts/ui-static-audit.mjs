@@ -49,9 +49,13 @@ const allowedBreakpoints = new Set(['640', '920', '1180', '1280', '1281']);
 const breakpointMatches = [...legacyCss.matchAll(/@media\s*\(\s*(?:min|max)-width\s*:\s*(\d+)px\s*\)/g)];
 const offMatrixBreakpoints = [...new Set(breakpointMatches.map((match) => match[1]).filter((value) => !allowedBreakpoints.has(value)))];
 notes.push(`off-matrix legacy breakpoints: ${offMatrixBreakpoints.join(', ') || 'none'}`);
+if (offMatrixBreakpoints.length) failures.push(`off-matrix breakpoints are not allowed: ${offMatrixBreakpoints.join(', ')}`);
 
-if (/html\s*\{[^}]*overflow-x\s*:\s*hidden/s.test(read('public/css/components.css'))) {
-  failures.push('components.css must not hide page-level horizontal overflow');
+const allCss = ['public/styles.css', ...requiredCssImports.map((item) => `public/${item.replace('./', '')}`)]
+  .map(read)
+  .join('\n');
+if (/html\s*\{[^}]*overflow-x\s*:\s*hidden/s.test(allCss)) {
+  failures.push('CSS must not hide page-level horizontal overflow');
 }
 
 if (failures.length) {

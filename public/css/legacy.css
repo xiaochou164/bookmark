@@ -5316,7 +5316,7 @@ body {
   }
 }
 
-@media (max-width: 1480px) {
+@media (max-width: 1280px) {
   .detail-panel-mode-switch>button {
     min-width: 40px;
     padding: 0 6px;
@@ -6628,10 +6628,6 @@ body {
  */
 @layer layout-safety {
 /* Layout stabilization: keep dense tool surfaces readable at every width. */
-html {
-  overflow-x: hidden;
-}
-
 body {
   min-width: 320px;
 }

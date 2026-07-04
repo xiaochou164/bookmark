@@ -21,11 +21,11 @@
   --radius-panel: 12px;
   --sidebar-width: 264px;
   --detail-width: 420px;
-  --z-sticky: 40;
-  --z-popover: 1200;
-  --z-drawer-backdrop: 1300;
-  --z-drawer: 1310;
-  --z-dialog-backdrop: 2000;
-  --z-dialog: 2010;
-  --z-toast: 3000;
+  --layer-sticky: 40;
+  --layer-popover: 1200;
+  --layer-drawer-backdrop: 1300;
+  --layer-drawer: 1310;
+  --layer-dialog-backdrop: 2000;
+  --layer-dialog: 2010;
+  --layer-toast: 3000;
 }

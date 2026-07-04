@@ -25,7 +25,7 @@
 - [ ] `UI-AUD-001` 拆分 `public/styles.css`：按 `tokens/base/layout/workbench/components/dialogs/settings/public/responsive` 分文件，入口文件只负责导入；验收为核心选择器不再跨 3 个以上文件重复定义。
 - [ ] `UI-AUD-002` 清理重复与失效规则：逐项合并 `.toolbar/.view-header/.tree/.bookmark-row/.detail/.context-menu` 的多代覆盖，移除无消费者样式；验收为完全重复选择器数量下降至少 80%。
 - [ ] `UI-AUD-003` 建立统一尺寸 token：控件高度限定为 `28/32/36/40px` 四档，统一圆角、间距、侧栏宽度、详情栏宽度和图标尺寸；禁止页面自行发明相邻尺寸。
-- [ ] `UI-AUD-004` 收敛响应式断点为 `640/920/1180/1280px` 四档，移除 `720/980/1080/1480px` 的局部补丁或并入最近断点；输出断点行为表。
+- [x] `UI-AUD-004` 收敛响应式断点为 `640/920/1180/1280px` 四档，移除 `720/980/1080/1480px` 的局部补丁或并入最近断点；输出断点行为表。
 - [ ] `UI-AUD-005` 建立页面视觉回归：登录、主列表、卡片、详情抽屉、设置、插件、公开页各保存四档基线截图，并在发布清单中强制检查。
 - [ ] `UI-AUD-006` 建立统一层级规范：整理 sticky header、popover、menu、drawer、dialog、toast 的 z-index；验收覆盖“菜单位于抽屉内”“Dialog 上再开确认”“移动端遮罩”三种场景。
 - [ ] `UI-AUD-007` 全局横向溢出审计：不得依赖 `html { overflow-x:hidden }` 掩盖问题；在四档宽度下 `documentElement.scrollWidth <= clientWidth`。

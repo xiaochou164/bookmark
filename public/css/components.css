@@ -3,6 +3,25 @@
  * do not append versioned override blocks to legacy.css.
  */
 
+:root {
+  --bg: var(--color-canvas);
+  --panel: var(--color-surface);
+  --surface: var(--color-surface-subtle);
+  --ink: var(--color-text);
+  --muted: var(--color-text-muted);
+  --accent: var(--color-primary);
+  --danger: var(--color-danger);
+  --line: var(--color-border);
+  --line-strong: var(--color-border-strong);
+  --z-sticky-main: var(--layer-sticky);
+  --z-sticky-toolbar: calc(var(--layer-sticky) + 10);
+  --z-sticky-filter: calc(var(--layer-sticky) + 5);
+  --z-popover: var(--layer-popover);
+  --z-menu: var(--layer-popover);
+  --z-drawer-backdrop: var(--layer-drawer-backdrop);
+  --z-drawer: var(--layer-drawer);
+}
+
 .settings-status-banner[aria-live],
 .dedupe-results[aria-live] {
   overflow-wrap: anywhere;
@@ -11,7 +30,7 @@
 .app-fatal-error {
   position: fixed;
   inset: 0;
-  z-index: var(--z-dialog);
+  z-index: var(--layer-dialog);
   display: grid;
   place-items: center;
   padding: var(--space-4);
