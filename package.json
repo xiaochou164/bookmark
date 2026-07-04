@@ -14,6 +14,7 @@
     "cf:release": "bash scripts/cf-release.sh",
     "cf:check": "node --check src/worker.mjs",
     "cf:smoke": "node scripts/cf-worker-smoke.mjs",
+    "ui:check": "node scripts/ui-static-audit.mjs",
     "cf:smoke:remote": "bash scripts/cf-remote-smoke.sh",
     "cf:d1:migrate:local": "bash scripts/cf-apply-d1-migration.sh local",
     "cf:d1:migrate:remote": "bash scripts/cf-apply-d1-migration.sh remote",

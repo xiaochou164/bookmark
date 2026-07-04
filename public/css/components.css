@@ -1,0 +1,106 @@
+/*
+ * Migrated component rules live here. Keep one canonical rule per component;
+ * do not append versioned override blocks to legacy.css.
+ */
+
+.settings-status-banner[aria-live],
+.dedupe-results[aria-live] {
+  overflow-wrap: anywhere;
+}
+
+.app-fatal-error {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: color-mix(in srgb, #111827 48%, transparent);
+}
+
+.app-fatal-error-card {
+  width: min(620px, 100%);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, .24);
+}
+
+.app-fatal-error-icon {
+  width: var(--control-h-lg);
+  height: var(--control-h-lg);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff0f2;
+  color: var(--color-danger);
+  font-weight: 800;
+}
+
+.app-fatal-error h1 {
+  margin: 0 0 var(--space-2);
+  font-size: 20px;
+}
+
+.app-fatal-error p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.app-fatal-error pre {
+  max-height: 180px;
+  margin: var(--space-3) 0 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.app-fatal-error-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .auth-page {
+    align-items: start;
+    padding: var(--space-3);
+  }
+
+  .auth-page-shell {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .auth-page-card {
+    order: 1;
+  }
+
+  .auth-page-hero {
+    order: 2;
+    padding: var(--space-4);
+  }
+
+  .auth-page-hero h1,
+  .auth-hero-list {
+    display: none;
+  }
+
+  .app-fatal-error-card {
+    grid-template-columns: 1fr;
+  }
+
+  .app-fatal-error-actions {
+    grid-column: auto;
+  }
+
+  .app-fatal-error-actions button {
+    width: 100%;
+  }
+}

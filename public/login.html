@@ -38,25 +38,25 @@
           <h2>账号登录</h2>
           <p class="muted">使用邮箱登录，或创建新账号后自动进入你的书签库。</p>
         </div>
-        <div class="auth-page-tabs">
-          <button type="button" id="loginTabBtn" class="active">登录</button>
-          <button type="button" id="registerTabBtn">注册</button>
+        <div class="auth-page-tabs" role="tablist" aria-label="账号操作">
+          <button type="button" id="loginTabBtn" class="active" role="tab" aria-selected="true" aria-controls="loginForm">登录</button>
+          <button type="button" id="registerTabBtn" role="tab" aria-selected="false" aria-controls="registerForm" tabindex="-1">注册</button>
         </div>
 
-        <form id="loginForm" class="auth-page-form">
+        <form id="loginForm" class="auth-page-form" role="tabpanel" aria-labelledby="loginTabBtn">
           <label>邮箱<input id="loginEmail" type="email" autocomplete="username" required /></label>
           <label>密码<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
           <button type="submit">登录</button>
         </form>
 
-        <form id="registerForm" class="auth-page-form hidden">
+        <form id="registerForm" class="auth-page-form hidden" role="tabpanel" aria-labelledby="registerTabBtn">
           <label>昵称<input id="registerName" autocomplete="name" /></label>
           <label>邮箱<input id="registerEmail" type="email" autocomplete="username" required /></label>
           <label>密码<input id="registerPassword" type="password" autocomplete="new-password" required /></label>
           <button type="submit" class="ghost">注册并登录</button>
         </form>
 
-        <div id="loginStatus" class="muted">正在检查登录状态...</div>
+        <div id="loginStatus" class="muted" role="status" aria-live="polite">正在检查登录状态...</div>
         <div class="auth-page-foot muted">
           <span>登录成功后将返回到你原来的页面。</span>
           <a href="/" id="backToAppLink">返回主界面</a>

@@ -42,6 +42,10 @@ function setTab(mode) {
   byId('loginForm')?.classList.toggle('hidden', isRegister);
   byId('registerTabBtn')?.classList.toggle('active', isRegister);
   byId('loginTabBtn')?.classList.toggle('active', !isRegister);
+  byId('registerTabBtn')?.setAttribute('aria-selected', String(isRegister));
+  byId('loginTabBtn')?.setAttribute('aria-selected', String(!isRegister));
+  byId('registerTabBtn')?.setAttribute('tabindex', isRegister ? '0' : '-1');
+  byId('loginTabBtn')?.setAttribute('tabindex', isRegister ? '-1' : '0');
 }
 
 async function loadAuthMe() {
@@ -76,10 +80,23 @@ async function registerAndLogin(displayName, email, password) {
 async function init() {
   const target = nextTarget();
   const back = byId('backToAppLink');
-  if (back) back.setAttribute('href', target);
+  if (back && target === '/') {
+    back.removeAttribute('href');
+    back.setAttribute('aria-disabled', 'true');
+    back.textContent = '登录后进入主界面';
+  } else if (back) {
+    back.setAttribute('href', target);
+  }
 
   byId('loginTabBtn')?.addEventListener('click', () => setTab('login'));
   byId('registerTabBtn')?.addEventListener('click', () => setTab('register'));
+  byId('loginTabBtn')?.parentElement?.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    const nextMode = byId('loginTabBtn')?.getAttribute('aria-selected') === 'true' ? 'register' : 'login';
+    setTab(nextMode);
+    byId(nextMode === 'register' ? 'registerTabBtn' : 'loginTabBtn')?.focus();
+  });
 
   byId('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();

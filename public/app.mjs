@@ -9040,7 +9040,29 @@ async function init() {
   await refreshAll();
 }
 
-init().catch((err) => {
-  console.error(err);
-  alert(err.message);
-});
+function showFatalAppError(error) {
+  console.error(error);
+  const shell = byId('appFatalError');
+  const details = byId('appFatalErrorDetails');
+  if (!shell || !details) return;
+  const diagnostic = [
+    `message: ${String(error?.message || error || 'Unknown error')}`,
+    `path: ${currentAppPath()}`,
+    `time: ${new Date().toISOString()}`,
+    `userAgent: ${navigator.userAgent}`
+  ].join('\n');
+  details.textContent = diagnostic;
+  shell.classList.remove('hidden');
+  byId('appFatalRetryBtn')?.addEventListener('click', () => window.location.reload(), { once: true });
+  byId('appFatalLoginBtn')?.addEventListener('click', () => redirectToLoginPage(), { once: true });
+  byId('appFatalCopyBtn')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(diagnostic);
+      showToast('诊断信息已复制', { timeoutMs: 1800 });
+    } catch (_copyError) {
+      details.focus?.();
+    }
+  }, { once: true });
+}
+
+init().catch(showFatalAppError);

@@ -816,3 +816,10 @@
 - 验证：`node --check /Users/xiaochou164/Desktop/bookmarktorain/src/worker.js`；`npm run cf:check`；`npm run cf:smoke`；`bash -n /Users/xiaochou164/Desktop/bookmarktorain/scripts/cf-apply-d1-migration.sh`。
 - 后续：在具备 npm registry 访问的环境安装 `wrangler`，执行 `cf:d1:create -> cf:d1:migrate:remote -> cf:deploy` 完成线上发布。
 >>>>>>> theirs
+
+## 2026-07-04 UI/UX 治理 Sprint A（第一批）
+
+- 待办：`UI-AUD-001`（进行中）、`UI-AUD-003`（进行中）、`UI-AUD-004`（进行中）、`UI-AUD-005`（进行中）、`UI-AUD-109`、`UI-AUD-302`、`UI-AUD-505`
+- 内容：建立分层 CSS 入口与 tokens/base/components/utilities 目录，将原大文件降为 legacy 层；新增 `npm run ui:check` 静态 UI 门禁；收敛本轮新增断点；实现主应用可恢复错误页、登录页移动端表单优先、Tab 语义/键盘基础与全局 reduced-motion。
+- 验证：`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、远端 smoke 全部通过；生产浏览器确认登录页无横向溢出、Tab ARIA 与状态 live region 正常。
+- 后续：继续迁移 legacy 核心组件，降低 199 个重复选择器基线并完成剩余 P0 工作台布局。
