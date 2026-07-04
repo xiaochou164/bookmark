@@ -278,6 +278,21 @@
         }
       }
     },
+    "/api/product/dedupe/scan": {
+      "get": {
+        "summary": "Detect URL duplicate bookmark groups and return handling suggestions",
+        "responses": { "200": { "description": "Duplicate groups with keeper suggestions" } }
+      }
+    },
+    "/api/product/dedupe/resolve": {
+      "post": {
+        "summary": "Apply user-selected duplicate handling actions",
+        "responses": {
+          "200": { "description": "Duplicate groups processed" },
+          "409": { "description": "Scan result is stale; scan again" }
+        }
+      }
+    },
     "/openapi.json": {
       "get": {
         "summary": "Serve API specification",

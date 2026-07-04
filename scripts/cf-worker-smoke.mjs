@@ -442,8 +442,42 @@ async function run() {
   );
   assert.equal(brokenLinksRetryRes.status, 202, 'broken links retry should return 202');
 
+  const duplicateBookmarkRes = await worker.fetch(
+    createRequest('/api/bookmarks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ title: 'Example duplicate', url: 'https://example.com/', folderId: 'root', tags: ['duplicate'] })
+    }),
+    env
+  );
+  assert.equal(duplicateBookmarkRes.status, 201, 'duplicate fixture should be created');
+  const duplicateBookmarkJson = await duplicateBookmarkRes.json();
+
   const dedupeRes = await worker.fetch(createRequest('/api/product/dedupe/scan', { headers: { cookie } }), env);
   assert.equal(dedupeRes.status, 200, 'dedupe scan should return 200');
+  const dedupeJson = await dedupeRes.json();
+  assert.equal(dedupeJson.totalGroups >= 1, true, 'dedupe scan should find a duplicate group');
+  const duplicateGroup = dedupeJson.groups.find((group) => group.items.some((item) => item.id === duplicateBookmarkJson.id));
+  assert.equal(Boolean(duplicateGroup?.suggestion?.keepId), true, 'dedupe group should include a keeper suggestion');
+
+  const dedupeResolveRes = await worker.fetch(
+    createRequest('/api/product/dedupe/resolve', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({
+        actions: [{
+          key: duplicateGroup.key,
+          strategy: 'merge_and_trash',
+          keepId: bookmarkJson.id,
+          removeIds: [duplicateBookmarkJson.id]
+        }]
+      })
+    }),
+    env
+  );
+  assert.equal(dedupeResolveRes.status, 200, 'dedupe resolve should return 200');
+  const dedupeResolveJson = await dedupeResolveRes.json();
+  assert.equal(dedupeResolveJson.removedCount, 1, 'dedupe resolve should trash one duplicate');
 
   const semanticDedupeRes = await worker.fetch(
     createRequest('/api/product/ai/dedupe/semantic-scan', {

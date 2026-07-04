@@ -3327,6 +3327,36 @@ function normalizeUrlLoose(url = '') {
   }
 }
 
+function duplicateBookmarkQuality(bookmark = {}) {
+  const tags = Array.isArray(bookmark.tags) ? bookmark.tags : [];
+  const highlights = Array.isArray(bookmark.highlights) ? bookmark.highlights : [];
+  let score = 0;
+  if (String(bookmark.title || '').trim() && bookmark.title !== '(untitled)') score += 1;
+  if (String(bookmark.note || '').trim()) score += 2;
+  score += Math.min(3, tags.length);
+  if (bookmark.favorite) score += 2;
+  if (String(bookmark.cover || '').trim()) score += 1;
+  if (highlights.length) score += 2;
+  if (bookmark.metadata && Object.keys(bookmark.metadata).length) score += 1;
+  return score;
+}
+
+function duplicateGroupSuggestion(items = []) {
+  const ranked = [...items].sort((a, b) => {
+    const qualityDelta = duplicateBookmarkQuality(b) - duplicateBookmarkQuality(a);
+    return qualityDelta || Number(b.updatedAt || 0) - Number(a.updatedAt || 0);
+  });
+  const keeper = ranked[0] || null;
+  return {
+    strategy: 'merge_and_trash',
+    keepId: keeper?.id || '',
+    removeIds: ranked.slice(1).map((item) => item.id),
+    reason: keeper
+      ? `建议保留“${keeper.title || keeper.url}”：其备注、标签、收藏状态或更新时间更完整；合并信息后将其余副本移入废纸篓。`
+      : ''
+  };
+}
+
 function cosineSimilarity(a = [], b = []) {
   const len = Math.min(Array.isArray(a) ? a.length : 0, Array.isArray(b) ? b.length : 0);
   if (!len) return 0;
@@ -6501,18 +6531,88 @@ async function handleApi(request, env, url, requestId) {
     }
     const groups = [...byUrl.entries()]
       .filter(([, items]) => items.length > 1)
-      .map(([urlKey, items]) => ({
+      .map(([urlKey, items]) => {
+        const suggestion = duplicateGroupSuggestion(items);
+        return {
         key: urlKey,
         count: items.length,
+        suggestion,
         items: items.map((item) => ({
           id: item.id,
           title: item.title,
           url: item.url,
           folderId: item.folderId,
-          updatedAt: item.updatedAt
+          note: item.note || '',
+          tags: item.tags || [],
+          favorite: Boolean(item.favorite),
+          updatedAt: item.updatedAt,
+          qualityScore: duplicateBookmarkQuality(item)
         }))
-      }));
+      };
+      });
     return jsonResponse({ ok: true, groups, totalGroups: groups.length }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/dedupe/resolve' && method === 'POST') {
+    const actions = Array.isArray(body.actions) ? body.actions.slice(0, 100) : [];
+    if (!actions.length) {
+      throw Object.assign(new Error('at least one duplicate action is required'), { status: 400, code: 'BAD_REQUEST' });
+    }
+    const results = [];
+    let removedCount = 0;
+    for (const action of actions) {
+      const strategy = String(action?.strategy || 'merge_and_trash');
+      if (strategy === 'skip') {
+        results.push({ key: String(action?.key || ''), strategy, skipped: true });
+        continue;
+      }
+      if (!['merge_and_trash', 'trash_only'].includes(strategy)) {
+        throw Object.assign(new Error('unsupported duplicate strategy'), { status: 400, code: 'BAD_REQUEST' });
+      }
+      const keepId = String(action?.keepId || '');
+      const removeIds = [...new Set((Array.isArray(action?.removeIds) ? action.removeIds : [])
+        .map((id) => String(id || ''))
+        .filter((id) => id && id !== keepId))].slice(0, 50);
+      if (!keepId || !removeIds.length) {
+        throw Object.assign(new Error('keepId and removeIds are required'), { status: 400, code: 'BAD_REQUEST' });
+      }
+      const keeper = await repo.getBookmark(auth.user.id, keepId);
+      const duplicates = (await Promise.all(removeIds.map((id) => repo.getBookmark(auth.user.id, id)))).filter(Boolean);
+      if (!keeper || keeper.deletedAt || duplicates.length !== removeIds.length || duplicates.some((item) => item.deletedAt)) {
+        throw Object.assign(new Error('duplicate bookmarks changed; scan again'), { status: 409, code: 'DEDUPE_STALE' });
+      }
+      const normalized = normalizeUrlLoose(keeper.url).toLowerCase();
+      if (!normalized || duplicates.some((item) => normalizeUrlLoose(item.url).toLowerCase() !== normalized)) {
+        throw Object.assign(new Error('selected bookmarks are not URL duplicates'), { status: 400, code: 'BAD_REQUEST' });
+      }
+      let kept = keeper;
+      if (strategy === 'merge_and_trash') {
+        const candidates = [keeper, ...duplicates];
+        const longest = (field) => candidates
+          .map((item) => String(item?.[field] || '').trim())
+          .sort((a, b) => b.length - a.length)[0] || '';
+        kept = await repo.updateBookmark(auth.user.id, keepId, {
+          title: longest('title') || keeper.title,
+          note: longest('note'),
+          tags: [...new Set(candidates.flatMap((item) => Array.isArray(item.tags) ? item.tags : []))],
+          favorite: candidates.some((item) => item.favorite),
+          read: candidates.some((item) => item.read),
+          cover: keeper.cover || candidates.find((item) => item.cover)?.cover || ''
+        });
+      }
+      for (const duplicate of duplicates) {
+        await repo.updateBookmark(auth.user.id, duplicate.id, { deleted: true });
+        removedCount += 1;
+      }
+      results.push({
+        key: normalized,
+        strategy,
+        keepId,
+        removedIds: duplicates.map((item) => item.id),
+        kept
+      });
+    }
+    return jsonResponse({ ok: true, processedGroups: results.length, removedCount, results }, { requestId });
   }
 
   if (url.pathname === '/api/product/ai/dedupe/semantic-scan' && method === 'POST') {

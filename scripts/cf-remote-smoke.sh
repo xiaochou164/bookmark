@@ -128,6 +128,22 @@ if [[ "$STATE_TOTAL" == "0" || "$HAS_SMOKE_TAG" != "true" ]]; then
   exit 1
 fi
 
+DUPLICATE_JSON="$(request_json POST /api/bookmarks "{\"title\":\"Smoke Duplicate\",\"url\":\"https://example.com/\",\"folderId\":\"$FOLDER_ID\"}")"
+DUPLICATE_ID="$(printf '%s' "$DUPLICATE_JSON" | json_get "data.id")"
+DEDUPE_JSON="$(request_json GET /api/product/dedupe/scan)"
+DEDUPE_KEEP_ID="$(printf '%s' "$DEDUPE_JSON" | json_get "data.groups[0] && data.groups[0].suggestion.keepId")"
+DEDUPE_REMOVE_ID="$(printf '%s' "$DEDUPE_JSON" | json_get "data.groups[0] && data.groups[0].items.map((item) => item.id).find((id) => id !== data.groups[0].suggestion.keepId)")"
+if [[ -z "$DUPLICATE_ID" || -z "$DEDUPE_KEEP_ID" || -z "$DEDUPE_REMOVE_ID" ]]; then
+  echo "dedupe scan failed: $DEDUPE_JSON" >&2
+  exit 1
+fi
+DEDUPE_RESOLVE_JSON="$(request_json POST /api/product/dedupe/resolve "{\"actions\":[{\"strategy\":\"merge_and_trash\",\"keepId\":\"$DEDUPE_KEEP_ID\",\"removeIds\":[\"$DEDUPE_REMOVE_ID\"]}]}")"
+DEDUPE_REMOVED="$(printf '%s' "$DEDUPE_RESOLVE_JSON" | json_get "data.removedCount")"
+if [[ "$DEDUPE_REMOVED" != "1" ]]; then
+  echo "dedupe resolve failed: $DEDUPE_RESOLVE_JSON" >&2
+  exit 1
+fi
+
 echo "[6/7] public link"
 PUBLIC_JSON="$(request_json POST /api/collab/public-links "{\"folderId\":\"$FOLDER_ID\",\"title\":\"Smoke Public\"}")"
 PUBLIC_TOKEN="$(printf '%s' "$PUBLIC_JSON" | json_get "data.item && data.item.token")"

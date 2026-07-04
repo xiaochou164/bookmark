@@ -29,7 +29,8 @@ const view = {
   quota: null,
   backups: [],
   aiConfig: null,
-  aiRuleConfig: null
+  aiRuleConfig: null,
+  dedupeGroups: []
 };
 let authGuardLastCheckAt = 0;
 let authGuardInFlight = null;
@@ -411,6 +412,91 @@ function renderProduct() {
   if (view.quota) {
     byId('quotaOutput').textContent = JSON.stringify(view.quota, null, 2);
   }
+}
+
+function renderDedupeGroups() {
+  const root = byId('dedupeResults');
+  if (!root) return;
+  const groups = Array.isArray(view.dedupeGroups) ? view.dedupeGroups : [];
+  root.classList.remove('hidden');
+  if (!groups.length) {
+    root.innerHTML = '<div class="dedupe-empty">没有发现 URL 重复的书签。</div>';
+    return;
+  }
+  root.innerHTML = `
+    <div class="dedupe-summary"><strong>发现 ${groups.length} 组重复书签</strong><span>请选择每组的保留项和处理方式，再执行。</span></div>
+    ${groups.map((group, index) => {
+      const suggestion = group.suggestion || {};
+      return `
+        <article class="dedupe-group" data-dedupe-group="${index}">
+          <div class="dedupe-group-head">
+            <div><strong>${esc(group.count)} 个副本</strong><div class="muted dedupe-url">${esc(group.key || '')}</div></div>
+            <span class="dedupe-badge">重复 URL</span>
+          </div>
+          <div class="dedupe-items">
+            ${(group.items || []).map((item) => `
+              <div class="dedupe-item ${String(item.id) === String(suggestion.keepId) ? 'recommended' : ''}">
+                <div><strong>${esc(item.title || '(untitled)')}</strong><div class="muted">${esc(item.folderId || 'root')} · ${item.updatedAt ? new Date(Number(item.updatedAt)).toLocaleString() : ''}</div></div>
+                <div class="dedupe-item-meta"><span>质量 ${Number(item.qualityScore || 0)}</span><span>${(item.tags || []).length} 标签</span>${item.note ? '<span>有备注</span>' : ''}</div>
+              </div>
+            `).join('')}
+          </div>
+          <div class="dedupe-suggestion"><strong>建议</strong><span>${esc(suggestion.reason || '选择信息最完整的一条保留，其余副本移入废纸篓。')}</span></div>
+          <div class="dedupe-controls">
+            <label>保留
+              <select data-dedupe-keep>
+                ${(group.items || []).map((item) => `<option value="${esc(item.id)}" ${String(item.id) === String(suggestion.keepId) ? 'selected' : ''}>${esc(item.title || item.url || item.id)}</option>`).join('')}
+              </select>
+            </label>
+            <label>处理方式
+              <select data-dedupe-strategy>
+                <option value="merge_and_trash">合并标签/备注/状态，然后移除副本（推荐）</option>
+                <option value="trash_only">只移除副本，不合并信息</option>
+                <option value="skip">暂不处理此组</option>
+              </select>
+            </label>
+            <button type="button" data-dedupe-apply>执行此组</button>
+          </div>
+        </article>
+      `;
+    }).join('')}
+  `;
+  root.querySelectorAll('[data-dedupe-apply]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const card = button.closest('[data-dedupe-group]');
+      const index = Number(card?.getAttribute('data-dedupe-group'));
+      const group = groups[index];
+      if (!card || !group) return;
+      const keepId = card.querySelector('[data-dedupe-keep]')?.value || '';
+      const strategy = card.querySelector('[data-dedupe-strategy]')?.value || 'merge_and_trash';
+      if (strategy === 'skip') {
+        card.classList.add('hidden');
+        setStatus('已暂时跳过这一组重复项');
+        return;
+      }
+      button.disabled = true;
+      try {
+        const out = await api('/api/product/dedupe/resolve', {
+          method: 'POST',
+          body: JSON.stringify({
+            actions: [{
+              key: group.key,
+              strategy,
+              keepId,
+              removeIds: (group.items || []).map((item) => item.id).filter((id) => String(id) !== String(keepId))
+            }]
+          })
+        });
+        setStatus(`重复项已处理：移除 ${Number(out?.removedCount || 0)} 个副本`);
+        const refreshed = await api('/api/product/dedupe/scan');
+        view.dedupeGroups = refreshed?.groups || [];
+        renderDedupeGroups();
+      } catch (err) {
+        setStatus(err.message || '重复项处理失败', { error: true });
+        button.disabled = false;
+      }
+    });
+  });
 }
 
 function renderBackups() {
@@ -865,8 +951,10 @@ function bind() {
   byId('dedupeScanBtn')?.addEventListener('click', async () => {
     try {
       const out = await api('/api/product/dedupe/scan');
-      byId('searchToolsOutput').textContent = JSON.stringify(out, null, 2);
-      setStatus('重复项扫描完成');
+      view.dedupeGroups = out?.groups || [];
+      renderDedupeGroups();
+      byId('searchToolsOutput').textContent = '';
+      setStatus(out?.totalGroups ? `重复项扫描完成：发现 ${out.totalGroups} 组` : '重复项扫描完成：未发现重复');
     } catch (err) {
       byId('searchToolsOutput').textContent = err.message || '失败';
       setStatus(err.message || '重复项扫描失败', { error: true });
