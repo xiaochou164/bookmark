@@ -748,18 +748,21 @@ function persistSidebarTagsUi() {
 function loadDetailSectionsUi() {
   try {
     const raw = JSON.parse(window.localStorage.getItem(DETAIL_SECTIONS_UI_STORAGE_KEY) || '{}');
+    const value = (key, fallback) => Object.prototype.hasOwnProperty.call(raw, key) ? Boolean(raw[key]) : fallback;
     return {
-      basic: Boolean(raw.basic),
-      status: Boolean(raw.status),
-      fetch: Boolean(raw.fetch),
-      highlights: Boolean(raw.highlights)
+      basic: value('basic', false),
+      status: value('status', false),
+      fetch: value('fetch', true),
+      highlights: value('highlights', true),
+      related: value('related', true)
     };
   } catch (_err) {
     return {
       basic: false,
       status: false,
-      fetch: false,
-      highlights: false
+      fetch: true,
+      highlights: true,
+      related: true
     };
   }
 }
