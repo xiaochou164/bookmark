@@ -352,6 +352,7 @@ textarea {
   display: grid;
   gap: 12px;
   margin-top: 14px;
+  min-width: 0;
 }
 
 .dedupe-summary,
@@ -384,8 +385,7 @@ textarea {
   background: #fbfcff;
 }
 
-.dedupe-group-head,
-.dedupe-item {
+.dedupe-group-head {
   justify-content: space-between;
 }
 
@@ -409,10 +409,26 @@ textarea {
 }
 
 .dedupe-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
   padding: 10px;
   border: 1px solid #e6ebf3;
   border-radius: 9px;
   background: #fff;
+}
+
+.dedupe-item > div:first-child {
+  min-width: 0;
+}
+
+.dedupe-item > div:first-child strong,
+.dedupe-item > div:first-child .muted {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dedupe-item.recommended {
@@ -437,12 +453,18 @@ textarea {
 }
 
 .dedupe-controls {
+  display: grid;
+  grid-template-columns: minmax(200px, .8fr) minmax(320px, 1.4fr) auto;
   align-items: end;
-  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .dedupe-controls label {
-  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.dedupe-controls select {
+  width: 100%;
 }
 
 .dedupe-controls button {
@@ -455,6 +477,49 @@ textarea {
   border-radius: 10px;
   color: var(--muted);
   text-align: center;
+}
+
+.search-maintenance-panel > .settings-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, max-content));
+  justify-content: start;
+}
+
+@media (max-width: 1080px) {
+  .dedupe-controls {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dedupe-controls button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
+@media (max-width: 720px) {
+  .dedupe-group-head,
+  .dedupe-suggestion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dedupe-badge {
+    justify-self: start;
+  }
+
+  .dedupe-item,
+  .dedupe-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dedupe-item-meta {
+    justify-content: flex-start;
+  }
+
+  .dedupe-controls button {
+    grid-column: auto;
+    width: 100%;
+  }
 }
 
 .plugin-db-summary {
