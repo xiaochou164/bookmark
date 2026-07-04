@@ -20,6 +20,14 @@ async function run() {
   const openapiJson = await openapiRes.json();
   assert.equal(openapiJson.openapi, '3.1.0', 'openapi version mismatch');
 
+  const unauthenticatedPageRes = await worker.fetch(createRequest('/?view=all'), env);
+  assert.equal(unauthenticatedPageRes.status, 302, 'unauthenticated workbench should redirect');
+  assert.equal(
+    unauthenticatedPageRes.headers.get('location'),
+    '/login?next=%2F%3Fview%3Dall',
+    'login redirect should preserve the requested page'
+  );
+
   const stateNoAuthRes = await worker.fetch(createRequest('/api/state'), { DB: createMockDb() });
   assert.equal(stateNoAuthRes.status, 401, 'state should require auth');
 
@@ -40,6 +48,9 @@ async function run() {
   assert.equal(authMeRes.status, 200, 'auth me should return 200');
   const authMeJson = await authMeRes.json();
   assert.equal(authMeJson.ok, true, 'auth me should return ok=true');
+
+  const authenticatedPageRes = await worker.fetch(createRequest('/', { headers: { cookie } }), env);
+  assert.notEqual(authenticatedPageRes.status, 302, 'authenticated workbench should not redirect');
 
   const profileGetRes = await worker.fetch(createRequest('/api/auth/profile', { headers: { cookie } }), env);
   assert.equal(profileGetRes.status, 200, 'profile get should return 200');

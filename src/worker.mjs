@@ -4242,6 +4242,32 @@ async function handleAssets(request, env, url) {
   return errorResponse('Not Found', { status: 404, code: 'NOT_FOUND' });
 }
 
+const PROTECTED_PAGE_PATHS = new Set([
+  '/',
+  '/index.html',
+  '/settings',
+  '/settings.html',
+  '/plugin',
+  '/plugin.html'
+]);
+
+async function redirectUnauthenticatedPage(request, env, url) {
+  if (!['GET', 'HEAD'].includes(request.method.toUpperCase())) return null;
+  if (!PROTECTED_PAGE_PATHS.has(url.pathname)) return null;
+  await ensureSchema(env);
+  const auth = await resolveAuth(env, request);
+  if (auth.authenticated) return null;
+  const loginUrl = new URL('/login', url.origin);
+  loginUrl.searchParams.set('next', `${url.pathname}${url.search}` || '/');
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: `${loginUrl.pathname}${loginUrl.search}`,
+      'cache-control': 'private, no-store'
+    }
+  });
+}
+
 async function handleApi(request, env, url, requestId) {
   if (url.pathname.startsWith('/public/c/')) {
     await ensureSchema(env);
@@ -6578,6 +6604,8 @@ export default {
       if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/public/')) {
         return await handleApi(request, env, url, requestId);
       }
+      const authRedirect = await redirectUnauthenticatedPage(request, env, url);
+      if (authRedirect) return authRedirect;
       return await handleAssets(request, env, url);
     } catch (error) {
       return errorResponse(error?.message || 'Unexpected worker error.', {

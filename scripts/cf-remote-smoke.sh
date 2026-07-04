@@ -75,6 +75,16 @@ if [[ "$OPENAPI_VERSION" != "3.1.0" ]]; then
   exit 1
 fi
 
+LOGIN_REDIRECT_HEADERS="$(curl -sS -D - -o /dev/null "$BASE_URL/?smoke=auth-redirect")"
+if ! printf '%s' "$LOGIN_REDIRECT_HEADERS" | grep -Eq '^HTTP/[^ ]+ 302'; then
+  echo "unauthenticated page did not redirect: $LOGIN_REDIRECT_HEADERS" >&2
+  exit 1
+fi
+if ! printf '%s' "$LOGIN_REDIRECT_HEADERS" | grep -Eqi '^location: /login\?next='; then
+  echo "login redirect location missing: $LOGIN_REDIRECT_HEADERS" >&2
+  exit 1
+fi
+
 echo "[2/7] register"
 REGISTER_JSON="$(request_json POST /api/auth/register "{\"email\":\"$SMOKE_EMAIL\",\"password\":\"$SMOKE_PASSWORD\",\"displayName\":\"Smoke\"}")"
 REGISTER_OK="$(printf '%s' "$REGISTER_JSON" | json_get "data.ok")"
