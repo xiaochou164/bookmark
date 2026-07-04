@@ -196,3 +196,18 @@ npx wrangler d1 execute rainboard --remote --file data/cf-import.sql
 - 是否完成手工主流程验收
 - 是否完成失败恢复演练
 - 仍存在的问题
+
+## 11. 远端验收记录
+
+### 2026-07-04
+
+- 分支/提交基线：`master` / `b1aae7d`（部署包含随后提交的工作区改动）
+- Cloudflare Worker 版本：`ec96833a-6760-46a0-adb0-aca39d63b8fe`
+- 生产地址：`https://bookmark.sundays.ink`
+- `npm run cf:check`：通过
+- `npm run cf:smoke`：通过
+- 远端 D1 migration：通过（32 queries，28 tables）
+- 远端 `/api/health`：通过，`runtime = cloudflare-workers`，`schemaVersion = 2`
+- `npm run cf:smoke:remote -- https://bookmark.sundays.ink`：7/7 通过
+- 远端绑定：D1、R2、Queues、DLQ、Cron、静态 Assets 均已部署
+- 部署结论：Cloudflare-first 主路径已完成远端闭环验收，可在 Cloudflare 免费额度内运行；超出免费用量后相关服务会受各自配额限制。

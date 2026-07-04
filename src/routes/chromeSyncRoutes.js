@@ -39,28 +39,80 @@ function normalizeUrl(input) {
  * Ensure a top-level folder for this user exists, returns the folder object.
  * Operates directly on the full db (not a scoped copy).
  */
-function ensureFolderForUser(db, folderName, userId, now) {
-    let folder = db.folders.find(
-        (f) =>
-            hasOwner(f, userId) &&
-            f.name === folderName &&
-            (f.parentId === 'root' || f.parentId === null)
-    );
-    if (!folder) {
-        folder = {
-            id: `fld_${crypto.randomUUID()}`,
-            userId,
-            name: folderName,
-            parentId: 'root',
-            color: '#8f96a3',
-            icon: '',
-            position: db.folders.filter((f) => hasOwner(f, userId)).length,
-            createdAt: now,
-            updatedAt: now,
-        };
-        db.folders.push(folder);
+function chromeSyncFolderPath(input, fallbackName = '') {
+    const raw = Array.isArray(input) ? input : [];
+    const path = raw
+        .map((part) => String(part || '').trim())
+        .filter(Boolean);
+    if (path.length) return path;
+    const name = String(fallbackName || '').trim();
+    return name ? [name] : [UNCATEGORIZED_FOLDER];
+}
+
+function folderPathForId(folders, folderId) {
+    const byId = new Map((folders || []).map((f) => [String(f.id), f]));
+    const out = [];
+    const seen = new Set();
+    let current = byId.get(String(folderId || ''));
+    while (current && !seen.has(String(current.id))) {
+        seen.add(String(current.id));
+        if (String(current.id) === 'root') break;
+        out.unshift(String(current.name || '').trim() || 'Untitled');
+        const parentId = String(current.parentId || 'root');
+        if (!parentId || parentId === 'root') break;
+        current = byId.get(parentId);
+    }
+    return out;
+}
+
+function ensureFolderPathForUser(db, folderPath, userId, now) {
+    const path = chromeSyncFolderPath(folderPath);
+    let parentId = 'root';
+    let folder = null;
+    for (const name of path) {
+        folder = db.folders.find(
+            (f) =>
+                hasOwner(f, userId) &&
+                String(f.name || '').trim() === name &&
+                String(f.parentId || 'root') === parentId
+        );
+        if (!folder) {
+            folder = {
+                id: `fld_${crypto.randomUUID()}`,
+                userId,
+                name,
+                parentId,
+                color: '#8f96a3',
+                icon: '',
+                position: db.folders.filter((f) => hasOwner(f, userId) && String(f.parentId || 'root') === parentId).length,
+                createdAt: now,
+                updatedAt: now,
+            };
+            db.folders.push(folder);
+        }
+        parentId = folder.id;
     }
     return folder;
+}
+
+function normalizeMirrorIndex(input) {
+    const out = {};
+    if (!input || typeof input !== 'object') return out;
+    for (const [key, raw] of Object.entries(input)) {
+        const rainboardId = String(raw?.rainboardId || key || '').trim();
+        if (!rainboardId) continue;
+        out[rainboardId] = {
+            rainboardId,
+            chromeId: String(raw?.chromeId || ''),
+            url: String(raw?.url || ''),
+            normalizedUrl: String(raw?.normalizedUrl || normalizeUrl(raw?.url) || ''),
+            title: String(raw?.title || ''),
+            folderName: String(raw?.folderName || ''),
+            folderPath: chromeSyncFolderPath(raw?.folderPath, raw?.folderName),
+            syncedAt: Number(raw?.syncedAt || 0)
+        };
+    }
+    return out;
 }
 
 function registerChromeSyncRoutes(app, deps) {
@@ -92,6 +144,7 @@ function registerChromeSyncRoutes(app, deps) {
                     // 以云端文件夹为准；没有文件夹（root 级）的归入待归档
                     folderName:
                         folder && folder.id !== 'root' ? folder.name : UNCATEGORIZED_FOLDER,
+                    folderPath: folder && folder.id !== 'root' ? folderPathForId(userFolders, folder.id) : [UNCATEGORIZED_FOLDER],
                     folderId: b.folderId,
                     createdAt: b.createdAt,
                     updatedAt: b.updatedAt,
@@ -123,48 +176,63 @@ function registerChromeSyncRoutes(app, deps) {
             const body = req.body || {};
             const chromeFolders = Array.isArray(body.folders) ? body.folders : [];
             const deleteSync = Boolean(body.deleteSync);
+            const mirrorIndex = normalizeMirrorIndex(body.mirrorIndex || {});
             const now = Date.now();
 
-            if (chromeFolders.length === 0) {
-                return next(badRequest('folders array is required and must not be empty'));
+            if (!Array.isArray(body.folders)) {
+                return next(badRequest('folders array is required'));
             }
 
-            // Build chrome index: normalizedUrl → { url, title, folderName, chromeId }
+            // Build chrome index: normalizedUrl → { url, title, folderName, folderPath, chromeId }
             // 未单独归类的书签（直接在书签栏下）background.js 已用 '待归档'，这里再做一层保险
             const chromeByUrl = new Map();
+            const chromeById = new Map();
+            const chromeFolderPaths = new Set();
             for (const folder of chromeFolders) {
                 // 空文件夹名一律归入待归档
-                const folderName =
-                    String(folder.name || '').trim() || UNCATEGORIZED_FOLDER;
+                const folderPath = chromeSyncFolderPath(folder.path, folder.name);
+                const folderName = folderPath[folderPath.length - 1] || UNCATEGORIZED_FOLDER;
+                chromeFolderPaths.add(folderPath.join('\u001f'));
                 for (const bm of folder.bookmarks || []) {
                     const normed = normalizeUrl(bm.url);
                     if (!normed || chromeByUrl.has(normed)) continue;
-                    chromeByUrl.set(normed, {
+                    const bookmarkFolderPath = chromeSyncFolderPath(bm.folderPath || folderPath, folderName);
+                    const chromeItem = {
                         url: String(bm.url || '').trim(),
                         title: String(bm.title || '').trim() || '(untitled)',
-                        folderName,
+                        folderName: bookmarkFolderPath[bookmarkFolderPath.length - 1] || folderName,
+                        folderPath: bookmarkFolderPath,
                         chromeId: String(bm.chromeId || ''),
                         createdAt: Number(bm.createdAt || 0),
-                    });
+                    };
+                    chromeByUrl.set(normed, chromeItem);
+                    if (chromeItem.chromeId) chromeById.set(chromeItem.chromeId, chromeItem);
                 }
             }
 
             const stats = {
                 createdInDb: 0,
                 skippedDuplicate: 0,
+                updatedInDb: 0,
+                movedInDb: 0,
+                deletedInDb: 0,
+                deletedFoldersInDb: 0,
                 toAddInChrome: 0,
                 toDeleteInChrome: 0,
             };
 
             const toAddInChrome = [];
             const toDeleteInChrome = [];
+            let nextMirrorIndex = {};
 
             await dbRepo.update((db) => {
                 // Build DB alive-bookmark index and deleted index
                 const dbByUrl = new Map();
+                const dbById = new Map();
                 const dbDeletedByUrl = new Map();
                 for (const bm of db.bookmarks) {
                     if (!hasOwner(bm, userId) || !bm.url) continue;
+                    dbById.set(String(bm.id || ''), bm);
                     const normed = normalizeUrl(bm.url);
                     if (!normed) continue;
                     
@@ -172,6 +240,59 @@ function registerChromeSyncRoutes(app, deps) {
                         if (!dbDeletedByUrl.has(normed)) dbDeletedByUrl.set(normed, bm);
                     } else {
                         if (!dbByUrl.has(normed)) dbByUrl.set(normed, bm);
+                    }
+                }
+
+                // 0. Chrome local timeline: use the previous rainboardId ↔ chromeId mirror
+                // to detect local deletes, moves, title edits, and URL edits.
+                for (const [rainboardId, snapshot] of Object.entries(mirrorIndex)) {
+                    const dbBm = dbById.get(String(rainboardId));
+                    if (!dbBm || dbBm.deletedAt) continue;
+
+                    const currentById = snapshot.chromeId ? chromeById.get(String(snapshot.chromeId)) : null;
+                    const currentByUrl = snapshot.normalizedUrl ? chromeByUrl.get(String(snapshot.normalizedUrl)) : null;
+                    const chromeBm = currentById || currentByUrl || null;
+                    const oldNorm = normalizeUrl(dbBm.url);
+
+                    if (!chromeBm) {
+                        dbBm.deletedAt = now;
+                        dbBm.updatedAt = now;
+                        if (oldNorm) {
+                            dbByUrl.delete(oldNorm);
+                            if (!dbDeletedByUrl.has(oldNorm)) dbDeletedByUrl.set(oldNorm, dbBm);
+                        }
+                        stats.deletedInDb++;
+                        continue;
+                    }
+
+                    const folder = ensureFolderPathForUser(db, chromeBm.folderPath, userId, now);
+                    const nextTitle = chromeBm.title || '(untitled)';
+                    const nextUrl = chromeBm.url || dbBm.url;
+                    const nextNorm = normalizeUrl(nextUrl);
+                    let changed = false;
+                    let moved = false;
+
+                    if (dbBm.folderId !== folder.id || dbBm.collectionId !== folder.id) {
+                        dbBm.folderId = folder.id;
+                        dbBm.collectionId = folder.id;
+                        changed = true;
+                        moved = true;
+                    }
+                    if (nextTitle && dbBm.title !== nextTitle) {
+                        dbBm.title = nextTitle;
+                        changed = true;
+                    }
+                    if (nextNorm && oldNorm !== nextNorm) {
+                        dbBm.url = nextUrl;
+                        if (oldNorm) dbByUrl.delete(oldNorm);
+                        dbByUrl.set(nextNorm, dbBm);
+                        changed = true;
+                    }
+
+                    if (changed) {
+                        dbBm.updatedAt = now;
+                        stats.updatedInDb++;
+                        if (moved) stats.movedInDb++;
                     }
                 }
 
@@ -195,7 +316,12 @@ function registerChromeSyncRoutes(app, deps) {
                         
                         // Otherwise, it was recently added to Chrome natively AFTER we deleted it in DB.
                         // Recover it (drop deletedAt)
+                        const folder = ensureFolderPathForUser(db, chromeBm.folderPath, userId, now);
                         dbDeleted.deletedAt = null;
+                        dbDeleted.title = chromeBm.title;
+                        dbDeleted.url = chromeBm.url;
+                        dbDeleted.folderId = folder.id;
+                        dbDeleted.collectionId = folder.id;
                         dbDeleted.updatedAt = now;
                         dbByUrl.set(normed, dbDeleted);
                         dbDeletedByUrl.delete(normed); // Remove from deleted so we don't delete from Chrome
@@ -203,7 +329,7 @@ function registerChromeSyncRoutes(app, deps) {
                         continue;
                     }
 
-                    const folder = ensureFolderForUser(db, chromeBm.folderName, userId, now);
+                    const folder = ensureFolderPathForUser(db, chromeBm.folderPath, userId, now);
                     const newBm = {
                         id: `bm_${crypto.randomUUID()}`,
                         userId,
@@ -251,11 +377,13 @@ function registerChromeSyncRoutes(app, deps) {
                     if (chromeByUrl.has(normed)) continue;
                     const folder = folderById.get(dbBm.folderId);
                     toAddInChrome.push({
+                        id: dbBm.id,
                         url: dbBm.url,
                         title: dbBm.title,
                         // 以云端文件夹名为准；无文件夹的指定待归档
                         folderName:
                             folder && folder.id !== 'root' ? folder.name : UNCATEGORIZED_FOLDER,
+                        folderPath: folder && folder.id !== 'root' ? folderPathForId(db.folders, folder.id) : [UNCATEGORIZED_FOLDER],
                     });
                     stats.toAddInChrome++;
                 }
@@ -276,6 +404,45 @@ function registerChromeSyncRoutes(app, deps) {
                     }
                 }
 
+                const aliveFolderIds = new Set();
+                for (const bm of db.bookmarks) {
+                    if (hasOwner(bm, userId) && !bm.deletedAt && bm.folderId) {
+                        aliveFolderIds.add(String(bm.folderId));
+                    }
+                }
+                const removedFolderIds = new Set();
+                db.folders = (db.folders || []).filter((folder) => {
+                    if (!hasOwner(folder, userId)) return true;
+                    if (String(folder.id) === 'root') return true;
+                    const name = String(folder.name || '').trim();
+                    const pathKey = folderPathForId(db.folders, folder.id).join('\u001f');
+                    if (!name || chromeFolderPaths.has(pathKey)) return true;
+                    if (aliveFolderIds.has(String(folder.id))) return true;
+                    removedFolderIds.add(String(folder.id));
+                    return false;
+                });
+                stats.deletedFoldersInDb += removedFolderIds.size;
+
+                nextMirrorIndex = {};
+                for (const bm of db.bookmarks) {
+                    if (!hasOwner(bm, userId) || bm.deletedAt || !bm.url) continue;
+                    const normed = normalizeUrl(bm.url);
+                    if (!normed) continue;
+                    const chromeBm = chromeByUrl.get(normed);
+                    if (!chromeBm) continue;
+                    const folder = folderById.get(bm.folderId);
+                    nextMirrorIndex[bm.id] = {
+                        rainboardId: bm.id,
+                        chromeId: chromeBm.chromeId || '',
+                        url: bm.url,
+                        normalizedUrl: normed,
+                        title: bm.title || '(untitled)',
+                        folderName: folder && folder.id !== 'root' ? folder.name : UNCATEGORIZED_FOLDER,
+                        folderPath: folder && folder.id !== 'root' ? folderPathForId(db.folders, folder.id) : [UNCATEGORIZED_FOLDER],
+                        syncedAt: now
+                    };
+                }
+
                 return db;
             });
 
@@ -283,6 +450,7 @@ function registerChromeSyncRoutes(app, deps) {
                 ok: true,
                 toAddInChrome,
                 toDeleteInChrome,
+                mirrorIndex: nextMirrorIndex,
                 stats,
             });
         } catch (err) {
@@ -325,9 +493,8 @@ function registerChromeSyncRoutes(app, deps) {
                         continue;
                     }
 
-                    const folderName =
-                        String(item.folderName || '').trim() || UNCATEGORIZED_FOLDER;
-                    const folder = ensureFolderForUser(db, folderName, userId, now);
+                    const folderPath = chromeSyncFolderPath(item.folderPath, item.folderName);
+                    const folder = ensureFolderPathForUser(db, folderPath, userId, now);
                     const newBm = {
                         id: `bm_${crypto.randomUUID()}`,
                         userId,

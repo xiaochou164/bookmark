@@ -116,6 +116,7 @@ function formatRbResult(result, title) {
     title,
     `Chrome 文件夹: ${result.chromeFolders || 0}，Chrome 书签总数: ${result.totalChromeBookmarks || 0}`,
     `新增到 Rainboard: ${s.createdInDb || 0}，跳过重复: ${s.skippedDuplicate || 0}`,
+    `更新/移动到 Rainboard: ${s.updatedInDb || 0} / ${s.movedInDb || 0}，本地删除同步: ${s.deletedInDb || 0}，文件夹删除: ${s.deletedFoldersInDb || 0}`,
     `待同步到 Chrome: ${c.toAddCount || 0}${result.preview ? ' (预览)' : `，已写入 ${c.addedToChrome || 0} 条`}`,
   ];
   const toAdd = result.samples?.toAdd || [];

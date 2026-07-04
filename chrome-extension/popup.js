@@ -24,6 +24,9 @@ function formatRainboardResult(result, title) {
     ``,
     `--- 云端 DB 侧 ---`,
     `新增到 Rainboard: ${s.createdInDb || 0}`,
+    `更新/移动到 Rainboard: ${s.updatedInDb || 0} / ${s.movedInDb || 0}`,
+    `本地删除同步到 Rainboard: ${s.deletedInDb || 0}`,
+    `本地文件夹删除同步到 Rainboard: ${s.deletedFoldersInDb || 0}`,
     `已跳过重复: ${s.skippedDuplicate || 0}`,
   ];
 

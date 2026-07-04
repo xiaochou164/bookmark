@@ -44,21 +44,68 @@ function randomSecret(bytes = 24) {
   return crypto.randomBytes(bytes).toString('base64url');
 }
 
-function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
-  const derived = crypto.scryptSync(String(password), salt, 64);
-  return `scrypt$${salt}$${derived.toString('hex')}`;
+async function pbkdf2DigestHex(password, salt, iterations) {
+  const key = await globalThis.crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(String(password || '')),
+    'PBKDF2',
+    false,
+    ['deriveBits']
+  );
+  const bits = await globalThis.crypto.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: new TextEncoder().encode(String(salt || '')),
+      iterations
+    },
+    key,
+    256
+  );
+  return Buffer.from(bits).toString('hex');
 }
 
-function verifyPassword(password, stored) {
-  const raw = String(stored || '');
-  const [algo, salt, digestHex] = raw.split('$');
-  if (algo !== 'scrypt' || !salt || !digestHex) return false;
-  const derived = crypto.scryptSync(String(password), salt, 64).toString('hex');
+async function hashPassword(password, salt = randomSecret(18)) {
+  const iterations = 100000;
+  const derived = await pbkdf2DigestHex(password, salt, iterations);
+  return `pbkdf2$sha256$${iterations}$${salt}$${derived}`;
+}
+
+async function verifyLegacyScryptPassword(password, salt, digestHex) {
+  const derived = await new Promise((resolve, reject) => {
+    crypto.scrypt(String(password || ''), salt, 64, (err, key) => {
+      if (err) reject(err);
+      else resolve(key);
+    });
+  });
   try {
-    return crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(digestHex, 'hex'));
+    return crypto.timingSafeEqual(Buffer.from(derived), Buffer.from(digestHex, 'hex'));
   } catch {
     return false;
   }
+}
+
+async function verifyPassword(password, stored) {
+  const raw = String(stored || '');
+  const parts = raw.split('$');
+  if (parts[0] === 'pbkdf2') {
+    const [, hashName, iterationsRaw, salt, digestHex] = parts;
+    if (hashName !== 'sha256' || !salt || !digestHex) return false;
+    const iterations = Number(iterationsRaw || 0);
+    if (!Number.isFinite(iterations) || iterations < 10000) return false;
+    const derived = await pbkdf2DigestHex(password, salt, iterations);
+    try {
+      return crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(digestHex, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+  if (parts[0] === 'scrypt') {
+    const [, salt, digestHex] = parts;
+    if (!salt || !digestHex) return false;
+    return verifyLegacyScryptPassword(password, salt, digestHex);
+  }
+  return false;
 }
 
 function withRequestId(headers, requestId) {
@@ -1083,7 +1130,7 @@ function createRepo(env) {
         id: `usr_${crypto.randomUUID()}`,
         email: emailNorm,
         displayName: name,
-        passwordHash: hashPassword(password),
+        passwordHash: await hashPassword(password),
         createdAt: now,
         updatedAt: now,
         lastLoginAt: 0
@@ -1114,6 +1161,17 @@ function createRepo(env) {
         String(email || '').trim().toLowerCase()
       );
       return row || null;
+    },
+
+    async updateUserPasswordHash(userId, passwordHash) {
+      const now = Date.now();
+      await runStatement(
+        db.prepare(`UPDATE users SET password_hash = ?2, updated_at = ?3 WHERE id = ?1`),
+        userId,
+        String(passwordHash || ''),
+        now
+      );
+      return true;
     },
 
     async getUserById(userId) {
@@ -2980,36 +3038,116 @@ function normalizeChromeSyncUrl(input) {
   }
 }
 
-function isRootLevelFolder(folder) {
-  const parentId = folder?.parentId;
-  return parentId === null || typeof parentId === 'undefined' || String(parentId) === ROOT_FOLDER_ID;
+function chromeSyncFolderPath(input, fallbackName = '') {
+  const raw = Array.isArray(input) ? input : [];
+  const path = raw.map((part) => String(part || '').trim()).filter(Boolean);
+  if (path.length) return path;
+  const name = String(fallbackName || '').trim();
+  return name ? [name] : [CHROME_SYNC_UNCATEGORIZED_FOLDER];
 }
 
-async function ensureChromeSyncFolder(repo, userId, folderName) {
-  const normalizedName = String(folderName || '').trim() || CHROME_SYNC_UNCATEGORIZED_FOLDER;
-  const folders = await repo.listFolders(userId);
-  const existing = folders.find((folder) => isRootLevelFolder(folder) && String(folder.name || '').trim() === normalizedName);
-  if (existing) return existing;
-  return repo.createFolder(userId, { name: normalizedName, parentId: ROOT_FOLDER_ID });
+function chromeSyncFolderPathKey(pathParts = []) {
+  return chromeSyncFolderPath(pathParts).join('\u001f');
+}
+
+function folderPathForId(folders = [], folderId = ROOT_FOLDER_ID) {
+  const byId = new Map((folders || []).map((folder) => [String(folder.id), folder]));
+  const out = [];
+  const seen = new Set();
+  let current = byId.get(String(folderId || ''));
+  while (current && !seen.has(String(current.id))) {
+    seen.add(String(current.id));
+    if (String(current.id) === ROOT_FOLDER_ID) break;
+    out.unshift(String(current.name || '').trim() || 'Untitled');
+    const parentId = String(current.parentId || ROOT_FOLDER_ID);
+    if (!parentId || parentId === ROOT_FOLDER_ID) break;
+    current = byId.get(parentId);
+  }
+  return out;
+}
+
+async function ensureChromeSyncFolderPath(repo, userId, folderPath, folderCache = null) {
+  const path = chromeSyncFolderPath(folderPath);
+  const key = chromeSyncFolderPathKey(path);
+  if (folderCache?.has(key)) return folderCache.get(key);
+
+  let parentId = ROOT_FOLDER_ID;
+  let folder = null;
+  for (const name of path) {
+    const cacheKey = `${parentId}\u001f${name}`;
+    if (folderCache?.has(cacheKey)) {
+      folder = folderCache.get(cacheKey);
+      parentId = folder.id;
+      continue;
+    }
+    const folders = await repo.listFolders(userId);
+    folder = folders.find((item) => String(item.parentId || ROOT_FOLDER_ID) === parentId && String(item.name || '').trim() === name);
+    if (!folder) {
+      folder = await repo.createFolder(userId, { name, parentId });
+    }
+    folderCache?.set(cacheKey, folder);
+    parentId = folder.id;
+  }
+  if (folder) folderCache?.set(key, folder);
+  return folder;
 }
 
 function buildChromeFolderIndex(rawFolders = []) {
   const chromeByUrl = new Map();
   for (const folder of Array.isArray(rawFolders) ? rawFolders : []) {
-    const folderName = String(folder?.name || '').trim() || CHROME_SYNC_UNCATEGORIZED_FOLDER;
+    const folderPath = chromeSyncFolderPath(folder?.path, folder?.name);
+    const folderName = folderPath[folderPath.length - 1] || CHROME_SYNC_UNCATEGORIZED_FOLDER;
     for (const bookmark of Array.isArray(folder?.bookmarks) ? folder.bookmarks : []) {
       const normed = normalizeChromeSyncUrl(bookmark?.url);
       if (!normed || chromeByUrl.has(normed)) continue;
+      const bookmarkFolderPath = chromeSyncFolderPath(bookmark?.folderPath || folderPath, folderName);
       chromeByUrl.set(normed, {
         url: String(bookmark?.url || '').trim(),
         title: String(bookmark?.title || '').trim() || '(untitled)',
-        folderName,
+        folderName: bookmarkFolderPath[bookmarkFolderPath.length - 1] || folderName,
+        folderPath: bookmarkFolderPath,
         chromeId: String(bookmark?.chromeId || ''),
         createdAt: Number(bookmark?.createdAt || 0)
       });
     }
   }
   return chromeByUrl;
+}
+
+function buildChromeFolderNameSet(rawFolders = []) {
+  const names = new Set();
+  for (const folder of Array.isArray(rawFolders) ? rawFolders : []) {
+    names.add(chromeSyncFolderPathKey(chromeSyncFolderPath(folder?.path, folder?.name)));
+  }
+  return names;
+}
+
+function buildChromeIdIndex(chromeByUrl) {
+  const chromeById = new Map();
+  for (const item of chromeByUrl.values()) {
+    if (item.chromeId) chromeById.set(String(item.chromeId), item);
+  }
+  return chromeById;
+}
+
+function normalizeChromeSyncMirrorIndex(input = {}) {
+  const out = {};
+  if (!input || typeof input !== 'object') return out;
+  for (const [key, raw] of Object.entries(input)) {
+    const rainboardId = String(raw?.rainboardId || key || '').trim();
+    if (!rainboardId) continue;
+    out[rainboardId] = {
+      rainboardId,
+      chromeId: String(raw?.chromeId || ''),
+      url: String(raw?.url || ''),
+      normalizedUrl: String(raw?.normalizedUrl || normalizeChromeSyncUrl(raw?.url) || ''),
+      title: String(raw?.title || ''),
+      folderName: String(raw?.folderName || ''),
+      folderPath: chromeSyncFolderPath(raw?.folderPath, raw?.folderName),
+      syncedAt: Number(raw?.syncedAt || 0)
+    };
+  }
+  return out;
 }
 
 function wordsFromText(input = '') {
@@ -4250,8 +4388,12 @@ async function handleApi(request, env, url, requestId) {
 
   if (url.pathname === '/api/auth/login' && method === 'POST') {
     const user = await repo.getUserByEmail(body.email);
-    if (!user || !verifyPassword(body.password, user.passwordHash)) {
+    const passwordOk = user ? await verifyPassword(body.password, user.passwordHash) : false;
+    if (!user || !passwordOk) {
       throw Object.assign(new Error('invalid email or password'), { status: 401, code: 'INVALID_CREDENTIALS' });
+    }
+    if (String(user.passwordHash || '').startsWith('scrypt$')) {
+      await repo.updateUserPasswordHash(user.id, await hashPassword(body.password));
     }
     const login = await repo.issueSession({
       userId: user.id,
@@ -4419,6 +4561,7 @@ async function handleApi(request, env, url, requestId) {
           url: bookmark.url,
           title: bookmark.title || '(untitled)',
           folderName: folder && folder.id !== ROOT_FOLDER_ID ? folder.name : CHROME_SYNC_UNCATEGORIZED_FOLDER,
+          folderPath: folder && folder.id !== ROOT_FOLDER_ID ? folderPathForId(folders, folder.id) : [CHROME_SYNC_UNCATEGORIZED_FOLDER],
           folderId: bookmark.folderId,
           createdAt: bookmark.createdAt,
           updatedAt: bookmark.updatedAt
@@ -4430,19 +4573,24 @@ async function handleApi(request, env, url, requestId) {
   if (url.pathname === '/api/chrome-sync' && method === 'POST') {
     const chromeFolders = Array.isArray(body.folders) ? body.folders : [];
     const deleteSync = Boolean(body.deleteSync);
+    const mirrorIndex = normalizeChromeSyncMirrorIndex(body.mirrorIndex || {});
     if (!Array.isArray(body.folders)) {
       throw Object.assign(new Error('folders array is required'), { status: 400, code: 'BAD_REQUEST' });
     }
 
     const chromeByUrl = buildChromeFolderIndex(chromeFolders);
+    const chromeFolderPaths = buildChromeFolderNameSet(chromeFolders);
+    const chromeById = buildChromeIdIndex(chromeByUrl);
     const folders = await repo.listFolders(auth.user.id);
     const bookmarks = await repo.listBookmarks(auth.user.id);
     const folderById = new Map(folders.map((folder) => [folder.id, folder]));
     const aliveByUrl = new Map();
+    const byId = new Map();
     const deletedByUrl = new Map();
 
     for (const bookmark of bookmarks) {
       if (!bookmark.url) continue;
+      byId.set(String(bookmark.id || ''), bookmark);
       const normed = normalizeChromeSyncUrl(bookmark.url);
       if (!normed) continue;
       if (bookmark.deletedAt) {
@@ -4455,11 +4603,70 @@ async function handleApi(request, env, url, requestId) {
     const stats = {
       createdInDb: 0,
       skippedDuplicate: 0,
+      updatedInDb: 0,
+      movedInDb: 0,
+      deletedInDb: 0,
+      deletedFoldersInDb: 0,
       toAddInChrome: 0,
       toDeleteInChrome: 0
     };
     const toAddInChrome = [];
     const toDeleteInChrome = [];
+    const folderPathCache = new Map();
+    const ensureFolderCached = async (folderPath) => {
+      const folder = await ensureChromeSyncFolderPath(repo, auth.user.id, folderPath, folderPathCache);
+      folderById.set(folder.id, folder);
+      if (!folders.some((item) => String(item.id) === String(folder.id))) folders.push(folder);
+      return folder;
+    };
+
+    for (const [rainboardId, snapshot] of Object.entries(mirrorIndex)) {
+      const bookmark = byId.get(String(rainboardId));
+      if (!bookmark || bookmark.deletedAt) continue;
+
+      const currentById = snapshot.chromeId ? chromeById.get(String(snapshot.chromeId)) : null;
+      const currentByUrl = snapshot.normalizedUrl ? chromeByUrl.get(String(snapshot.normalizedUrl)) : null;
+      const chromeBookmark = currentById || currentByUrl || null;
+      const oldNorm = normalizeChromeSyncUrl(bookmark.url);
+
+      if (!chromeBookmark) {
+        const deleted = await repo.updateBookmark(auth.user.id, bookmark.id, { deleted: true });
+        if (deleted) {
+          if (oldNorm) {
+            aliveByUrl.delete(oldNorm);
+            if (!deletedByUrl.has(oldNorm)) deletedByUrl.set(oldNorm, deleted);
+          }
+          byId.set(bookmark.id, deleted);
+          stats.deletedInDb += 1;
+        }
+        continue;
+      }
+
+      const folder = await ensureFolderCached(chromeBookmark.folderPath);
+      const nextTitle = chromeBookmark.title || '(untitled)';
+      const nextUrl = chromeBookmark.url || bookmark.url;
+      const nextNorm = normalizeChromeSyncUrl(nextUrl);
+      const patch = {};
+      let moved = false;
+
+      if (String(bookmark.folderId || ROOT_FOLDER_ID) !== String(folder.id)) {
+        patch.folderId = folder.id;
+        moved = true;
+      }
+      if (nextTitle && String(bookmark.title || '') !== nextTitle) patch.title = nextTitle;
+      if (nextNorm && oldNorm !== nextNorm) patch.url = nextUrl;
+
+      if (Object.keys(patch).length > 0) {
+        const updated = await repo.updateBookmark(auth.user.id, bookmark.id, patch);
+        if (updated) {
+          if (oldNorm && oldNorm !== nextNorm) aliveByUrl.delete(oldNorm);
+          if (nextNorm) aliveByUrl.set(nextNorm, updated);
+          byId.set(updated.id, updated);
+          stats.updatedInDb += 1;
+          if (moved) stats.movedInDb += 1;
+        }
+      }
+    }
 
     for (const [normed, chromeBookmark] of chromeByUrl.entries()) {
       if (aliveByUrl.has(normed)) {
@@ -4474,7 +4681,7 @@ async function handleApi(request, env, url, requestId) {
         const looksLikeOldGhost = chromeAge > 0 && (chromeAge <= deletedAt || chromeAge < Date.now() - 365 * 24 * 60 * 60 * 1000);
         if (looksLikeOldGhost) continue;
 
-        const folder = await ensureChromeSyncFolder(repo, auth.user.id, chromeBookmark.folderName);
+        const folder = await ensureFolderCached(chromeBookmark.folderPath);
         const revived = await repo.updateBookmark(auth.user.id, deletedBookmark.id, {
           deleted: false,
           title: chromeBookmark.title,
@@ -4484,20 +4691,20 @@ async function handleApi(request, env, url, requestId) {
         if (revived) {
           aliveByUrl.set(normed, revived);
           deletedByUrl.delete(normed);
-          folderById.set(folder.id, folder);
+          byId.set(revived.id, revived);
           stats.createdInDb += 1;
         }
         continue;
       }
 
-      const folder = await ensureChromeSyncFolder(repo, auth.user.id, chromeBookmark.folderName);
-      folderById.set(folder.id, folder);
+      const folder = await ensureFolderCached(chromeBookmark.folderPath);
       const created = await repo.createBookmark(auth.user.id, {
         title: chromeBookmark.title,
         url: chromeBookmark.url,
         folderId: folder.id
       });
       aliveByUrl.set(normed, created);
+      byId.set(created.id, created);
       stats.createdInDb += 1;
     }
 
@@ -4505,9 +4712,11 @@ async function handleApi(request, env, url, requestId) {
       if (chromeByUrl.has(normed)) continue;
       const folder = folderById.get(String(bookmark.folderId || ROOT_FOLDER_ID));
       toAddInChrome.push({
+        id: bookmark.id,
         url: bookmark.url,
         title: bookmark.title,
-        folderName: folder && folder.id !== ROOT_FOLDER_ID ? folder.name : CHROME_SYNC_UNCATEGORIZED_FOLDER
+        folderName: folder && folder.id !== ROOT_FOLDER_ID ? folder.name : CHROME_SYNC_UNCATEGORIZED_FOLDER,
+        folderPath: folder && folder.id !== ROOT_FOLDER_ID ? folderPathForId(folders, folder.id) : [CHROME_SYNC_UNCATEGORIZED_FOLDER]
       });
       stats.toAddInChrome += 1;
     }
@@ -4526,10 +4735,50 @@ async function handleApi(request, env, url, requestId) {
       }
     }
 
+    const aliveFolderIds = new Set();
+    for (const bookmark of byId.values()) {
+      if (bookmark && !bookmark.deletedAt && bookmark.folderId) {
+        aliveFolderIds.add(String(bookmark.folderId));
+      }
+    }
+    for (const folder of folders) {
+      if (!folder || String(folder.id) === ROOT_FOLDER_ID) continue;
+      const name = String(folder.name || '').trim();
+      const pathKey = folderPathForId(folders, folder.id).join('\u001f');
+      if (!name || chromeFolderPaths.has(pathKey)) continue;
+      if (aliveFolderIds.has(String(folder.id))) continue;
+      const deleted = await repo.deleteFolder(auth.user.id, folder.id);
+      if (deleted) {
+        folderById.delete(folder.id);
+        stats.deletedFoldersInDb += 1;
+      }
+    }
+
+    const nextMirrorIndex = {};
+    for (const bookmark of byId.values()) {
+      if (!bookmark || bookmark.deletedAt || !bookmark.url) continue;
+      const normed = normalizeChromeSyncUrl(bookmark.url);
+      if (!normed) continue;
+      const chromeBookmark = chromeByUrl.get(normed);
+      if (!chromeBookmark) continue;
+      const folder = folderById.get(String(bookmark.folderId || ROOT_FOLDER_ID));
+      nextMirrorIndex[bookmark.id] = {
+        rainboardId: bookmark.id,
+        chromeId: chromeBookmark.chromeId || '',
+        url: bookmark.url,
+        normalizedUrl: normed,
+        title: bookmark.title || '(untitled)',
+        folderName: folder && folder.id !== ROOT_FOLDER_ID ? folder.name : CHROME_SYNC_UNCATEGORIZED_FOLDER,
+        folderPath: folder && folder.id !== ROOT_FOLDER_ID ? folderPathForId(folders, folder.id) : [CHROME_SYNC_UNCATEGORIZED_FOLDER],
+        syncedAt: Date.now()
+      };
+    }
+
     return jsonResponse({
       ok: true,
       toAddInChrome,
       toDeleteInChrome,
+      mirrorIndex: nextMirrorIndex,
       stats
     }, { requestId });
   }
@@ -4556,7 +4805,7 @@ async function handleApi(request, env, url, requestId) {
         skipped += 1;
         continue;
       }
-      const folder = await ensureChromeSyncFolder(repo, auth.user.id, item?.folderName);
+      const folder = await ensureChromeSyncFolderPath(repo, auth.user.id, chromeSyncFolderPath(item?.folderPath, item?.folderName), new Map());
       const bookmark = await repo.createBookmark(auth.user.id, {
         title: String(item?.title || '').trim() || '(untitled)',
         url: String(item?.url || '').trim(),

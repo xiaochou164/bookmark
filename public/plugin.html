@@ -74,15 +74,14 @@
                                     <button type="button" id="loadDbBookmarksBtn">刷新云端书签列表</button>
                                 </div>
                             </div>
-                            <div id="dbBookmarksSummary" style="margin-top:8px;font-size:13px;color:#555;"></div>
-                            <pre id="dbBookmarksOutput" style="max-height:200px;overflow-y:auto;"></pre>
-                            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-                                <p class="muted" style="margin-bottom:8px;">💡 提示：点击 Chrome 插件弹窗中的「云书签双向同步」按钮，即可将 Chrome
+                            <div id="dbBookmarksSummary" class="plugin-db-summary"></div>
+                            <pre id="dbBookmarksOutput" class="plugin-db-output"></pre>
+                            <div class="plugin-sync-note">
+                                <p class="muted plugin-sync-note-text">💡 提示：点击 Chrome 插件弹窗中的「云书签双向同步」按钮，即可将 Chrome
                                     书签 ↔ Rainboard 云书签进行同步。</p>
-                                <div
-                                    style="background:#f0f4ff;border:1px solid #c7d6ff;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#3b5bdb;">
+                                <div class="plugin-sync-logic">
                                     同步逻辑：
-                                    <ul style="margin:6px 0 0 16px;padding:0;line-height:1.7">
+                                    <ul class="plugin-sync-logic-list">
                                         <li>Chrome 有 → Rainboard DB 没有：<strong>将 Chrome 书签添加到 Rainboard</strong></li>
                                         <li>Rainboard DB 有 → Chrome 没有：<strong>将 Rainboard 书签添加到 Chrome</strong></li>
                                         <li>两侧都有：<strong>跳过（幂等）</strong></li>

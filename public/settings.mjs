@@ -394,7 +394,7 @@ function renderAuditLogs() {
     <div class="auth-token-item">
       <div class="auth-token-row"><strong>${esc(row.action || '-')}</strong><span class="muted">${row.createdAt ? new Date(Number(row.createdAt)).toLocaleString() : ''}</span></div>
       <div class="muted">${esc(row.resourceType || '')} · ${esc(row.resourceId || '')}</div>
-      <pre style="margin:0;white-space:pre-wrap">${esc(JSON.stringify(row.payload || {}, null, 2))}</pre>
+      <pre class="settings-audit-payload">${esc(JSON.stringify(row.payload || {}, null, 2))}</pre>
     </div>
   `).join('');
 }

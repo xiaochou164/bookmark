@@ -109,10 +109,12 @@ function bindEvents() {
         try {
             const data = await api('/api/chrome-sync/bookmarks');
             const items = data?.items || [];
-            // Group by folderName
+            // Group by full folder path so Chrome hierarchy is visible.
             const byFolder = {};
             for (const bm of items) {
-                const key = bm.folderName || 'Rainboard';
+                const key = Array.isArray(bm.folderPath) && bm.folderPath.length
+                    ? bm.folderPath.join(' / ')
+                    : (bm.folderName || 'Rainboard');
                 if (!byFolder[key]) byFolder[key] = [];
                 byFolder[key].push(bm);
             }

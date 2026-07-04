@@ -22,6 +22,7 @@ const DEFAULTS = {
   autoSyncEnabled: true,
   autoSyncMinutes: 15,
   mirrorIndex: {},
+  rainboardMirrorIndex: {},
   deviceId: '',
   syncLease: null,
   mappingState: {},
@@ -168,6 +169,25 @@ async function ensureDeviceId(cfg) {
   const id = `dev_${newId()}`;
   await chrome.storage.local.set({ deviceId: id });
   return id;
+}
+
+function normalizeRainboardMirrorIndex(input) {
+  const out = {};
+  for (const [bookmarkId, raw] of Object.entries(input || {})) {
+    const id = String(bookmarkId || raw?.rainboardId || '').trim();
+    if (!id) continue;
+    out[id] = {
+      rainboardId: id,
+      chromeId: String(raw?.chromeId || ''),
+      url: String(raw?.url || ''),
+      normalizedUrl: String(raw?.normalizedUrl || normalizeUrl(raw?.url) || ''),
+      title: String(raw?.title || ''),
+      folderName: String(raw?.folderName || ''),
+      folderPath: Array.isArray(raw?.folderPath) ? raw.folderPath.map((part) => String(part || '').trim()).filter(Boolean) : [],
+      syncedAt: Number(raw?.syncedAt || 0)
+    };
+  }
+  return out;
 }
 
 async function acquireLease(owner, preview) {
@@ -913,6 +933,7 @@ chrome.runtime.onInstalled.addListener(async () => {
     cloudApiBaseUrl: normalizeCloudBaseUrl(cfg.cloudApiBaseUrl),
     mappings: cfg.mappings,
     mirrorIndex: cfg.mirrorIndex || {},
+    rainboardMirrorIndex: normalizeRainboardMirrorIndex(cfg.rainboardMirrorIndex || {}),
     mappingState: cfg.mappingState || {},
     tombstones: cfg.tombstones || {},
     appliedOps: cfg.appliedOps || {},
@@ -949,79 +970,73 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // ── Chrome ↔ Rainboard DB Sync ──────────────────────────────────────────────
 
+function chromeFolderPathKey(pathParts = []) {
+  return (Array.isArray(pathParts) ? pathParts : [])
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join('\u001f');
+}
+
 /**
  * Collect all bookmarks from the Chrome bookmark tree (excluding trash folder).
- * Returns an array of { name: folderName, bookmarks: [{ url, title, chromeId, chromeParentId }] }
+ * Returns an array of { name, path, bookmarks: [{ url, title, chromeId, chromeParentId, folderPath }] }.
  */
 async function collectChromeBookmarksByFolder() {
   const tree = await chrome.bookmarks.getTree();
-  const folderMap = new Map(); // folderName -> [bookmarks]
+  const folderMap = new Map(); // pathKey -> { name, path, bookmarks }
 
-  function walkNode(node, parentFolderName) {
+  function ensureFolderEntry(pathParts) {
+    const path = (Array.isArray(pathParts) ? pathParts : [])
+      .map((part) => String(part || '').trim())
+      .filter(Boolean);
+    if (!path.length) return null;
+    const key = chromeFolderPathKey(path);
+    if (!folderMap.has(key)) {
+      folderMap.set(key, {
+        name: path[path.length - 1],
+        path,
+        bookmarks: []
+      });
+    }
+    return folderMap.get(key);
+  }
+
+  function walkNode(node, parentPath = []) {
     if (!node) return;
     const isFolder = !node.url;
 
     if (isFolder) {
-      // Use node title as folder name (except root nodes)
       const folderName = (node.title || '').trim();
-      // Skip the root nodes (id 0, 1, 2) and our trash folder
-      const isRoot = !node.title || node.id === '0';
+      // Chrome root id 0 is only a container. Bookmark bar / other roots keep their titles.
+      const isRootContainer = !folderName || node.id === '0';
       const isTrash = folderName === TRASH_FOLDER;
+      if (isTrash) return;
 
-      if (!isRoot && !isTrash && folderName) {
-        // Use this folder name for all its direct bookmark children
-        for (const child of node.children || []) {
-          if (child.url) {
-            if (!folderMap.has(folderName)) folderMap.set(folderName, []);
-            folderMap.get(folderName).push({
-              url: child.url,
-              title: (child.title || '').trim() || '(untitled)',
-              chromeId: child.id,
-              chromeParentId: child.parentId,
-              createdAt: Number(child.dateAdded || Date.now())
-            });
-          }
-        }
-        // Recurse into subfolders, still under this folder name context
-        for (const child of node.children || []) {
-          if (!child.url) walkNode(child, folderName);
-        }
-      } else {
-        // For root nodes, recurse with their title as context
-        for (const child of node.children || []) {
-          walkNode(child, folderName);
+      const folderPath = isRootContainer ? parentPath : [...parentPath, folderName];
+      const entry = isRootContainer ? null : ensureFolderEntry(folderPath);
+      for (const child of node.children || []) {
+        if (child.url) {
+          if (!entry) continue;
+          entry.bookmarks.push({
+            url: child.url,
+            title: (child.title || '').trim() || '(untitled)',
+            chromeId: child.id,
+            chromeParentId: child.parentId,
+            folderPath,
+            createdAt: Number(child.dateAdded || Date.now())
+          });
+        } else {
+          walkNode(child, folderPath);
         }
       }
     }
   }
 
   for (const root of tree) {
-    walkNode(root, '');
+    walkNode(root, []);
   }
 
-  // Also collect bookmarks directly under bookmark bar without any folder → "待归档"
-  const barId = await getBookmarkBarId().catch(() => '1');
-  const barChildren = await chrome.bookmarks.getChildren(barId).catch(() => []);
-  const directBookmarks = barChildren.filter((n) => n.url);
-  if (directBookmarks.length > 0) {
-    const uncategorizedFolderName = '待归档';
-    if (!folderMap.has(uncategorizedFolderName)) folderMap.set(uncategorizedFolderName, []);
-    for (const bm of directBookmarks) {
-      folderMap.get(uncategorizedFolderName).push({
-        url: bm.url,
-        title: (bm.title || '').trim() || '(untitled)',
-        chromeId: bm.id,
-        chromeParentId: bm.parentId,
-        createdAt: Number(bm.dateAdded || Date.now())
-      });
-    }
-  }
-
-  const result = [];
-  for (const [name, bookmarks] of folderMap.entries()) {
-    result.push({ name, bookmarks });
-  }
-  return result;
+  return [...folderMap.values()];
 }
 
 /**
@@ -1034,6 +1049,44 @@ async function ensureChromeFolderByName(name) {
   const id = await findOrCreateTopFolder(name);
   chromeFolderCache.set(name, id);
   return id;
+}
+
+async function ensureChromeFolderByPath(pathParts) {
+  const path = (Array.isArray(pathParts) ? pathParts : [])
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+  if (!path.length) return ensureChromeFolderByName('待归档');
+  const key = chromeFolderPathKey(path);
+  if (chromeFolderCache.has(key)) return chromeFolderCache.get(key);
+
+  const firstPathPart = String(path[0] || '').trim();
+  let parentId = await getBookmarkBarId();
+  let startIndex = 0;
+  const tree = await chrome.bookmarks.getTree().catch(() => []);
+  const rootChildren = tree?.[0]?.children || [];
+  const matchedRoot = rootChildren.find((node) => !node.url && String(node.title || '').trim() === firstPathPart);
+  const isBookmarkBarPath = firstPathPart === '书签栏' || /^bookmarks bar$/i.test(firstPathPart);
+  if (matchedRoot) {
+    parentId = matchedRoot.id;
+    startIndex = 1;
+  } else if (isBookmarkBarPath) {
+    parentId = await getBookmarkBarId();
+    startIndex = 1;
+  }
+  if (startIndex === 0) {
+    parentId = await findOrCreateTopFolder(path[0]);
+  }
+
+  for (let i = startIndex; i < path.length; i++) {
+    const name = path[i];
+    const children = await chrome.bookmarks.getChildren(parentId);
+    const found = children.find((x) => !x.url && x.title === name);
+    const folder = found || await chrome.bookmarks.create({ parentId, title: name });
+    parentId = folder.id;
+  }
+
+  chromeFolderCache.set(key, parentId);
+  return parentId;
 }
 
 /**
@@ -1056,6 +1109,8 @@ async function syncWithRainboard({ preview = false } = {}) {
   if (!token) {
     throw new Error('请先在插件设置中配置云端 API Token');
   }
+  const deviceId = await ensureDeviceId(cfg);
+  const mirrorIndex = normalizeRainboardMirrorIndex(cfg.rainboardMirrorIndex || {});
 
   // 1. Collect Chrome bookmarks grouped by folder
   chromeFolderCache.clear();
@@ -1075,6 +1130,8 @@ async function syncWithRainboard({ preview = false } = {}) {
     headers,
     body: JSON.stringify({
       folders,
+      deviceId,
+      mirrorIndex,
       deleteSync: true  // 以云端删除记录为准，删除 Chrome 中对应的书签
     })
   });
@@ -1097,18 +1154,32 @@ async function syncWithRainboard({ preview = false } = {}) {
   // 3. Apply changes to Chrome (if not preview)
   let addedToChrome = 0;
   let deletedFromChrome = 0;
+  const nextMirrorIndex = normalizeRainboardMirrorIndex(syncData.mirrorIndex || {});
 
   if (!preview) {
     // Add bookmarks that exist in DB but not in Chrome
     for (const item of toAddInChrome) {
       try {
         const folderName = String(item.folderName || '').trim() || '待归档';
-        const folderId = await ensureChromeFolderByName(folderName);
-        await chrome.bookmarks.create({
+        const folderId = await ensureChromeFolderByPath(item.folderPath || [folderName]);
+        const created = await chrome.bookmarks.create({
           parentId: folderId,
           title: String(item.title || '').trim() || '(untitled)',
           url: item.url
         });
+        const bookmarkId = String(item.id || item.rainboardId || '');
+        if (bookmarkId) {
+          nextMirrorIndex[bookmarkId] = {
+            rainboardId: bookmarkId,
+            chromeId: created.id,
+            url: created.url || item.url,
+            normalizedUrl: normalizeUrl(created.url || item.url) || '',
+            title: created.title || item.title || '(untitled)',
+            folderName,
+            folderPath: Array.isArray(item.folderPath) ? item.folderPath : [folderName],
+            syncedAt: Date.now()
+          };
+        }
         addedToChrome++;
       } catch (_err) {
         // best-effort; skip individual failures
@@ -1138,6 +1209,8 @@ async function syncWithRainboard({ preview = false } = {}) {
         }
       } catch (_err) { }
     }
+
+    await chrome.storage.local.set({ rainboardMirrorIndex: nextMirrorIndex });
   }
 
   const result = {

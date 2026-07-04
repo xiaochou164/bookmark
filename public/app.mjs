@@ -3623,7 +3623,7 @@ function bookmarkActionButtonsHtml(item, { compact = false, iconOnly = false } =
     out.push(bookmarkActionButtonHtml({ dataAttr: 'data-edit-tags', id: item.id, label: '标签', icon: 'tag', iconOnly, className: btnClass }));
     out.push(bookmarkActionButtonHtml({ dataAttr: 'data-edit-item', id: item.id, label: '编辑', icon: 'edit', iconOnly, className: btnClass }));
   }
-  out.push(bookmarkActionButtonHtml({ dataAttr: 'data-delete', id: item.id, label: '删除', icon: 'delete', iconOnly, className: `ghost${iconOnly ? ' icon-action-btn danger' : 'ghost danger'}`, hidden: Boolean(item.deletedAt) }));
+  out.push(bookmarkActionButtonHtml({ dataAttr: 'data-delete', id: item.id, label: '删除', icon: 'delete', iconOnly, className: `ghost${iconOnly ? ' icon-action-btn danger' : ' danger'}`, hidden: Boolean(item.deletedAt) }));
   out.push(bookmarkActionButtonHtml({ dataAttr: 'data-restore', id: item.id, label: '恢复', icon: 'restore', iconOnly, className: btnClass, hidden: !item.deletedAt }));
   return out.join('');
 }
@@ -3658,11 +3658,11 @@ function cardHtml(item) {
   return `<article class="card ${active} ${selectedClass}" data-id="${item.id}">
     ${cover}
     <div class="card-top">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <div class="card-top-row">
         <label><input type="checkbox" data-select="${item.id}" ${selected}/> 选择</label>
         <span>${bookmarkFlagsText(item)}</span>
       </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <div class="card-host-row">
         <img alt="icon" src="${favicon}" width="18" height="18" />
         <span class="host">${escapeHtml(hostFromUrl(item.url))}</span>
         ${timeText ? `<span class="muted">${escapeHtml(timeText)}</span>` : ''}
