@@ -2,6 +2,8 @@
 
 审计日期：2026-07-04
 
+专项测试清单：`docs/UI_UX_TEST_CHECKLIST.md`
+
 ## 审计范围与结论
 
 覆盖范围：Web 主工作台、登录页、设置页、同步插件页、公开分享页、Chrome 扩展 Popup/Options，以及桌面、平板、手机断点。

@@ -1,5 +1,7 @@
 # 前端回归清单（Web）
 
+> UI/UX 四档视口、设计系统、可访问性、扩展和性能专项测试见 `docs/UI_UX_TEST_CHECKLIST.md`。
+
 ## 1. 认证与导航
 
 - 未登录访问 `/` 自动跳转 `/login.html`
