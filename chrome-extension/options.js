@@ -1,4 +1,5 @@
-const DEFAULT_CLOUD_API_BASE = 'https://rainboard.82fr9qxfqc8554.workers.dev';
+const DEFAULT_CLOUD_API_BASE = 'https://bookmark.sundays.ink';
+const LEGACY_CLOUD_API_BASE = 'https://rainboard.82fr9qxfqc8554.workers.dev';
 const cloudApiBaseUrl = document.getElementById('cloudApiBaseUrl');
 const cloudApiToken = document.getElementById('cloudApiToken');
 const saveBtn = document.getElementById('saveBtn');
@@ -17,7 +18,8 @@ function render(text, ok = true) {
 }
 
 function normalizeCloudUrl(input) {
-  return String(input || DEFAULT_CLOUD_API_BASE).trim().replace(/\/+$/, '') || DEFAULT_CLOUD_API_BASE;
+  const normalized = String(input || DEFAULT_CLOUD_API_BASE).trim().replace(/\/+$/, '') || DEFAULT_CLOUD_API_BASE;
+  return normalized === LEGACY_CLOUD_API_BASE ? DEFAULT_CLOUD_API_BASE : normalized;
 }
 
 function callBg(type, payload = {}) {

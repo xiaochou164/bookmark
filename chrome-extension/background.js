@@ -1,5 +1,6 @@
 const API_BASE = 'https://api.raindrop.io/rest/v1';
-const DEFAULT_CLOUD_API_BASE = 'https://rainboard.82fr9qxfqc8554.workers.dev';
+const DEFAULT_CLOUD_API_BASE = 'https://bookmark.sundays.ink';
+const LEGACY_CLOUD_API_BASE = 'https://rainboard.82fr9qxfqc8554.workers.dev';
 const TRASH_FOLDER = 'Raindrop Sync Trash';
 const LEASE_TTL_MS = 60 * 1000;
 const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -100,7 +101,8 @@ function isCloudBackend(cfg) {
 
 function normalizeCloudBaseUrl(input) {
   const raw = String(input || DEFAULT_CLOUD_API_BASE).trim() || DEFAULT_CLOUD_API_BASE;
-  return raw.replace(/\/+$/, '');
+  const normalized = raw.replace(/\/+$/, '');
+  return normalized === LEGACY_CLOUD_API_BASE ? DEFAULT_CLOUD_API_BASE : normalized;
 }
 
 async function cloudRequest(cfg, method, path, body) {
