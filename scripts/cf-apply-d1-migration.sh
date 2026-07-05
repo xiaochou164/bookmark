@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_DB_NAME="${CF_D1_DB_NAME:-rainbow}"
+DEFAULT_DB_NAME="${CF_D1_DB_NAME:-rainboard}"
 DEFAULT_MIGRATION_FILE="${CF_D1_MIGRATION_FILE:-migrations/0001_cloudflare_core.sql}"
 
 resolve_db_name_from_wrangler() {

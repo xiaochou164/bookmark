@@ -126,7 +126,7 @@ npm run cf:release -- --import-local-data
 
 - 发布前请先登录 Cloudflare：`npx wrangler login`
 - `wrangler.toml` 已预留 `D1/R2/Queues/Cron` 绑定
-- 主任务队列默认是 `rainbow-tasks`，死信队列默认是 `rainbow-tasks-dlq`
+- 主任务队列沿用生产资源 `rainboard-tasks`，死信队列沿用 `rainboard-tasks-dlq`
 - Worker 侧任务默认记录 `attemptCount/maxAttempts`，Cron 会对卡住的任务做补偿重投
 - 导入脚本会把现有 `JSON/SQLite app_state` 转换成 D1 可执行 SQL
 - `/api/assets/*` 现在优先从 R2 读取对象
@@ -220,7 +220,7 @@ npm run cf:migrate:data          # SQLite/JSON -> D1 SQL
 
 ## 常用环境变量
 
-- `CF_D1_DB_NAME`：D1 数据库名称（默认 `rainbow`）
+- `CF_D1_DB_NAME`：D1 数据库名称（默认沿用生产资源 `rainboard`）
 - `CF_D1_MIGRATION_FILE`：D1 迁移文件（默认 `migrations/0001_cloudflare_core.sql`）
 - `DATA_FILE`：旧 JSON 状态文件路径
 - `SQLITE_FILE`：旧 SQLite 状态文件路径

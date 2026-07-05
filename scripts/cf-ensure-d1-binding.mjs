@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 
 function parseArgs(argv) {
   const options = {
-    dbName: process.env.CF_D1_DB_NAME || 'rainbow',
+    dbName: process.env.CF_D1_DB_NAME || 'rainboard',
     binding: 'DB',
     config: 'wrangler.toml',
     databaseId: '',
