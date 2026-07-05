@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rainbow Sync</title>
+  <link rel="stylesheet" href="shared.css" />
+</head>
+
+<body class="popup-body">
+  <div class="popup-shell">
+  <header class="popup-header">
+    <div class="popup-logo">RB</div>
+    <div class="popup-header-text">
+      <strong>Rainbow Sync</strong>
+      <small>Safari 书签 · 云书签</small>
+    </div>
+  </header>
+
+  <div class="section">
+    <div class="section-title">Safari ↔ 云书签（Rainbow）</div>
+    <div class="popup-actions">
+    <button id="rbPreviewBtn" class="btn btn-ghost" type="button">
+      <span class="btn-icon" aria-hidden="true">P</span>
+      <span class="btn-label">
+        预览变更
+        <span class="btn-sub">查看差异，不写入</span>
+      </span>
+    </button>
+    <button id="rbSyncBtn" class="btn btn-accent" type="button">
+      <span class="btn-icon" aria-hidden="true">S</span>
+      <span class="btn-label">
+        云书签双向同步
+        <span class="btn-sub">Safari ↔ Rainbow 数据库</span>
+      </span>
+    </button>
+    </div>
+  </div>
+
+  <div class="section" id="statusSection">
+    <details class="popup-status-details" open>
+      <summary>同步状态</summary>
+      <div id="statusBox" class="state-box status-box" role="status" aria-live="polite"></div>
+    </details>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="footer">
+    <span class="badge"><span class="badge-dot"></span>已连接</span>
+    <a href="#" id="openOptions">插件设置</a>
+  </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>

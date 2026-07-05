@@ -83,7 +83,7 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'RainboardBot/0.1 (+metadata-fetcher)',
+        'User-Agent': 'RainbowBot/0.1 (+metadata-fetcher)',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
     });

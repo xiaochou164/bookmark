@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>登录 - Rainboard 云书签</title>
+    <title>登录 - Rainbow 云书签</title>
     <meta name="theme-color" content="#1194ff" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.svg" />
@@ -15,7 +15,7 @@
         <div class="brand">
           <div class="brand-dot"></div>
           <div>
-            <strong>Rainboard</strong>
+            <strong>Rainbow</strong>
             <small>云书签</small>
           </div>
         </div>
@@ -43,16 +43,16 @@
           <button type="button" id="registerTabBtn" role="tab" aria-selected="false" aria-controls="registerForm" tabindex="-1">注册</button>
         </div>
 
-        <form id="loginForm" class="auth-page-form" role="tabpanel" aria-labelledby="loginTabBtn">
-          <label>邮箱<input id="loginEmail" type="email" autocomplete="username" required /></label>
-          <label>密码<input id="loginPassword" type="password" autocomplete="current-password" required /></label>
+        <form id="loginForm" class="auth-page-form" role="tabpanel" aria-labelledby="loginTabBtn" aria-hidden="false">
+          <label>邮箱<input id="loginEmail" type="email" autocomplete="username" required aria-describedby="loginStatus" /></label>
+          <label>密码<input id="loginPassword" type="password" autocomplete="current-password" required aria-describedby="loginStatus" /></label>
           <button type="submit">登录</button>
         </form>
 
-        <form id="registerForm" class="auth-page-form hidden" role="tabpanel" aria-labelledby="registerTabBtn">
+        <form id="registerForm" class="auth-page-form hidden" role="tabpanel" aria-labelledby="registerTabBtn" aria-hidden="true">
           <label>昵称<input id="registerName" autocomplete="name" /></label>
-          <label>邮箱<input id="registerEmail" type="email" autocomplete="username" required /></label>
-          <label>密码<input id="registerPassword" type="password" autocomplete="new-password" required /></label>
+          <label>邮箱<input id="registerEmail" type="email" autocomplete="username" required aria-describedby="loginStatus" /></label>
+          <label>密码<input id="registerPassword" type="password" autocomplete="new-password" required aria-describedby="loginStatus" /></label>
           <button type="submit" class="ghost">注册并登录</button>
         </form>
 

@@ -1,6 +1,5 @@
-const API_BASE = 'https://api.raindrop.io/rest/v1';
 const DEFAULT_CLOUD_API_BASE = 'https://bookmark.sundays.ink';
-const LEGACY_CLOUD_API_BASE = 'https://rainboard.82fr9qxfqc8554.workers.dev';
+const LEGACY_CLOUD_API_BASE = 'https://rainbow.82fr9qxfqc8554.workers.dev';
 const TRASH_FOLDER = 'Raindrop Sync Trash';
 const LEASE_TTL_MS = 60 * 1000;
 const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -10,8 +9,7 @@ const DEFAULTS = {
   syncBackend: 'cloud',
   cloudApiBaseUrl: DEFAULT_CLOUD_API_BASE,
   cloudApiToken: '',
-  raindropToken: '',
-  topLevelAutoSync: true,
+  topLevelAutoSync: false,
   mappings: [
     {
       id: 'default',
@@ -22,8 +20,10 @@ const DEFAULTS = {
   ],
   autoSyncEnabled: true,
   autoSyncMinutes: 15,
+  rbAutoSyncEnabled: false,
+  rbAutoSyncMinutes: 30,
   mirrorIndex: {},
-  rainboardMirrorIndex: {},
+  rainbowMirrorIndex: {},
   deviceId: '',
   syncLease: null,
   mappingState: {},
@@ -91,12 +91,13 @@ async function getSettings() {
   return {
     ...DEFAULTS,
     ...migrated,
+    syncBackend: 'cloud',
     mappings: finalMappings
   };
 }
 
 function isCloudBackend(cfg) {
-  return String(cfg?.syncBackend || 'direct') === 'cloud';
+  return String(cfg?.syncBackend || 'cloud') === 'cloud';
 }
 
 function normalizeCloudBaseUrl(input) {
@@ -173,13 +174,13 @@ async function ensureDeviceId(cfg) {
   return id;
 }
 
-function normalizeRainboardMirrorIndex(input) {
+function normalizeRainbowMirrorIndex(input) {
   const out = {};
   for (const [bookmarkId, raw] of Object.entries(input || {})) {
-    const id = String(bookmarkId || raw?.rainboardId || '').trim();
+    const id = String(bookmarkId || raw?.rainbowId || '').trim();
     if (!id) continue;
     out[id] = {
-      rainboardId: id,
+      rainbowId: id,
       chromeId: String(raw?.chromeId || ''),
       url: String(raw?.url || ''),
       normalizedUrl: String(raw?.normalizedUrl || normalizeUrl(raw?.url) || ''),
@@ -246,22 +247,11 @@ async function setSyncStatus(patch) {
 }
 
 async function raindropRequest(token, method, path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json'
-    },
-    body: body ? JSON.stringify(body) : undefined
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Raindrop API ${method} ${path} failed: ${res.status} ${text}`);
-  }
-
-  if (res.status === 204) return {};
-  return res.json();
+  void token;
+  void method;
+  void path;
+  void body;
+  throw new Error('Direct Raindrop API access is disabled in the extension. Use Rainbow cloud sync.');
 }
 
 async function listRaindropItems(token, collectionId) {
@@ -677,7 +667,7 @@ async function buildEffectiveMappings(cfg) {
     collectionUsed.add(-1);
   }
 
-  const topCollections = await listRaindropTopLevelCollections(cfg.raindropToken);
+  const topCollections = [];
   for (const col of topCollections) {
     if (collectionUsed.has(col.id)) continue;
     const auto = normalizeMapping({
@@ -859,83 +849,30 @@ async function reportCloudDeviceStatus(cfg, deviceId, payload = {}) {
 }
 
 async function runSync({ manual = false, preview = false } = {}) {
-  const cfg = await getSettings();
-  if (!cfg.raindropToken) {
-    throw new Error('Missing token: set Raindrop token in extension options');
-  }
-  const deviceId = await ensureDeviceId(cfg);
-  const releaseLease = await acquireLease(deviceId, preview);
-
-  try {
-    const mappings = await buildEffectiveMappings(cfg);
-    if (mappings.length === 0) {
-      throw new Error('No mapping configured');
-    }
-
-    const now = nowMs();
-    const nextMirrorIndex = { ...(cfg.mirrorIndex || {}) };
-    const nextMappingState = { ...(cfg.mappingState || {}) };
-    const nextTombstones = pruneTombstonesByTtl(cfg.tombstones || {}, now);
-    const nextAppliedOps = pruneByTtl(cfg.appliedOps || {}, APPLIED_OP_TTL_MS, now);
-    const perMappingStats = [];
-
-    for (const mapping of mappings) {
-      const { stats, newMirror, newMappingState, nextTombstonesByMapping, nextAppliedOps: mappingAppliedOps } = await executeMapping({
-        token: cfg.raindropToken,
-        mapping,
-        preview,
-        mirrorIndex: cfg.mirrorIndex || {},
-        mappingState: (cfg.mappingState || {})[mapping.id] || {},
-        tombstones: nextTombstones,
-        appliedOps: nextAppliedOps,
-        deviceId
-      });
-      perMappingStats.push(stats);
-      if (!preview) {
-        nextMirrorIndex[mapping.id] = newMirror;
-        nextMappingState[mapping.id] = newMappingState;
-        nextTombstones[mapping.id] = nextTombstonesByMapping;
-        Object.assign(nextAppliedOps, mappingAppliedOps);
-      }
-    }
-
-    const totals = aggregateStats(perMappingStats, preview, manual);
-    const payload = { totals, mappings: perMappingStats };
-
-    if (!preview) {
-      await chrome.storage.local.set({
-        mirrorIndex: nextMirrorIndex,
-        mappingState: nextMappingState,
-        tombstones: nextTombstones,
-        appliedOps: nextAppliedOps
-      });
-      await setSyncStatus({ ok: true, stats: payload, error: '', deviceId });
-    }
-
-    return payload;
-  } finally {
-    await releaseLease();
-  }
+  void manual;
+  void preview;
+  throw new Error('Direct provider sync is disabled in the extension. Use SYNC_WITH_RAINBOW.');
 }
 
 async function setupAlarm() {
   const cfg = await getSettings();
-  // Chrome ↔ Rainboard 自动同步
-  await chrome.alarms.clear('autoSyncRainboard');
+  // Chrome ↔ Rainbow 自动同步
+  await chrome.alarms.clear('autoSyncRainbow');
   if (cfg.rbAutoSyncEnabled) {
     const rbPeriod = Math.max(5, Number(cfg.rbAutoSyncMinutes) || 30);
-    chrome.alarms.create('autoSyncRainboard', { periodInMinutes: rbPeriod });
+    chrome.alarms.create('autoSyncRainbow', { periodInMinutes: rbPeriod });
   }
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
   const cfg = await getSettings();
+  await chrome.storage.local.remove(['raindropToken', 'raindropCollectionId', 'chromeImportFolder']);
   await chrome.storage.local.set({
     syncBackend: cfg.syncBackend || 'cloud',
     cloudApiBaseUrl: normalizeCloudBaseUrl(cfg.cloudApiBaseUrl),
     mappings: cfg.mappings,
     mirrorIndex: cfg.mirrorIndex || {},
-    rainboardMirrorIndex: normalizeRainboardMirrorIndex(cfg.rainboardMirrorIndex || {}),
+    rainbowMirrorIndex: normalizeRainbowMirrorIndex(cfg.rainbowMirrorIndex || {}),
     mappingState: cfg.mappingState || {},
     tombstones: cfg.tombstones || {},
     appliedOps: cfg.appliedOps || {},
@@ -960,17 +897,17 @@ chrome.runtime.onStartup.addListener(async () => {
 });
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'autoSyncRainboard') {
+  if (alarm.name === 'autoSyncRainbow') {
     try {
-      await syncWithRainboard({ preview: false });
+      await syncWithRainbow({ preview: false });
     } catch (err) {
       // best-effort: log but don't crash service worker
-      console.warn('[autoSyncRainboard] error:', err?.message || err);
+      console.warn('[autoSyncRainbow] error:', err?.message || err);
     }
   }
 });
 
-// ── Chrome ↔ Rainboard DB Sync ──────────────────────────────────────────────
+// ── Chrome ↔ Rainbow DB Sync ──────────────────────────────────────────────
 
 function chromeFolderPathKey(pathParts = []) {
   return (Array.isArray(pathParts) ? pathParts : [])
@@ -1092,8 +1029,8 @@ async function ensureChromeFolderByPath(pathParts) {
 }
 
 /**
- * syncWithRainboard({ preview })
- * Bidirectional sync between Chrome bookmarks and the Rainboard cloud DB.
+ * syncWithRainbow({ preview })
+ * Bidirectional sync between Chrome bookmarks and the Rainbow cloud DB.
  *
  * Steps:
  *  1. Collect all Chrome bookmarks (folder by folder)
@@ -1102,17 +1039,17 @@ async function ensureChromeFolderByPath(pathParts) {
  *     - toAddInChrome: create these bookmarks in Chrome (in correct folder)
  *     - toDeleteInChrome: move these Chrome bookmarks to trash (if deleteSync)
  */
-async function syncWithRainboard({ preview = false } = {}) {
+async function syncWithRainbow({ preview = false } = {}) {
   const cfg = await getSettings();
   if (!isCloudBackend(cfg)) {
-    throw new Error('Chrome ↔ Rainboard 同步需要云端模式（cloud backend）');
+    throw new Error('Chrome ↔ Rainbow 同步需要云端模式（cloud backend）');
   }
   const token = String(cfg.cloudApiToken || '').trim();
   if (!token) {
     throw new Error('请先在插件设置中配置云端 API Token');
   }
   const deviceId = await ensureDeviceId(cfg);
-  const mirrorIndex = normalizeRainboardMirrorIndex(cfg.rainboardMirrorIndex || {});
+  const mirrorIndex = normalizeRainbowMirrorIndex(cfg.rainbowMirrorIndex || {});
 
   // 1. Collect Chrome bookmarks grouped by folder
   chromeFolderCache.clear();
@@ -1156,7 +1093,7 @@ async function syncWithRainboard({ preview = false } = {}) {
   // 3. Apply changes to Chrome (if not preview)
   let addedToChrome = 0;
   let deletedFromChrome = 0;
-  const nextMirrorIndex = normalizeRainboardMirrorIndex(syncData.mirrorIndex || {});
+  const nextMirrorIndex = normalizeRainbowMirrorIndex(syncData.mirrorIndex || {});
 
   if (!preview) {
     // Add bookmarks that exist in DB but not in Chrome
@@ -1169,10 +1106,10 @@ async function syncWithRainboard({ preview = false } = {}) {
           title: String(item.title || '').trim() || '(untitled)',
           url: item.url
         });
-        const bookmarkId = String(item.id || item.rainboardId || '');
+        const bookmarkId = String(item.id || item.rainbowId || '');
         if (bookmarkId) {
           nextMirrorIndex[bookmarkId] = {
-            rainboardId: bookmarkId,
+            rainbowId: bookmarkId,
             chromeId: created.id,
             url: created.url || item.url,
             normalizedUrl: normalizeUrl(created.url || item.url) || '',
@@ -1212,7 +1149,7 @@ async function syncWithRainboard({ preview = false } = {}) {
       } catch (_err) { }
     }
 
-    await chrome.storage.local.set({ rainboardMirrorIndex: nextMirrorIndex });
+    await chrome.storage.local.set({ rainbowMirrorIndex: nextMirrorIndex });
   }
 
   const result = {
@@ -1235,7 +1172,7 @@ async function syncWithRainboard({ preview = false } = {}) {
   if (!preview) {
     await setSyncStatus({
       ok: true,
-      rainboardSync: result,
+      rainbowSync: result,
       error: '',
       backend: 'cloud'
     });
@@ -1320,15 +1257,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     return true;
   }
 
-  if (msg?.type === 'SYNC_WITH_RAINBOARD') {
-    syncWithRainboard({ preview: false })
+  if (msg?.type === 'SYNC_WITH_RAINBOW') {
+    syncWithRainbow({ preview: false })
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
     return true;
   }
 
-  if (msg?.type === 'PREVIEW_RAINBOARD_SYNC') {
-    syncWithRainboard({ preview: true })
+  if (msg?.type === 'PREVIEW_RAINBOW_SYNC') {
+    syncWithRainbow({ preview: true })
       .then((result) => sendResponse({ ok: true, ...result }))
       .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
     return true;

@@ -1,0 +1,1307 @@
+// Generated Safari Web Extension compatibility wrapper.
+const chrome = (() => {
+  const browserApi = globalThis.browser;
+  const chromeApi = globalThis.chrome;
+  const api = browserApi || chromeApi;
+  if (!api) throw new Error('WebExtension API is not available.');
+  if (!browserApi) return api;
+
+  const wrapper = Object.create(browserApi);
+  const runtime = Object.create(browserApi.runtime);
+
+  runtime.sendMessage = (message, callback) => {
+    const promise = browserApi.runtime.sendMessage(message);
+    if (typeof callback !== 'function') return promise;
+
+    promise.then(
+      (response) => callback(response),
+      (error) => {
+        runtime.lastError = { message: error?.message || String(error) };
+        callback(undefined);
+        queueMicrotask(() => {
+          runtime.lastError = null;
+        });
+      }
+    );
+    return undefined;
+  };
+
+  wrapper.runtime = runtime;
+  return wrapper;
+})();
+
+const DEFAULT_CLOUD_API_BASE = 'https://bookmark.sundays.ink';
+const LEGACY_CLOUD_API_BASE = 'https://rainbow.82fr9qxfqc8554.workers.dev';
+const TRASH_FOLDER = 'Raindrop Sync Trash';
+const LEASE_TTL_MS = 60 * 1000;
+const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const APPLIED_OP_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+const DEFAULTS = {
+  syncBackend: 'cloud',
+  cloudApiBaseUrl: DEFAULT_CLOUD_API_BASE,
+  cloudApiToken: '',
+  topLevelAutoSync: false,
+  mappings: [
+    {
+      id: 'default',
+      collectionId: -1,
+      chromeFolder: 'Raindrop Synced',
+      deleteSync: false
+    }
+  ],
+  autoSyncEnabled: true,
+  autoSyncMinutes: 15,
+  rbAutoSyncEnabled: false,
+  rbAutoSyncMinutes: 30,
+  mirrorIndex: {},
+  rainbowMirrorIndex: {},
+  deviceId: '',
+  syncLease: null,
+  mappingState: {},
+  tombstones: {},
+  appliedOps: {}
+};
+
+function mappingIdFrom(mapping) {
+  const raw = `${mapping.collectionId}:${mapping.chromeFolder}`;
+  return raw.replace(/[^a-zA-Z0-9:_-]/g, '_');
+}
+
+function normalizeMapping(mapping) {
+  const collectionId = Number(mapping.collectionId ?? -1);
+  const chromeFolder = String(mapping.chromeFolder || 'Raindrop Synced').trim() || 'Raindrop Synced';
+  const deleteSync = Boolean(mapping.deleteSync);
+  const id = String(mapping.id || mappingIdFrom({ collectionId, chromeFolder }));
+  return { id, collectionId, chromeFolder, deleteSync };
+}
+
+function migrateLegacySettings(data) {
+  if (Array.isArray(data.mappings) && data.mappings.length > 0) return data;
+
+  if (typeof data.raindropCollectionId !== 'undefined' || typeof data.chromeImportFolder !== 'undefined') {
+    return {
+      ...data,
+      mappings: [
+        normalizeMapping({
+          id: 'default',
+          collectionId: Number(data.raindropCollectionId ?? -1),
+          chromeFolder: String(data.chromeImportFolder || 'Raindrop Synced'),
+          deleteSync: false
+        })
+      ]
+    };
+  }
+
+  return data;
+}
+
+function normalizeUrl(input) {
+  try {
+    const url = new URL(String(input).trim());
+    url.hash = '';
+    const protocol = url.protocol.toLowerCase();
+    const hostname = url.hostname.toLowerCase();
+    const pathname = (url.pathname.endsWith('/') && url.pathname !== '/') ? url.pathname.slice(0, -1) : url.pathname;
+    const params = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
+    const search = new URLSearchParams(params).toString();
+    return `${protocol}//${hostname}${url.port ? `:${url.port}` : ''}${pathname || '/'}${search ? `?${search}` : ''}`;
+  } catch (_err) {
+    return null;
+  }
+}
+
+function chromeDateToUnix(dateAdded) {
+  return Number(dateAdded || 0);
+}
+
+async function getSettings() {
+  const raw = await chrome.storage.local.get(DEFAULTS);
+  const migrated = migrateLegacySettings(raw);
+  const mappings = (migrated.mappings || []).map(normalizeMapping);
+  const finalMappings = mappings.length > 0 ? mappings : DEFAULTS.mappings;
+  return {
+    ...DEFAULTS,
+    ...migrated,
+    syncBackend: 'cloud',
+    mappings: finalMappings
+  };
+}
+
+function isCloudBackend(cfg) {
+  return String(cfg?.syncBackend || 'cloud') === 'cloud';
+}
+
+function normalizeCloudBaseUrl(input) {
+  const raw = String(input || DEFAULT_CLOUD_API_BASE).trim() || DEFAULT_CLOUD_API_BASE;
+  const normalized = raw.replace(/\/+$/, '');
+  return normalized === LEGACY_CLOUD_API_BASE ? DEFAULT_CLOUD_API_BASE : normalized;
+}
+
+async function cloudRequest(cfg, method, path, body) {
+  const baseUrl = normalizeCloudBaseUrl(cfg?.cloudApiBaseUrl);
+  const headers = { 'Content-Type': 'application/json' };
+  const token = String(cfg?.cloudApiToken || '').trim();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(`${baseUrl}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) {
+    let message = `Cloud API ${method} ${path} failed: ${res.status}`;
+    try {
+      const payload = await res.json();
+      if (payload?.error?.message) message = payload.error.message;
+      else if (payload?.message) message = payload.message;
+    } catch (_err) {
+      const text = await res.text().catch(() => '');
+      if (text) message = `${message} ${text}`;
+    }
+    throw new Error(message);
+  }
+  if (res.status === 204) return {};
+  return res.json();
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+function newId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function pruneByTtl(mapObj, ttlMs, now = nowMs()) {
+  const out = {};
+  for (const [key, value] of Object.entries(mapObj || {})) {
+    const ts = Number(value?.at ?? value?.deletedAt ?? value ?? 0);
+    if (ts > 0 && now - ts <= ttlMs) out[key] = value;
+  }
+  return out;
+}
+
+function pruneTombstonesByTtl(tombstones, now = nowMs()) {
+  const next = {};
+  for (const [mappingId, entries] of Object.entries(tombstones || {})) {
+    const kept = {};
+    for (const [url, marker] of Object.entries(entries || {})) {
+      const deletedAt = Number(marker?.deletedAt || 0);
+      if (deletedAt > 0 && now - deletedAt <= TOMBSTONE_TTL_MS) {
+        kept[url] = marker;
+      }
+    }
+    if (Object.keys(kept).length > 0) next[mappingId] = kept;
+  }
+  return next;
+}
+
+async function ensureDeviceId(cfg) {
+  if (cfg.deviceId && String(cfg.deviceId).trim()) return String(cfg.deviceId);
+  const id = `dev_${newId()}`;
+  await chrome.storage.local.set({ deviceId: id });
+  return id;
+}
+
+function normalizeRainbowMirrorIndex(input) {
+  const out = {};
+  for (const [bookmarkId, raw] of Object.entries(input || {})) {
+    const id = String(bookmarkId || raw?.rainbowId || '').trim();
+    if (!id) continue;
+    out[id] = {
+      rainbowId: id,
+      chromeId: String(raw?.chromeId || ''),
+      url: String(raw?.url || ''),
+      normalizedUrl: String(raw?.normalizedUrl || normalizeUrl(raw?.url) || ''),
+      title: String(raw?.title || ''),
+      folderName: String(raw?.folderName || ''),
+      folderPath: Array.isArray(raw?.folderPath) ? raw.folderPath.map((part) => String(part || '').trim()).filter(Boolean) : [],
+      syncedAt: Number(raw?.syncedAt || 0)
+    };
+  }
+  return out;
+}
+
+async function acquireLease(owner, preview) {
+  if (preview) {
+    return async () => { };
+  }
+  const now = nowMs();
+  const { syncLease } = await chrome.storage.local.get({ syncLease: null });
+  const existing = syncLease || null;
+  if (existing && Number(existing.expiresAt || 0) > now && existing.owner !== owner) {
+    throw new Error(`Sync is busy by ${existing.owner}`);
+  }
+  const lease = {
+    owner,
+    acquiredAt: now,
+    expiresAt: now + LEASE_TTL_MS
+  };
+  await chrome.storage.local.set({ syncLease: lease });
+  return async () => {
+    const current = await chrome.storage.local.get({ syncLease: null });
+    if (current.syncLease?.owner === owner) {
+      await chrome.storage.local.set({ syncLease: null });
+    }
+  };
+}
+
+async function setSyncStatus(patch) {
+  const now = new Date().toISOString();
+  const prev = await chrome.storage.local.get({ lastSyncStatus: {} });
+  const nextStatus = {
+    ...prev.lastSyncStatus,
+    ...patch,
+    updatedAt: now
+  };
+  await chrome.storage.local.set({
+    lastSyncStatus: {
+      ...nextStatus
+    }
+  });
+  try {
+    const cfg = await getSettings();
+    if (isCloudBackend(cfg)) {
+      const deviceId = await ensureDeviceId(cfg);
+      await reportCloudDeviceStatus(cfg, deviceId, {
+        status: nextStatus.ok ? 'online' : 'error',
+        lastError: nextStatus.ok ? '' : String(nextStatus.error || ''),
+        lastSyncStatus: nextStatus,
+        lastSyncAt: Date.now()
+      });
+    }
+  } catch (_err) {
+    // Best-effort status report; keep local status write successful.
+  }
+}
+
+async function raindropRequest(token, method, path, body) {
+  void token;
+  void method;
+  void path;
+  void body;
+  throw new Error('Direct Raindrop API access is disabled in the extension. Use Rainbow cloud sync.');
+}
+
+async function listRaindropItems(token, collectionId) {
+  const items = [];
+  let page = 0;
+  while (true) {
+    const payload = await raindropRequest(token, 'GET', `/raindrops/${collectionId}?page=${page}&perpage=50&sort=created`);
+    const batch = payload.items || [];
+    items.push(...batch);
+    if (batch.length < 50) break;
+    page += 1;
+  }
+  return items;
+}
+
+function flattenCollections(items, depth = 0, out = []) {
+  for (const item of items || []) {
+    out.push({
+      id: Number(item?._id),
+      title: `${'  '.repeat(depth)}${item?.title || 'Untitled'}`
+    });
+    if (Array.isArray(item?.children) && item.children.length > 0) {
+      flattenCollections(item.children, depth + 1, out);
+    }
+  }
+  return out;
+}
+
+async function listRaindropTopLevelCollections(token) {
+  const payload = await raindropRequest(token, 'GET', '/collections');
+  const items = payload?.items || [];
+  return items
+    .map((x) => ({ id: Number(x?._id), title: String(x?.title || '').trim() }))
+    .filter((x) => Number.isFinite(x.id) && x.title.length > 0);
+}
+
+function pickTitle(chromeItem, raindropItem) {
+  const c = (chromeItem?.title || '').trim();
+  const r = (raindropItem?.title || '').trim();
+  if (!c) return { title: r || '(untitled)', source: 'raindrop' };
+  if (!r) return { title: c, source: 'chrome' };
+
+  const cts = chromeItem?.created || 0;
+  const rts = Date.parse(raindropItem?.lastUpdate || raindropItem?.created || 0) / 1000;
+  if (cts >= rts) return { title: c, source: 'chrome' };
+  return { title: r, source: 'raindrop' };
+}
+
+async function getBookmarkBarId() {
+  try {
+    await chrome.bookmarks.getSubTree('1');
+    return '1';
+  } catch (_err) {
+    const tree = await chrome.bookmarks.getTree();
+    const root = tree[0];
+    const fallback = (root.children || []).find((n) => !n.url);
+    if (!fallback) throw new Error('Cannot locate a bookmark folder root');
+    return fallback.id;
+  }
+}
+
+async function findOrCreateTopFolder(folderName) {
+  const barId = await getBookmarkBarId();
+  const children = await chrome.bookmarks.getChildren(barId);
+  const found = children.find((x) => !x.url && x.title === folderName);
+  if (found) return found.id;
+  const created = await chrome.bookmarks.create({ parentId: barId, title: folderName });
+  return created.id;
+}
+
+async function listChromeFolderBookmarks(folderName) {
+  const folderId = await findOrCreateTopFolder(folderName);
+  const [node] = await chrome.bookmarks.getSubTree(folderId);
+  const out = [];
+
+  function walk(n) {
+    if (n.url) {
+      const normalizedUrl = normalizeUrl(n.url);
+      if (!normalizedUrl) return;
+      out.push({
+        id: n.id,
+        title: (n.title || '').trim() || '(untitled)',
+        url: n.url,
+        normalizedUrl,
+        created: chromeDateToUnix(n.dateAdded)
+      });
+      return;
+    }
+    for (const child of n.children || []) walk(child);
+  }
+
+  walk(node);
+  return { folderId, items: out };
+}
+
+function toMapByUrl(items, getUrl) {
+  const map = new Map();
+  for (const item of items) {
+    const normalized = normalizeUrl(getUrl(item));
+    if (!normalized || map.has(normalized)) continue;
+    map.set(normalized, item);
+  }
+  return map;
+}
+
+function createMappingStats(mapping) {
+  return {
+    mappingId: mapping.id,
+    collectionId: mapping.collectionId,
+    chromeFolder: mapping.chromeFolder,
+    deleteSync: mapping.deleteSync,
+    chromeTotal: 0,
+    raindropTotal: 0,
+    createdInRaindrop: 0,
+    createdInChrome: 0,
+    updatedRaindropTitle: 0,
+    deletedInRaindrop: 0,
+    movedToChromeTrash: 0,
+    samples: []
+  };
+}
+
+function pushSample(stats, label) {
+  if (stats.samples.length < 12) stats.samples.push(label);
+}
+
+function itemUpdatedAtFromChrome(item) {
+  return Number(item?.created || 0) * 1000;
+}
+
+function itemUpdatedAtFromRaindrop(item) {
+  return Number(Date.parse(item?.lastUpdate || item?.created || 0) || 0);
+}
+
+function shouldSkipCreateByTombstone(tombstone, source, itemUpdatedAtMs) {
+  if (!tombstone) return false;
+  if (tombstone.source !== source) return false;
+  return Number(tombstone.deletedAt || 0) >= Number(itemUpdatedAtMs || 0);
+}
+
+function buildActions({ chromeByUrl, raindropByUrl, prevIndex, mapping, tombstones }) {
+  const actions = [];
+  const deleteLocked = new Set();
+  const byUrlTombstones = tombstones || {};
+
+  if (mapping.deleteSync && prevIndex) {
+    for (const [url, snapshot] of Object.entries(prevIndex)) {
+      const cItem = chromeByUrl.get(url);
+      const rItem = raindropByUrl.get(url);
+      if (cItem && !rItem) {
+        actions.push({ kind: 'MOVE_CHROME_TO_TRASH', url, chromeId: cItem.id, title: cItem.title, source: 'raindrop' });
+        deleteLocked.add(url);
+      } else if (!cItem && rItem) {
+        actions.push({ kind: 'DELETE_RAINDROP', url, raindropId: rItem._id, title: rItem.title || '', source: 'chrome' });
+        deleteLocked.add(url);
+      } else if (!cItem && !rItem) {
+        // stale index entry; no action needed
+      } else if (snapshot?.raindropId && rItem && Number(snapshot.raindropId) !== Number(rItem._id)) {
+        // Recreated item in Raindrop; let normal create/update logic settle it.
+      }
+    }
+  }
+
+  for (const [url, cItem] of chromeByUrl.entries()) {
+    if (raindropByUrl.has(url) || deleteLocked.has(url)) continue;
+    if (shouldSkipCreateByTombstone(byUrlTombstones[url], 'chrome', itemUpdatedAtFromChrome(cItem))) continue;
+    actions.push({ kind: 'CREATE_RAINDROP', url, title: cItem.title, link: cItem.url });
+  }
+
+  for (const [url, rItem] of raindropByUrl.entries()) {
+    if (chromeByUrl.has(url) || deleteLocked.has(url)) continue;
+    if (shouldSkipCreateByTombstone(byUrlTombstones[url], 'raindrop', itemUpdatedAtFromRaindrop(rItem))) continue;
+    actions.push({ kind: 'CREATE_CHROME', url, title: rItem.title || '(untitled)', link: rItem.link });
+  }
+
+  for (const [url, cItem] of chromeByUrl.entries()) {
+    const rItem = raindropByUrl.get(url);
+    if (!rItem || deleteLocked.has(url)) continue;
+    const winner = pickTitle(cItem, rItem);
+    if (winner.source === 'chrome' && winner.title !== (rItem.title || '')) {
+      actions.push({ kind: 'UPDATE_RAINDROP_TITLE', url, raindropId: rItem._id, title: winner.title });
+    }
+  }
+
+  return actions;
+}
+
+function actionOpKey(mappingId, action) {
+  const targetId = action.raindropId ? `:${action.raindropId}` : '';
+  const title = action.title ? `:${action.title}` : '';
+  return `${mappingId}|${action.kind}|${action.url}${targetId}${title}`;
+}
+
+async function ensureTrashFolderId() {
+  return findOrCreateTopFolder(TRASH_FOLDER);
+}
+
+async function moveBookmarkToTrash(bookmarkId, title) {
+  const trashId = await ensureTrashFolderId();
+  await chrome.bookmarks.move(bookmarkId, { parentId: trashId });
+  if (!String(title || '').startsWith('[Synced Delete] ')) {
+    await chrome.bookmarks.update(bookmarkId, { title: `[Synced Delete] ${title || '(untitled)'}` });
+  }
+}
+
+function toSafeError(err) {
+  return String(err?.message || err || 'Unknown error');
+}
+
+async function executeMapping({
+  token,
+  mapping,
+  preview,
+  mirrorIndex,
+  mappingState,
+  tombstones,
+  appliedOps,
+  deviceId
+}) {
+  const stats = createMappingStats(mapping);
+  const beforeCursor = Number(mappingState?.cursor || 0);
+  stats.cursorBefore = beforeCursor;
+  const { folderId, items: chromeItems } = await listChromeFolderBookmarks(mapping.chromeFolder);
+  const chromeByUrl = new Map();
+  for (const item of chromeItems) {
+    if (!chromeByUrl.has(item.normalizedUrl)) chromeByUrl.set(item.normalizedUrl, item);
+  }
+
+  const raindropItems = await listRaindropItems(token, mapping.collectionId);
+  const raindropByUrl = toMapByUrl(raindropItems, (i) => i.link || '');
+
+  stats.chromeTotal = chromeByUrl.size;
+  stats.raindropTotal = raindropByUrl.size;
+
+  const prevByMapping = mirrorIndex[mapping.id] || {};
+  const tombstonesByMapping = tombstones[mapping.id] || {};
+  const actions = buildActions({
+    chromeByUrl,
+    raindropByUrl,
+    prevIndex: prevByMapping,
+    mapping,
+    tombstones: tombstonesByMapping
+  });
+
+  // Working maps for new index calculation.
+  const chromeWork = new Map(chromeByUrl);
+  const raindropWork = new Map(raindropByUrl);
+  const nextAppliedOps = { ...appliedOps };
+  const nextTombstonesByMapping = { ...tombstonesByMapping };
+  const opNow = nowMs();
+
+  for (const action of actions) {
+    const opKey = actionOpKey(mapping.id, action);
+    if (!preview && nextAppliedOps[opKey] && opNow - Number(nextAppliedOps[opKey]?.at || 0) <= APPLIED_OP_TTL_MS) {
+      continue;
+    }
+    const opId = `${deviceId}:${newId()}`;
+
+    if (action.kind === 'CREATE_RAINDROP') {
+      stats.createdInRaindrop += 1;
+      pushSample(stats, `+ Raindrop: ${action.title} (${action.link})`);
+      if (!preview) {
+        const payload = await raindropRequest(token, 'POST', '/raindrop', {
+          collection: { $id: mapping.collectionId },
+          title: action.title,
+          link: action.link
+        });
+        const created = payload?.item || payload?.result || payload;
+        if (created && created._id) {
+          raindropWork.set(action.url, created);
+        }
+        nextAppliedOps[opKey] = { at: nowMs(), opId };
+      }
+      delete nextTombstonesByMapping[action.url];
+      continue;
+    }
+
+    if (action.kind === 'CREATE_CHROME') {
+      stats.createdInChrome += 1;
+      pushSample(stats, `+ Safari: ${action.title} (${action.link})`);
+      if (!preview) {
+        const created = await chrome.bookmarks.create({
+          parentId: folderId,
+          title: action.title,
+          url: action.link
+        });
+        chromeWork.set(action.url, {
+          id: created.id,
+          title: created.title,
+          url: created.url,
+          normalizedUrl: action.url,
+          created: chromeDateToUnix(created.dateAdded)
+        });
+        nextAppliedOps[opKey] = { at: nowMs(), opId };
+      }
+      delete nextTombstonesByMapping[action.url];
+      continue;
+    }
+
+    if (action.kind === 'UPDATE_RAINDROP_TITLE') {
+      stats.updatedRaindropTitle += 1;
+      pushSample(stats, `~ 标题更新: ${action.title}`);
+      if (!preview) {
+        await raindropRequest(token, 'PUT', `/raindrop/${action.raindropId}`, { title: action.title });
+        nextAppliedOps[opKey] = { at: nowMs(), opId };
+      }
+      const old = raindropWork.get(action.url);
+      if (old) raindropWork.set(action.url, { ...old, title: action.title });
+      continue;
+    }
+
+    if (action.kind === 'DELETE_RAINDROP') {
+      stats.deletedInRaindrop += 1;
+      pushSample(stats, `- Raindrop: ${action.title || action.url}`);
+      if (!preview) {
+        await raindropRequest(token, 'DELETE', `/raindrop/${action.raindropId}`);
+        nextAppliedOps[opKey] = { at: nowMs(), opId };
+      }
+      raindropWork.delete(action.url);
+      nextTombstonesByMapping[action.url] = {
+        deletedAt: nowMs(),
+        source: action.source || 'chrome',
+        opId
+      };
+      continue;
+    }
+
+    if (action.kind === 'MOVE_CHROME_TO_TRASH') {
+      stats.movedToChromeTrash += 1;
+      pushSample(stats, `- Safari->Trash: ${action.title || action.url}`);
+      if (!preview) {
+        try {
+          await moveBookmarkToTrash(action.chromeId, action.title);
+          nextAppliedOps[opKey] = { at: nowMs(), opId };
+        } catch (_err) {
+          // Bookmark might already be removed manually.
+        }
+      }
+      chromeWork.delete(action.url);
+      nextTombstonesByMapping[action.url] = {
+        deletedAt: nowMs(),
+        source: action.source || 'raindrop',
+        opId
+      };
+    }
+  }
+
+  const newMirror = {};
+  for (const [url, cItem] of chromeWork.entries()) {
+    const rItem = raindropWork.get(url);
+    if (!rItem) continue;
+    newMirror[url] = {
+      chromeId: cItem.id,
+      raindropId: rItem._id,
+      syncedAt: Date.now()
+    };
+  }
+
+  const newMappingState = {
+    cursor: preview ? beforeCursor : nowMs(),
+    lastSuccessAt: nowMs()
+  };
+  stats.cursorAfter = newMappingState.cursor;
+
+  return {
+    stats,
+    newMirror,
+    newMappingState,
+    nextTombstonesByMapping,
+    nextAppliedOps
+  };
+}
+
+function aggregateStats(perMapping, preview, manual) {
+  const totals = {
+    mappings: perMapping.length,
+    createdInRaindrop: 0,
+    createdInChrome: 0,
+    updatedRaindropTitle: 0,
+    deletedInRaindrop: 0,
+    movedToChromeTrash: 0,
+    preview,
+    manual
+  };
+
+  for (const s of perMapping) {
+    totals.createdInRaindrop += s.createdInRaindrop;
+    totals.createdInChrome += s.createdInChrome;
+    totals.updatedRaindropTitle += s.updatedRaindropTitle;
+    totals.deletedInRaindrop += s.deletedInRaindrop;
+    totals.movedToChromeTrash += s.movedToChromeTrash;
+  }
+
+  return totals;
+}
+
+async function buildEffectiveMappings(cfg) {
+  const explicit = (cfg.mappings || []).map(normalizeMapping);
+  if (!cfg.topLevelAutoSync) return explicit;
+
+  const collectionUsed = new Set(explicit.map((m) => Number(m.collectionId)));
+  const pairUsed = new Set(explicit.map((m) => `${m.collectionId}:${m.chromeFolder}`));
+  const out = [...explicit];
+
+  const autoUnsorted = normalizeMapping({
+    id: 'auto_unsorted',
+    collectionId: -1,
+    chromeFolder: 'Raindrop Unsorted',
+    deleteSync: false
+  });
+  if (!collectionUsed.has(-1) && !pairUsed.has(`${autoUnsorted.collectionId}:${autoUnsorted.chromeFolder}`)) {
+    out.push(autoUnsorted);
+    collectionUsed.add(-1);
+  }
+
+  const topCollections = [];
+  for (const col of topCollections) {
+    if (collectionUsed.has(col.id)) continue;
+    const auto = normalizeMapping({
+      id: `auto_${col.id}`,
+      collectionId: col.id,
+      chromeFolder: col.title,
+      deleteSync: false
+    });
+    const key = `${auto.collectionId}:${auto.chromeFolder}`;
+    if (pairUsed.has(key)) continue;
+    out.push(auto);
+    pairUsed.add(key);
+    collectionUsed.add(col.id);
+  }
+
+  return out;
+}
+
+function adaptCloudStats(payload, { preview = false, manual = false } = {}) {
+  const srcTotals = payload?.totals || {};
+  const srcMappings = Array.isArray(payload?.mappings) ? payload.mappings : [];
+  const totals = {
+    mappings: Number(srcTotals.mappings || srcMappings.length || 0),
+    createdInRaindrop: Number(srcTotals.createdRemote || 0),
+    createdInChrome: Number(srcTotals.createdLocal || 0),
+    updatedRaindropTitle: Number(srcTotals.updatedRemoteTitle || 0),
+    deletedInRaindrop: Number(srcTotals.deletedRemote || 0),
+    movedToChromeTrash: Number(srcTotals.deletedLocal || 0),
+    preview: Boolean(preview),
+    manual: Boolean(manual),
+    backend: 'cloud'
+  };
+
+  const mappings = srcMappings.map((m) => ({
+    mappingId: m.mappingId,
+    collectionId: Number(m.collectionId ?? -1),
+    chromeFolder: String(m.folderName || m.chromeFolder || 'Raindrop Synced'),
+    deleteSync: Boolean(m.deleteSync),
+    chromeTotal: Number(m.localTotal || m.chromeTotal || 0),
+    raindropTotal: Number(m.remoteTotal || m.raindropTotal || 0),
+    createdInRaindrop: Number(m.createdRemote || m.createdInRaindrop || 0),
+    createdInChrome: Number(m.createdLocal || m.createdInChrome || 0),
+    updatedRaindropTitle: Number(m.updatedRemoteTitle || m.updatedRaindropTitle || 0),
+    deletedInRaindrop: Number(m.deletedRemote || m.deletedInRaindrop || 0),
+    movedToChromeTrash: Number(m.deletedLocal || m.movedToChromeTrash || 0),
+    cursorBefore: Number(m.cursorBefore || 0),
+    cursorAfter: Number(m.cursorAfter || 0),
+    samples: Array.isArray(m.samples) ? m.samples : []
+  }));
+
+  return { totals, mappings };
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function cloudPreviewSync(cfg, { manual = true } = {}) {
+  const result = await cloudRequest(cfg, 'POST', '/api/plugins/raindropSync/preview', {});
+  return adaptCloudStats(result, { preview: true, manual });
+}
+
+async function cloudRunSync(cfg, { manual = true } = {}) {
+  const queued = await cloudRequest(cfg, 'POST', '/api/plugins/raindropSync/tasks', {
+    kind: 'run',
+    input: {},
+    idempotencyKey: manual ? 'chrome-extension-manual-run' : 'chrome-extension-auto-run'
+  });
+
+  const taskId = queued?.task?.id;
+  if (!taskId) {
+    throw new Error('Cloud task enqueue failed: missing task id');
+  }
+
+  if (!manual) {
+    const payload = {
+      totals: {
+        mappings: 0,
+        createdInRaindrop: 0,
+        createdInChrome: 0,
+        updatedRaindropTitle: 0,
+        deletedInRaindrop: 0,
+        movedToChromeTrash: 0,
+        preview: false,
+        manual: false,
+        backend: 'cloud',
+        queued: true,
+        taskId
+      },
+      mappings: []
+    };
+    await setSyncStatus({ ok: true, stats: payload, error: '', backend: 'cloud', queued: true, taskId });
+    return payload;
+  }
+
+  const started = Date.now();
+  const timeoutMs = 90 * 1000;
+  while (true) {
+    const task = await cloudRequest(cfg, 'GET', `/api/plugins/raindropSync/tasks/${encodeURIComponent(taskId)}`);
+    if (task.status === 'succeeded') {
+      const payload = adaptCloudStats(task.resultSummary || {}, { preview: false, manual: true });
+      await setSyncStatus({ ok: true, stats: payload, error: '', backend: 'cloud', queued: false, taskId });
+      return payload;
+    }
+    if (task.status === 'failed') {
+      const message = String(task?.error?.message || 'Cloud sync task failed');
+      const err = new Error(message);
+      err.taskId = taskId;
+      throw err;
+    }
+    if (Date.now() - started > timeoutMs) {
+      throw new Error(`Cloud sync task timeout: ${taskId}`);
+    }
+    await sleep(1000);
+  }
+}
+
+async function runSyncEntry({ manual = false, preview = false } = {}) {
+  const cfg = await getSettings();
+  if (!isCloudBackend(cfg)) {
+    return runSync({ manual, preview });
+  }
+  if (preview) {
+    return cloudPreviewSync(cfg, { manual });
+  }
+  return cloudRunSync(cfg, { manual });
+}
+
+async function pingCloud(cfg) {
+  const data = await cloudRequest(cfg, 'GET', '/api/health');
+  return data;
+}
+
+function extensionCapabilities() {
+  return [
+    'cloud-sync-dispatch',
+    'device-status-report',
+    'chrome-bookmarks-access'
+  ];
+}
+
+async function registerCloudDevice(cfg, { reason = 'manual', status = 'online' } = {}) {
+  if (!isCloudBackend(cfg)) return { ok: true, skipped: 'direct' };
+  const deviceId = await ensureDeviceId(cfg);
+  const manifest = chrome.runtime.getManifest();
+  const local = await chrome.storage.local.get({
+    lastSyncStatus: null,
+    autoSyncEnabled: true,
+    autoSyncMinutes: 15
+  });
+  const payload = {
+    deviceId,
+    platform: 'chrome-extension',
+    app: 'bookmark-raindrop-sync',
+    appVersion: String(manifest.version || ''),
+    extensionVersion: String(manifest.version || ''),
+    syncBackend: String(cfg.syncBackend || 'cloud'),
+    cloudApiBaseUrl: normalizeCloudBaseUrl(cfg.cloudApiBaseUrl),
+    capabilities: extensionCapabilities(),
+    status,
+    lastSyncStatus: local.lastSyncStatus || null,
+    meta: {
+      reason,
+      autoSyncEnabled: Boolean(local.autoSyncEnabled),
+      autoSyncMinutes: Math.max(1, Number(local.autoSyncMinutes || 15)),
+      topLevelAutoSync: Boolean(cfg.topLevelAutoSync),
+      mappings: (cfg.mappings || []).length
+    }
+  };
+  const resp = await cloudRequest(cfg, 'POST', '/api/plugins/raindropSync/devices/register', payload);
+  return { ok: true, deviceId, item: resp?.item || null };
+}
+
+async function reportCloudDeviceStatus(cfg, deviceId, payload = {}) {
+  if (!isCloudBackend(cfg)) return { ok: true, skipped: 'direct' };
+  if (!deviceId) throw new Error('Missing deviceId');
+  const resp = await cloudRequest(cfg, 'POST', `/api/plugins/raindropSync/devices/${encodeURIComponent(deviceId)}/status`, payload);
+  return { ok: true, item: resp?.item || null };
+}
+
+async function runSync({ manual = false, preview = false } = {}) {
+  void manual;
+  void preview;
+  throw new Error('Direct provider sync is disabled in the extension. Use SYNC_WITH_RAINBOW.');
+}
+
+async function setupAlarm() {
+  const cfg = await getSettings();
+  // Safari ↔ Rainbow 自动同步
+  await chrome.alarms.clear('autoSyncRainbow');
+  if (cfg.rbAutoSyncEnabled) {
+    const rbPeriod = Math.max(5, Number(cfg.rbAutoSyncMinutes) || 30);
+    chrome.alarms.create('autoSyncRainbow', { periodInMinutes: rbPeriod });
+  }
+}
+
+chrome.runtime.onInstalled.addListener(async () => {
+  const cfg = await getSettings();
+  await chrome.storage.local.remove(['raindropToken', 'raindropCollectionId', 'chromeImportFolder']);
+  await chrome.storage.local.set({
+    syncBackend: cfg.syncBackend || 'cloud',
+    cloudApiBaseUrl: normalizeCloudBaseUrl(cfg.cloudApiBaseUrl),
+    mappings: cfg.mappings,
+    mirrorIndex: cfg.mirrorIndex || {},
+    rainbowMirrorIndex: normalizeRainbowMirrorIndex(cfg.rainbowMirrorIndex || {}),
+    mappingState: cfg.mappingState || {},
+    tombstones: cfg.tombstones || {},
+    appliedOps: cfg.appliedOps || {},
+    deviceId: cfg.deviceId || `dev_${newId()}`
+  });
+  await setupAlarm();
+  try {
+    await registerCloudDevice(cfg, { reason: 'installed', status: 'online' });
+  } catch (_err) {
+    // ignore
+  }
+});
+
+chrome.runtime.onStartup.addListener(async () => {
+  await setupAlarm();
+  try {
+    const cfg = await getSettings();
+    await registerCloudDevice(cfg, { reason: 'startup', status: 'online' });
+  } catch (_err) {
+    // ignore
+  }
+});
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === 'autoSyncRainbow') {
+    try {
+      await syncWithRainbow({ preview: false });
+    } catch (err) {
+      // best-effort: log but don't crash service worker
+      console.warn('[autoSyncRainbow] error:', err?.message || err);
+    }
+  }
+});
+
+// ── Safari ↔ Rainbow DB Sync ──────────────────────────────────────────────
+
+function chromeFolderPathKey(pathParts = []) {
+  return (Array.isArray(pathParts) ? pathParts : [])
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .join('\u001f');
+}
+
+/**
+ * Collect all bookmarks from the Chrome bookmark tree (excluding trash folder).
+ * Returns an array of { name, path, bookmarks: [{ url, title, chromeId, chromeParentId, folderPath }] }.
+ */
+async function collectChromeBookmarksByFolder() {
+  const tree = await chrome.bookmarks.getTree();
+  const folderMap = new Map(); // pathKey -> { name, path, bookmarks }
+
+  function ensureFolderEntry(pathParts) {
+    const path = (Array.isArray(pathParts) ? pathParts : [])
+      .map((part) => String(part || '').trim())
+      .filter(Boolean);
+    if (!path.length) return null;
+    const key = chromeFolderPathKey(path);
+    if (!folderMap.has(key)) {
+      folderMap.set(key, {
+        name: path[path.length - 1],
+        path,
+        bookmarks: []
+      });
+    }
+    return folderMap.get(key);
+  }
+
+  function walkNode(node, parentPath = []) {
+    if (!node) return;
+    const isFolder = !node.url;
+
+    if (isFolder) {
+      const folderName = (node.title || '').trim();
+      // Chrome root id 0 is only a container. Bookmark bar / other roots keep their titles.
+      const isRootContainer = !folderName || node.id === '0';
+      const isTrash = folderName === TRASH_FOLDER;
+      if (isTrash) return;
+
+      const folderPath = isRootContainer ? parentPath : [...parentPath, folderName];
+      const entry = isRootContainer ? null : ensureFolderEntry(folderPath);
+      for (const child of node.children || []) {
+        if (child.url) {
+          if (!entry) continue;
+          entry.bookmarks.push({
+            url: child.url,
+            title: (child.title || '').trim() || '(untitled)',
+            chromeId: child.id,
+            chromeParentId: child.parentId,
+            folderPath,
+            createdAt: Number(child.dateAdded || Date.now())
+          });
+        } else {
+          walkNode(child, folderPath);
+        }
+      }
+    }
+  }
+
+  for (const root of tree) {
+    walkNode(root, []);
+  }
+
+  return [...folderMap.values()];
+}
+
+/**
+ * Ensure a Chrome top-level bookmark folder exists (under the bookmark bar).
+ * Returns the folder's Chrome ID.
+ */
+const chromeFolderCache = new Map();
+async function ensureChromeFolderByName(name) {
+  if (chromeFolderCache.has(name)) return chromeFolderCache.get(name);
+  const id = await findOrCreateTopFolder(name);
+  chromeFolderCache.set(name, id);
+  return id;
+}
+
+async function ensureChromeFolderByPath(pathParts) {
+  const path = (Array.isArray(pathParts) ? pathParts : [])
+    .map((part) => String(part || '').trim())
+    .filter(Boolean);
+  if (!path.length) return ensureChromeFolderByName('待归档');
+  const key = chromeFolderPathKey(path);
+  if (chromeFolderCache.has(key)) return chromeFolderCache.get(key);
+
+  const firstPathPart = String(path[0] || '').trim();
+  let parentId = await getBookmarkBarId();
+  let startIndex = 0;
+  const tree = await chrome.bookmarks.getTree().catch(() => []);
+  const rootChildren = tree?.[0]?.children || [];
+  const matchedRoot = rootChildren.find((node) => !node.url && String(node.title || '').trim() === firstPathPart);
+  const isBookmarkBarPath = firstPathPart === '书签栏' || /^bookmarks bar$/i.test(firstPathPart);
+  if (matchedRoot) {
+    parentId = matchedRoot.id;
+    startIndex = 1;
+  } else if (isBookmarkBarPath) {
+    parentId = await getBookmarkBarId();
+    startIndex = 1;
+  }
+  if (startIndex === 0) {
+    parentId = await findOrCreateTopFolder(path[0]);
+  }
+
+  for (let i = startIndex; i < path.length; i++) {
+    const name = path[i];
+    const children = await chrome.bookmarks.getChildren(parentId);
+    const found = children.find((x) => !x.url && x.title === name);
+    const folder = found || await chrome.bookmarks.create({ parentId, title: name });
+    parentId = folder.id;
+  }
+
+  chromeFolderCache.set(key, parentId);
+  return parentId;
+}
+
+/**
+ * syncWithRainbow({ preview })
+ * Bidirectional sync between Chrome bookmarks and the Rainbow cloud DB.
+ *
+ * Steps:
+ *  1. Collect all Chrome bookmarks (folder by folder)
+ *  2. POST to /api/chrome-sync with the full snapshot
+ *  3. Apply the response:
+ *     - toAddInChrome: create these bookmarks in Chrome (in correct folder)
+ *     - toDeleteInChrome: move these Chrome bookmarks to trash (if deleteSync)
+ */
+async function syncWithRainbow({ preview = false } = {}) {
+  const cfg = await getSettings();
+  if (!isCloudBackend(cfg)) {
+    throw new Error('Safari ↔ Rainbow 同步需要云端模式（cloud backend）');
+  }
+  const token = String(cfg.cloudApiToken || '').trim();
+  if (!token) {
+    throw new Error('请先在插件设置中配置云端 API Token');
+  }
+  const deviceId = await ensureDeviceId(cfg);
+  const mirrorIndex = normalizeRainbowMirrorIndex(cfg.rainbowMirrorIndex || {});
+
+  // 1. Collect Chrome bookmarks grouped by folder
+  chromeFolderCache.clear();
+  const folders = await collectChromeBookmarksByFolder();
+
+  const totalChromeBookmarks = folders.reduce((s, f) => s + f.bookmarks.length, 0);
+
+  // 2. Call backend sync API
+  const baseUrl = normalizeCloudBaseUrl(cfg.cloudApiBaseUrl);
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+
+  const syncRes = await fetch(`${baseUrl}/api/chrome-sync`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      folders,
+      deviceId,
+      mirrorIndex,
+      deleteSync: true  // 以云端删除记录为准，删除 Chrome 中对应的书签
+    })
+  });
+
+  if (!syncRes.ok) {
+    let message = `Safari sync API failed: ${syncRes.status}`;
+    try {
+      const payload = await syncRes.json();
+      if (payload?.error?.message) message = payload.error.message;
+      else if (payload?.message) message = payload.message;
+    } catch (_) { }
+    throw new Error(message);
+  }
+
+  const syncData = await syncRes.json();
+  const toAddInChrome = Array.isArray(syncData.toAddInChrome) ? syncData.toAddInChrome : [];
+  const toDeleteInChrome = Array.isArray(syncData.toDeleteInChrome) ? syncData.toDeleteInChrome : [];
+  const serverStats = syncData.stats || {};
+
+  // 3. Apply changes to Chrome (if not preview)
+  let addedToChrome = 0;
+  let deletedFromChrome = 0;
+  const nextMirrorIndex = normalizeRainbowMirrorIndex(syncData.mirrorIndex || {});
+
+  if (!preview) {
+    // Add bookmarks that exist in DB but not in Chrome
+    for (const item of toAddInChrome) {
+      try {
+        const folderName = String(item.folderName || '').trim() || '待归档';
+        const folderId = await ensureChromeFolderByPath(item.folderPath || [folderName]);
+        const created = await chrome.bookmarks.create({
+          parentId: folderId,
+          title: String(item.title || '').trim() || '(untitled)',
+          url: item.url
+        });
+        const bookmarkId = String(item.id || item.rainbowId || '');
+        if (bookmarkId) {
+          nextMirrorIndex[bookmarkId] = {
+            rainbowId: bookmarkId,
+            chromeId: created.id,
+            url: created.url || item.url,
+            normalizedUrl: normalizeUrl(created.url || item.url) || '',
+            title: created.title || item.title || '(untitled)',
+            folderName,
+            folderPath: Array.isArray(item.folderPath) ? item.folderPath : [folderName],
+            syncedAt: Date.now()
+          };
+        }
+        addedToChrome++;
+      } catch (_err) {
+        // best-effort; skip individual failures
+      }
+    }
+
+    // 删除 Chrome 中已在 DB 被删除的书签（以云端删除记录为准）
+    for (const item of toDeleteInChrome) {
+      try {
+        if (item.chromeId) {
+          // 优先用 chromeId 直接删除
+          try {
+            await chrome.bookmarks.remove(item.chromeId);
+            deletedFromChrome++;
+            continue;
+          } catch (_idErr) {
+            // chromeId 可能已过期，继续用 URL 匹配删除
+          }
+        }
+        // 安全居安：按 URL 搜索 Chrome 中的书签并删除
+        if (item.url) {
+          const found = await chrome.bookmarks.search({ url: item.url });
+          for (const bm of found) {
+            try { await chrome.bookmarks.remove(bm.id); } catch (_) { }
+          }
+          if (found.length > 0) deletedFromChrome++;
+        }
+      } catch (_err) { }
+    }
+
+    await chrome.storage.local.set({ rainbowMirrorIndex: nextMirrorIndex });
+  }
+
+  const result = {
+    preview,
+    chromeFolders: folders.length,
+    totalChromeBookmarks,
+    server: serverStats,
+    chrome: {
+      addedToChrome: preview ? toAddInChrome.length : addedToChrome,
+      toAddCount: toAddInChrome.length,
+      toDeleteCount: toDeleteInChrome.length,
+      deletedFromChrome: preview ? 0 : deletedFromChrome,
+    },
+    samples: {
+      toAdd: toAddInChrome.slice(0, 8).map((x) => `+Safari: ${x.title} (${x.folderName})`),
+      toDelete: toDeleteInChrome.slice(0, 8).map((x) => `-Safari: ${x.url}`)
+    }
+  };
+
+  if (!preview) {
+    await setSyncStatus({
+      ok: true,
+      rainbowSync: result,
+      error: '',
+      backend: 'cloud'
+    });
+  }
+
+  return result;
+}
+
+// ── Message listener ─────────────────────────────────────────────────────────
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === 'SETTINGS_CHANGED') {
+    (async () => {
+      await setupAlarm();
+      const cfg = await getSettings();
+      if (isCloudBackend(cfg)) {
+        await registerCloudDevice(cfg, { reason: 'settings_changed', status: 'online' });
+      }
+      return { ok: true, backend: cfg.syncBackend || 'cloud' };
+    })()
+      .then((resp) => sendResponse(resp))
+      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
+  if (msg?.type === 'PING_CLOUD') {
+    getSettings()
+      .then(async (cfg) => {
+        const effectiveCfg = {
+          ...cfg,
+          syncBackend: typeof msg?.syncBackend !== 'undefined' ? String(msg.syncBackend) : cfg.syncBackend,
+          cloudApiBaseUrl: typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : cfg.cloudApiBaseUrl,
+          cloudApiToken: typeof msg?.cloudApiToken !== 'undefined' ? String(msg.cloudApiToken) : cfg.cloudApiToken
+        };
+        if (!isCloudBackend(effectiveCfg)) return { ok: true, mode: 'direct' };
+        const health = await pingCloud(effectiveCfg);
+        return { ok: true, mode: 'cloud', health };
+      })
+      .then((resp) => sendResponse(resp))
+      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
+  if (msg?.type === 'AUTO_FETCH_TOKEN') {
+    (async () => {
+      try {
+        const urlToUse = typeof msg?.cloudApiBaseUrl !== 'undefined' ? String(msg.cloudApiBaseUrl) : DEFAULT_CLOUD_API_BASE;
+        const url = normalizeCloudBaseUrl(urlToUse);
+
+        const cookies = await chrome.cookies.getAll({ url });
+        const sessionCookie = cookies.find(c => c.name === 'rb_session');
+        if (!sessionCookie) {
+          return { ok: false, error: '未在该网站找到登录会话，请先手动访问并登录。' };
+        }
+
+        const res = await fetch(`${url}/api/auth/tokens`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ name: 'Safari Ext Auto Token' }),
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          let errText = await res.text().catch(() => '');
+          return { ok: false, error: `认证令牌生成失败 [${res.status}]: ${errText}` };
+        }
+
+        const payload = await res.json();
+        const newToken = payload.token || payload?.item?.token;
+        if (!newToken) {
+          return { ok: false, error: '令牌生成成功但内容解析失败' };
+        }
+
+        return { ok: true, token: newToken };
+      } catch (err) {
+        return { ok: false, error: toSafeError(err) };
+      }
+    })()
+      .then(resp => sendResponse(resp))
+      .catch(err => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
+  if (msg?.type === 'SYNC_WITH_RAINBOW') {
+    syncWithRainbow({ preview: false })
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
+  if (msg?.type === 'PREVIEW_RAINBOW_SYNC') {
+    syncWithRainbow({ preview: true })
+      .then((result) => sendResponse({ ok: true, ...result }))
+      .catch((err) => sendResponse({ ok: false, error: toSafeError(err) }));
+    return true;
+  }
+
+  return false;
+});

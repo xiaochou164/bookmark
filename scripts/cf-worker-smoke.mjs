@@ -333,6 +333,58 @@ async function run() {
     env
   );
   assert.equal(articleExtractRes.status, 200, 'article extract should return 200');
+  const articleExtractJson = await articleExtractRes.json();
+  assert.equal(articleExtractJson.article?.status, 'success', 'article extract should store success status');
+  assert.equal(Boolean(articleExtractJson.article?.provider?.providerType), true, 'article extract should include provider metadata');
+
+  const invalidContentBookmarkRes = await worker.fetch(
+    createRequest('/api/bookmarks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ title: 'Invalid content URL', url: 'ftp://example.com/file', folderId: 'root' })
+    }),
+    env
+  );
+  assert.equal(invalidContentBookmarkRes.status, 201, 'invalid content bookmark fixture should be created');
+  const invalidContentBookmark = await invalidContentBookmarkRes.json();
+
+  const metadataFailureRes = await worker.fetch(
+    createRequest(`/api/bookmarks/${invalidContentBookmark.id}/metadata/fetch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ timeoutMs: 1000 })
+    }),
+    env
+  );
+  assert.equal(metadataFailureRes.status, 502, 'metadata fetch should expose structured external failure');
+  const metadataFailureJson = await metadataFailureRes.json();
+  assert.equal(metadataFailureJson.error?.failure?.code, 'METADATA_URL_PROTOCOL', 'metadata failure should include code');
+  assert.equal(metadataFailureJson.error?.failure?.retryable, false, 'metadata protocol failure should not be retryable');
+
+  const articleFailureRes = await worker.fetch(
+    createRequest(`/api/bookmarks/${invalidContentBookmark.id}/article/extract`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ strict: true, timeoutMs: 1000 })
+    }),
+    env
+  );
+  assert.equal(articleFailureRes.status, 502, 'strict article extract should expose structured external failure');
+  const articleFailureJson = await articleFailureRes.json();
+  assert.equal(Boolean(articleFailureJson.error?.failure?.code), true, 'article failure should include code');
+
+  const taskHealthRes = await worker.fetch(createRequest('/api/product/task-health', { headers: { cookie } }), env);
+  assert.equal(taskHealthRes.status, 200, 'task health should return 200');
+  const taskHealthJson = await taskHealthRes.json();
+  assert.equal(Boolean(taskHealthJson.sections?.metadata), true, 'task health should include metadata section');
+  assert.equal(Array.isArray(taskHealthJson.dlqCandidates), true, 'task health should include DLQ candidates');
+
+  const eventsRes = await worker.fetch(createRequest('/api/events', { headers: { cookie } }), env);
+  assert.equal(eventsRes.status, 200, 'realtime events should return 200');
+  assert.match(eventsRes.headers.get('content-type') || '', /text\/event-stream/, 'realtime events should use event-stream');
+  const eventsText = await eventsRes.text();
+  assert.match(eventsText, /event: rainbow:update/, 'realtime events should include update event');
+  assert.match(eventsText, /"tasks"/, 'realtime events should include task snapshot');
 
   const highlightsCreateRes = await worker.fetch(
     createRequest(`/api/bookmarks/${bookmarkJson.id}/highlights`, {
@@ -358,6 +410,86 @@ async function run() {
   assert.equal(aiConfigRes.status, 200, 'ai config should be writable');
   const aiConfigGetRes = await worker.fetch(createRequest('/api/product/ai/config', { headers: { cookie } }), env);
   assert.equal(aiConfigGetRes.status, 200, 'ai config should be readable');
+
+  const aiEvalRunRes = await worker.fetch(
+    createRequest('/api/product/ai/evals/run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({})
+    }),
+    env
+  );
+  assert.equal(aiEvalRunRes.status, 200, 'ai eval baseline should run');
+  const aiEvalRunJson = await aiEvalRunRes.json();
+  assert.equal(Boolean(aiEvalRunJson.run?.id), true, 'ai eval baseline should return run id');
+
+  const aiFeedbackRes = await worker.fetch(
+    createRequest('/api/product/ai/feedback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ jobId: 'ai_smoke', action: 'accepted', feature: 'smoke' })
+    }),
+    env
+  );
+  assert.equal(aiFeedbackRes.status, 201, 'ai feedback should be accepted');
+
+  const aiPrivacyRes = await worker.fetch(
+    createRequest('/api/product/ai/privacy-policy', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ anonymize: true })
+    }),
+    env
+  );
+  assert.equal(aiPrivacyRes.status, 200, 'ai privacy policy should be writable');
+  const aiPrivacyGetRes = await worker.fetch(createRequest('/api/product/ai/privacy-policy', { headers: { cookie } }), env);
+  assert.equal(aiPrivacyGetRes.status, 200, 'ai privacy policy should be readable');
+  const aiPrivacyGetJson = await aiPrivacyGetRes.json();
+  assert.match(aiPrivacyGetJson.sample || '', /\[redacted-/, 'ai privacy sample should be redacted');
+
+  const aiFeaturePolicyRes = await worker.fetch(
+    createRequest('/api/product/ai/feature-policy', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ enabled: true, capabilities: { autoTag: false } })
+    }),
+    env
+  );
+  assert.equal(aiFeaturePolicyRes.status, 200, 'ai feature policy should be writable');
+  const aiFeaturePolicyGetRes = await worker.fetch(createRequest('/api/product/ai/feature-policy', { headers: { cookie } }), env);
+  assert.equal(aiFeaturePolicyGetRes.status, 200, 'ai feature policy should be readable');
+  const aiFeaturePolicyGetJson = await aiFeaturePolicyGetRes.json();
+  assert.equal(aiFeaturePolicyGetJson.policy?.capabilities?.autoTag, false, 'ai feature policy should persist disabled autotag');
+  const aiFeatureBlockedRes = await worker.fetch(
+    createRequest(`/api/product/ai/autotag/${bookmarkJson.id}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({})
+    }),
+    env
+  );
+  assert.equal(aiFeatureBlockedRes.status, 403, 'ai feature policy should gate disabled autotag');
+  const aiFeaturePolicyRestoreRes = await worker.fetch(
+    createRequest('/api/product/ai/feature-policy', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({ enabled: true, capabilities: { autoTag: true } })
+    }),
+    env
+  );
+  assert.equal(aiFeaturePolicyRestoreRes.status, 200, 'ai feature policy should restore autotag');
+
+  const aiHealthProbeRes = await worker.fetch(
+    createRequest('/api/product/ai/health/probe', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie },
+      body: JSON.stringify({})
+    }),
+    env
+  );
+  assert.equal(aiHealthProbeRes.status, 200, 'ai health probe should return structured result');
+  const aiHealthRes = await worker.fetch(createRequest('/api/product/ai/health', { headers: { cookie } }), env);
+  assert.equal(aiHealthRes.status, 200, 'ai health should be readable');
 
   const aiJobsRes = await worker.fetch(createRequest('/api/product/ai/jobs', { headers: { cookie } }), env);
   assert.equal(aiJobsRes.status, 200, 'ai jobs list should return 200');
@@ -661,6 +793,8 @@ async function run() {
   assert.equal(publicLinkJsonPayload.ok, true, 'public link json should return ok=true');
   assert.equal(publicLinkJsonPayload.link?.token, publicLinkCreateJson.item.token, 'public link json should return matching token');
   assert.equal(Array.isArray(publicLinkJsonPayload.bookmarks), true, 'public link json should contain bookmarks array');
+  assert.equal(Boolean(publicLinkJsonPayload.aiGuide?.summary), true, 'public link json should include ai guide summary');
+  assert.equal(Array.isArray(publicLinkJsonPayload.aiGuide?.faq), true, 'public link json should include ai guide faq');
 
   const publicLinkHtmlRes = await worker.fetch(
     createRequest(`/public/c/${encodeURIComponent(publicLinkCreateJson.item.token)}`),
@@ -669,6 +803,7 @@ async function run() {
   assert.equal(publicLinkHtmlRes.status, 200, 'public link html should return 200');
   const publicLinkHtmlText = await publicLinkHtmlRes.text();
   assert.equal(publicLinkHtmlText.includes('Public Inbox'), true, 'public link html should include public title');
+  assert.equal(publicLinkHtmlText.includes('public-ai-guide'), true, 'public link html should render ai guide');
 
   const publicLinkUpdateRes = await worker.fetch(
     createRequest(`/api/collab/public-links/${publicLinkCreateJson.item.id}`, {
@@ -855,7 +990,8 @@ function createMockEnv() {
         public_links: [],
         collaboration_audit_logs: [],
         io_tasks: [],
-        quota_usage: []
+        quota_usage: [],
+        app_meta: []
       },
       async exec() {},
       prepare(sql) {
@@ -917,6 +1053,16 @@ function createMockEnv() {
               }
               if (row && source.includes('SET ai_suggestions_json = ?3')) {
                 row.aiSuggestionsJson = args[2];
+                row.updatedAt = args[3];
+              }
+              if (row && source.includes('SET metadata_json = ?3, title = ?4, cover = ?5')) {
+                row.metadataJson = args[2];
+                row.title = args[3];
+                row.cover = args[4];
+                row.updatedAt = args[5];
+              }
+              if (row && source.includes('SET article_json = ?3')) {
+                row.articleJson = args[2];
                 row.updatedAt = args[3];
               }
             }
@@ -1059,6 +1205,12 @@ function createMockEnv() {
               if (idx >= 0) env._data.quota_usage[idx] = value;
               else env._data.quota_usage.push(value);
             }
+            if (source.includes('INSERT INTO app_meta')) {
+              const idx = env._data.app_meta.findIndex((row) => row.metaKey === args[0]);
+              const value = { metaKey: args[0], valueText: args[1], updatedAt: args[2] };
+              if (idx >= 0) env._data.app_meta[idx] = value;
+              else env._data.app_meta.push(value);
+            }
             if (source.includes('UPDATE auth_sessions SET last_seen_at')) {
               const item = env._data.auth_sessions.find((row) => row.id === args[0]);
               if (item) {
@@ -1094,6 +1246,9 @@ function createMockEnv() {
             }
             if (source.includes('FROM metadata_tasks') && source.includes('bookmark_id = ?2')) {
               return { results: env._data.metadata_tasks.filter((row) => row.userId === args[0] && row.bookmarkId === args[1]) };
+            }
+            if (source.includes('FROM metadata_tasks') && source.includes('WHERE user_id = ?1') && !source.includes('bookmark_id = ?2') && !source.includes('id = ?2')) {
+              return { results: env._data.metadata_tasks.filter((row) => row.userId === args[0]).slice(0, Number(args[1] || 50)) };
             }
             if (source.includes('FROM ai_jobs') && source.includes('WHERE user_id = ?1')) {
               return { results: env._data.ai_jobs.filter((row) => row.userId === args[0]) };
@@ -1177,6 +1332,7 @@ function createMockEnv() {
             if (source.includes('FROM public_links WHERE token = ?1')) return env._data.public_links.find((row) => row.token === args[0]) || null;
             if (source.includes('FROM io_tasks WHERE id = ?1')) return env._data.io_tasks.find((row) => row.id === args[0]) || null;
             if (source.includes('FROM quota_usage WHERE user_id = ?1')) return env._data.quota_usage.find((row) => row.userId === args[0]) || null;
+            if (source.includes('FROM app_meta WHERE meta_key = ?1')) return env._data.app_meta.find((row) => row.metaKey === args[0]) || null;
             return null;
           }
         });

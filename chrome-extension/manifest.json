@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Bookmark Rainboard Sync",
-  "version": "0.2.8",
-  "description": "Bidirectional sync between Chrome bookmarks and Rainboard cloud bookmarks.",
+  "name": "Bookmark Rainbow Sync",
+  "version": "0.2.9",
+  "description": "Bidirectional sync between Chrome bookmarks and Rainbow cloud bookmarks.",
   "permissions": [
     "bookmarks",
     "storage",
@@ -19,7 +19,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Rainboard Sync",
+    "default_title": "Rainbow Sync",
     "default_popup": "popup.html"
   },
   "options_page": "options.html"

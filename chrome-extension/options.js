@@ -1,10 +1,12 @@
 const DEFAULT_CLOUD_API_BASE = 'https://bookmark.sundays.ink';
-const LEGACY_CLOUD_API_BASE = 'https://rainboard.82fr9qxfqc8554.workers.dev';
+const LEGACY_CLOUD_API_BASE = 'https://rainbow.82fr9qxfqc8554.workers.dev';
 const cloudApiBaseUrl = document.getElementById('cloudApiBaseUrl');
 const cloudApiToken = document.getElementById('cloudApiToken');
 const saveBtn = document.getElementById('saveBtn');
 const testCloudBtn = document.getElementById('testCloudBtn');
 const autoFetchTokenBtn = document.getElementById('autoFetchTokenBtn');
+const toggleTokenBtn = document.getElementById('toggleTokenBtn');
+const clearTokenBtn = document.getElementById('clearTokenBtn');
 const msg = document.getElementById('msg');
 const rbAutoSyncEnabled = document.getElementById('rbAutoSyncEnabled');
 const rbAutoSyncMinutes = document.getElementById('rbAutoSyncMinutes');
@@ -14,7 +16,7 @@ const rbSyncMsg = document.getElementById('rbSyncMsg');
 
 function render(text, ok = true) {
   msg.textContent = text;
-  msg.style.color = ok ? '#0f6f38' : '#b00020';
+  msg.dataset.state = ok ? 'success' : 'error';
 }
 
 function normalizeCloudUrl(input) {
@@ -26,7 +28,14 @@ function callBg(type, payload = {}) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type, ...payload }, (resp) => {
       if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message });
+        const raw = String(chrome.runtime.lastError.message || '');
+        const sourceUnavailable = /message port closed|receiving end does not exist/i.test(raw);
+        resolve({
+          ok: false,
+          error: sourceUnavailable
+            ? '扩展后台未运行。项目已更名为 Rainbow，请在 chrome://extensions 中重新加载此扩展后再试。'
+            : raw
+        });
         return;
       }
       resolve(resp || { ok: false, error: '未知错误' });
@@ -87,6 +96,22 @@ if (autoFetchTokenBtn) {
   });
 }
 
+if (toggleTokenBtn && cloudApiToken) {
+  toggleTokenBtn.addEventListener('click', () => {
+    const visible = cloudApiToken.type === 'text';
+    cloudApiToken.type = visible ? 'password' : 'text';
+    toggleTokenBtn.textContent = visible ? '显示 Token' : '隐藏 Token';
+  });
+}
+
+if (clearTokenBtn && cloudApiToken) {
+  clearTokenBtn.addEventListener('click', async () => {
+    cloudApiToken.value = '';
+    await chrome.storage.local.set({ cloudApiToken: '' });
+    render('Token 已清除。保存设置后扩展将使用空 Token。', true);
+  });
+}
+
 saveBtn.addEventListener('click', async () => {
   const payload = {
     syncBackend: 'cloud',
@@ -97,6 +122,7 @@ saveBtn.addEventListener('click', async () => {
   };
 
   await chrome.storage.local.set(payload);
+  await chrome.storage.local.remove(['raindropToken', 'raindropCollectionId', 'chromeImportFolder']);
   const resp = await callBg('SETTINGS_CHANGED');
   if (!resp.ok) {
     render(resp.error || '保存失败', false);
@@ -108,7 +134,7 @@ saveBtn.addEventListener('click', async () => {
 function renderRb(text, ok = true) {
   if (!rbSyncMsg) return;
   rbSyncMsg.textContent = text;
-  rbSyncMsg.style.color = ok ? '#0f6f38' : '#b00020';
+  rbSyncMsg.dataset.state = ok ? 'success' : 'error';
 }
 
 function formatRbResult(result, title) {
@@ -117,8 +143,8 @@ function formatRbResult(result, title) {
   const lines = [
     title,
     `Chrome 文件夹: ${result.chromeFolders || 0}，Chrome 书签总数: ${result.totalChromeBookmarks || 0}`,
-    `新增到 Rainboard: ${s.createdInDb || 0}，跳过重复: ${s.skippedDuplicate || 0}`,
-    `更新/移动到 Rainboard: ${s.updatedInDb || 0} / ${s.movedInDb || 0}，本地删除同步: ${s.deletedInDb || 0}，文件夹删除: ${s.deletedFoldersInDb || 0}`,
+    `新增到 Rainbow: ${s.createdInDb || 0}，跳过重复: ${s.skippedDuplicate || 0}`,
+    `更新/移动到 Rainbow: ${s.updatedInDb || 0} / ${s.movedInDb || 0}，本地删除同步: ${s.deletedInDb || 0}，文件夹删除: ${s.deletedFoldersInDb || 0}`,
     `待同步到 Chrome: ${c.toAddCount || 0}${result.preview ? ' (预览)' : `，已写入 ${c.addedToChrome || 0} 条`}`,
   ];
   const toAdd = result.samples?.toAdd || [];
@@ -133,15 +159,15 @@ if (rbSyncNowBtn) {
   rbSyncNowBtn.addEventListener('click', async () => {
     rbSyncNowBtn.disabled = true;
     rbPreviewNowBtn.disabled = true;
-    renderRb('同步中（Chrome ↔ Rainboard）...');
-    const resp = await callBg('SYNC_WITH_RAINBOARD');
+    renderRb('同步中（Chrome ↔ Rainbow）...');
+    const resp = await callBg('SYNC_WITH_RAINBOW');
     rbSyncNowBtn.disabled = false;
     rbPreviewNowBtn.disabled = false;
     if (!resp.ok) {
       renderRb(resp.error || '同步失败', false);
       return;
     }
-    renderRb(formatRbResult(resp, '✅ 同步完成！'), true);
+    renderRb(formatRbResult(resp, '同步完成'), true);
   });
 }
 
@@ -149,15 +175,15 @@ if (rbPreviewNowBtn) {
   rbPreviewNowBtn.addEventListener('click', async () => {
     rbSyncNowBtn.disabled = true;
     rbPreviewNowBtn.disabled = true;
-    renderRb('预览中（Chrome ↔ Rainboard）...');
-    const resp = await callBg('PREVIEW_RAINBOARD_SYNC');
+    renderRb('预览中（Chrome ↔ Rainbow）...');
+    const resp = await callBg('PREVIEW_RAINBOW_SYNC');
     rbSyncNowBtn.disabled = false;
     rbPreviewNowBtn.disabled = false;
     if (!resp.ok) {
       renderRb(resp.error || '预览失败', false);
       return;
     }
-    renderRb(formatRbResult(resp, '🔍 预览完成（未写入）'), true);
+    renderRb(formatRbResult(resp, '预览完成（未写入）'), true);
   });
 }
 

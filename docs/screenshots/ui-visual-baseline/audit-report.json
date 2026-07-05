@@ -1,0 +1,1028 @@
+{
+  "createdAt": "2026-07-05T10:42:19.543Z",
+  "baseUrl": "http://127.0.0.1:55905",
+  "viewports": [
+    {
+      "name": "mobile",
+      "width": 360,
+      "height": 780
+    },
+    {
+      "name": "small",
+      "width": 640,
+      "height": 900
+    },
+    {
+      "name": "tablet",
+      "width": 920,
+      "height": 900
+    },
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 900
+    }
+  ],
+  "screenshots": [
+    {
+      "state": "login",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/login-mobile-360.png",
+      "overflow": {
+        "path": "/login.html",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "login",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/login-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "login",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/login-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "login",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/login-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          }
+        ]
+      }
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-list-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-list-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-list-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-list-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 96,
+            "clientWidth": 92
+          }
+        ]
+      }
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-card-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-card-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-card-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/main-card-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/detail-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "detail-panel-mode-switch",
+            "scrollWidth": 101,
+            "clientWidth": 96
+          }
+        ]
+      }
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/detail-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "detail-panel-mode-switch",
+            "scrollWidth": 101,
+            "clientWidth": 96
+          }
+        ]
+      }
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/detail-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/detail-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/settings-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/settings-small-640.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/settings-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/settings-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/plugin-mobile-360.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/plugin-small-640.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/plugin-tablet-920.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/plugin-desktop-1280.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/public-mobile-360.png",
+      "overflow": {
+        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/public-small-640.png",
+      "overflow": {
+        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/public-tablet-920.png",
+      "overflow": {
+        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      }
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/public-desktop-1280.png",
+      "overflow": {
+        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      }
+    }
+  ],
+  "overflow": [
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 96,
+          "clientWidth": 92
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "detail-panel-mode-switch",
+          "scrollWidth": 101,
+          "clientWidth": 96
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "detail-panel-mode-switch",
+          "scrollWidth": 101,
+          "clientWidth": 96
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    }
+  ],
+  "keyboard": {
+    "hasVisibleFocus": true,
+    "menuOpened": true,
+    "menuClosed": true,
+    "searchValue": "example",
+    "detailFocused": true,
+    "focusTrail": [
+      {
+        "tag": "BUTTON",
+        "id": "sidebarAccountBtn",
+        "text": "U\n            \n              UI Audit\n  "
+      },
+      {
+        "tag": "BUTTON",
+        "id": "sidebarTopNewBtn",
+        "text": "+"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "所有书签\n          99"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "…"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "收件箱\n          99"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "…"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "收藏\n          2"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "…"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "归档\n          0"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "…"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "废纸篓\n          0"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "…"
+      }
+    ]
+  },
+  "largeSample": {
+    "initial": {
+      "folderCount": 153,
+      "treeVirtualized": true,
+      "visibleTagRows": 12,
+      "tagTotalText": "标签 (104)",
+      "tagsCollapsed": true,
+      "loadMoreVisible": true,
+      "listRows": 24,
+      "sidebarWidth": 300
+    },
+    "expandedTags": {
+      "tagsVirtualized": true,
+      "virtualCount": 104,
+      "visibleTagRows": 35,
+      "tagsCollapsed": false
+    },
+    "afterLoadMore": {
+      "listRows": 48,
+      "loadMoreVisible": true,
+      "loadMoreMeta": "已显示 48 / 99 条 · 已加载 2 页",
+      "pageOverflowOk": true
+    }
+  },
+  "zoomAndMotion": {
+    "reducedMotion": true,
+    "scrollOk": true,
+    "reachable": true,
+    "visibleControlCount": 89
+  },
+  "console": [],
+  "networkErrors": []
+}

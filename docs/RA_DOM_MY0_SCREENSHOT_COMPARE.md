@@ -87,5 +87,5 @@
   - 需优化列表（附偏差标注）
   - 新回归问题列表
 - 如需归档到项目，可放在：
-  - `/Users/xiaochou164/Desktop/bookmarktorain/docs/screenshots/ra-dom-my0/`
+  - `/Users/xiaochou164/Desktop/mycode/Rainbow/docs/screenshots/ra-dom-my0/`
 

@@ -1,0 +1,152 @@
+/*
+ * Workbench shell layout and split-view rules.
+ */
+
+@media (min-width: 921px) {
+  .shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) minmax(560px, 1fr);
+    grid-template-areas: "sidebar main";
+    min-height: 100vh;
+    gap: 0;
+    padding: 0;
+    background: var(--color-page);
+  }
+
+  .shell.detail-panel-open {
+    grid-template-columns: var(--sidebar-width) minmax(560px, 1fr) minmax(360px, var(--detail-width));
+    grid-template-areas: "sidebar main detail";
+  }
+
+  .shell .sidebar {
+    grid-area: sidebar;
+    position: sticky;
+    top: 0;
+    width: auto;
+    height: 100vh;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border-radius: 0;
+    border-right: 1px solid var(--color-border);
+    box-shadow: inset -1px 0 0 rgba(15, 23, 42, .02);
+  }
+
+  .shell .main {
+    grid-area: main;
+    min-width: 0;
+    min-height: 100vh;
+    border-radius: 0;
+    border-right: 1px solid var(--color-border);
+  }
+
+  .shell .detail {
+    grid-area: detail;
+    position: relative;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    height: 100vh;
+    min-height: 0;
+    overflow-y: auto;
+    border-radius: 0;
+    border-left: 1px solid var(--color-border);
+    transform: none;
+    opacity: 1;
+    pointer-events: auto;
+    box-shadow: none;
+  }
+
+  .sidebar-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--control-h-md);
+    gap: var(--space-2);
+    align-items: center;
+    margin-bottom: var(--space-2);
+  }
+
+  .sidebar-topbar .sidebar-account {
+    min-width: 0;
+    margin-bottom: 0;
+  }
+
+  .sidebar-top-new-btn {
+    width: var(--control-h-md);
+    height: var(--control-h-md);
+    padding: 0;
+    display: inline-grid;
+    place-items: center;
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .split-resize-handle {
+    position: absolute;
+    z-index: var(--layer-sticky);
+    width: 7px;
+    cursor: col-resize;
+    touch-action: none;
+    background: transparent;
+    border: 0;
+  }
+
+  .split-resize-handle::after {
+    content: "";
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    left: 3px;
+    width: 1px;
+    background: transparent;
+    transition: background .12s ease, box-shadow .12s ease;
+  }
+
+  .split-resize-handle:hover::after,
+  .split-resize-handle:focus-visible::after,
+  body.split-resizing .split-resize-handle::after {
+    background: var(--color-accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+  }
+
+  .sidebar-resize-handle {
+    top: 0;
+    right: -4px;
+    bottom: 0;
+  }
+
+  .detail-resize-handle {
+    top: 0;
+    left: -4px;
+    bottom: 0;
+  }
+
+  .shell:not(.detail-panel-open) .detail {
+    display: none;
+  }
+
+  .detail-panel-backdrop,
+  .shell.detail-panel-open .detail-panel-backdrop:not(.hidden) {
+    display: none;
+  }
+
+  .shell.detail-panel-open .cards.layout-list .bookmark-row {
+    grid-template-columns: auto 56px minmax(0, 1fr);
+  }
+
+  .shell.detail-panel-open .cards.layout-list .bookmark-row-side {
+    display: none;
+  }
+}
+
+@media (min-width: 921px) and (max-width: 1180px) {
+  .shell {
+    grid-template-columns: clamp(220px, 24vw, var(--sidebar-width)) minmax(0, 1fr);
+  }
+
+  .shell.detail-panel-open {
+    grid-template-columns:
+      clamp(220px, 24vw, var(--sidebar-width))
+      minmax(360px, 1fr)
+      clamp(320px, 34vw, var(--detail-width));
+  }
+}

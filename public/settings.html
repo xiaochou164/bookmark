@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>设置 - Rainboard 云书签</title>
+    <title>应用设置 - Rainbow 云书签</title>
     <meta name="theme-color" content="#1194ff" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.svg" />
@@ -12,12 +12,13 @@
   <body class="auth-page">
     <main class="settings-page-shell">
       <aside class="settings-nav">
+        <a class="settings-nav-back" href="/" aria-label="返回主界面">‹</a>
         <div class="settings-nav-head">
           <div class="brand">
             <div class="brand-dot"></div>
             <div>
-              <strong>Rainboard</strong>
-              <small>用户设置</small>
+              <strong>Rainbow</strong>
+              <small>应用设置</small>
             </div>
           </div>
           <div class="settings-nav-account">
@@ -32,9 +33,14 @@
         <div class="settings-nav-block">
           <div class="settings-nav-title">页面</div>
           <div class="settings-nav-pages" id="settingsNavPages">
-            <button type="button" class="settings-nav-page" data-settings-target="account">账号与安全</button>
-            <button type="button" class="settings-nav-page" data-settings-target="collab">共享与公开</button>
-            <button type="button" class="settings-nav-page" data-settings-target="product">产品能力</button>
+            <button type="button" class="settings-nav-page" data-settings-target="app">应用</button>
+            <button type="button" class="settings-nav-page" data-settings-target="account">帐户</button>
+            <button type="button" class="settings-nav-page" data-settings-target="product">订阅</button>
+            <button type="button" class="settings-nav-page" data-settings-target="import">导入</button>
+            <button type="button" class="settings-nav-page" data-settings-target="collab">整合方式</button>
+            <button type="button" class="settings-nav-page" data-settings-target="operations">备份</button>
+            <button type="button" class="settings-nav-page" data-settings-target="security">2FA</button>
+            <button type="button" class="settings-nav-page" data-settings-target="ai">AI</button>
           </div>
         </div>
 
@@ -48,25 +54,44 @@
       <section class="settings-page-card">
         <div class="settings-page-header">
           <div class="settings-page-header-main">
-            <h1>用户设置</h1>
-            <p class="muted">账号、安全、共享、产品能力与运维工具集中管理。</p>
+            <h1 id="settingsPageTitle">应用</h1>
+            <p class="muted">账号、安全、同步、备份与智能工具集中管理。</p>
           </div>
           <div class="settings-page-header-actions">
             <a class="ghost button-link" href="/">返回主界面</a>
           </div>
         </div>
 
-        <div id="settingsStatus" class="settings-status-banner muted">正在加载设置...</div>
+        <div id="settingsStatus" class="settings-status-banner muted" role="status" aria-live="polite">正在加载设置...</div>
 
         <div class="settings-sections">
           <section id="settingsSectionAccount" class="settings-section" data-settings-section="account">
             <div class="settings-section-head">
               <div>
-                <h2>账号与安全</h2>
-                <p class="muted">个人资料、API Token、登录会话与同步设备。</p>
+                <h2>应用</h2>
+                <p class="muted">语言、界面偏好、账号资料、API Token、登录会话与同步设备。</p>
               </div>
             </div>
             <div class="settings-section-grid">
+              <section class="settings-panel">
+                <h3>界面偏好</h3>
+                <div class="settings-form">
+                  <label>主题
+                    <select id="uiThemeSelect">
+                      <option value="light">浅色</option>
+                      <option value="dark">深色</option>
+                      <option value="system">跟随系统</option>
+                    </select>
+                  </label>
+                  <label>密度
+                    <select id="uiDensitySelect">
+                      <option value="comfortable">舒适</option>
+                      <option value="compact">紧凑</option>
+                    </select>
+                  </label>
+                </div>
+              </section>
+
               <section class="settings-panel">
                 <h3>账号信息</h3>
                 <form id="profileForm" class="settings-form">
@@ -89,7 +114,7 @@
                     <button type="button" class="ghost" id="settingsRefreshTokensBtn">刷新 Token 列表</button>
                   </div>
                 </div>
-                <pre id="settingsTokenOutput">尚未创建 Token</pre>
+                <div id="settingsTokenOutput" class="settings-output" role="status" aria-live="polite">尚未创建 Token</div>
                 <div id="settingsTokensList" class="io-task-list"></div>
               </section>
 
@@ -114,7 +139,7 @@
           <section id="settingsSectionCollab" class="settings-section" data-settings-section="collab">
             <div class="settings-section-head">
               <div>
-                <h2>共享与公开</h2>
+                <h2>整合方式</h2>
                 <p class="muted">共享集合邀请、公开页面链接与协作审计日志。</p>
               </div>
             </div>
@@ -170,8 +195,8 @@
           <section id="settingsSectionProduct" class="settings-section" data-settings-section="product">
             <div class="settings-section-head">
               <div>
-                <h2>产品能力与运维工具</h2>
-                <p class="muted">套餐、配额、索引/坏链扫描、备份恢复与 AI 工具。</p>
+                <h2>订阅</h2>
+                <p class="muted">套餐订阅、权益与配额使用情况。</p>
               </div>
             </div>
             <div class="settings-section-grid">
@@ -189,7 +214,7 @@
                     <button type="button" class="ghost" id="productSavePlanBtn">保存套餐（模拟计费）</button>
                   </div>
                 </div>
-                <pre id="productEntitlementOutput"></pre>
+                <div id="productEntitlementOutput" class="settings-output" role="status" aria-live="polite"></div>
               </section>
 
               <section class="settings-panel">
@@ -197,20 +222,47 @@
                 <div class="settings-actions">
                   <button type="button" class="ghost" id="quotaRefreshBtn">刷新配额</button>
                 </div>
-                <pre id="quotaOutput"></pre>
+                <div id="quotaOutput" class="settings-output" role="status" aria-live="polite"></div>
               </section>
+            </div>
+          </section>
 
+          <section id="settingsSectionOperations" class="settings-section" data-settings-section="operations">
+            <div class="settings-section-head">
+              <div>
+                <h2>备份</h2>
+                <p class="muted">索引维护、重复项处理、坏链扫描和备份恢复。</p>
+              </div>
+            </div>
+            <div class="settings-section-grid">
               <section class="settings-panel settings-panel-span-2 search-maintenance-panel">
                 <h3>搜索 / 去重 / 坏链</h3>
-                <div class="settings-actions">
-                  <button type="button" class="ghost" id="searchRebuildBtn">重建全文索引</button>
-                  <button type="button" class="ghost" id="dedupeScanBtn">扫描重复项</button>
-                  <button type="button" class="ghost" id="semanticDedupeScanBtn">AI 语义去重聚类</button>
-                  <button type="button" class="ghost" id="brokenLinkScanBtn">扫描坏链</button>
-                  <button type="button" class="ghost" id="brokenLinkTasksBtn">查看坏链任务</button>
+                <div class="settings-tool-grid">
+                  <section class="settings-tool-subpanel">
+                    <h4>全文搜索</h4>
+                    <div class="settings-actions">
+                      <button type="button" class="ghost" id="searchRebuildBtn">重建全文索引</button>
+                    </div>
+                    <div id="searchIndexOutput" class="settings-output" role="status" aria-live="polite"></div>
+                  </section>
+                  <section class="settings-tool-subpanel">
+                    <h4>重复项</h4>
+                    <div class="settings-actions">
+                      <button type="button" class="ghost" id="dedupeScanBtn">扫描重复项</button>
+                      <button type="button" class="ghost" id="semanticDedupeScanBtn">AI 语义去重聚类</button>
+                    </div>
+                    <div id="dedupeResults" class="dedupe-results hidden" aria-live="polite"></div>
+                    <div id="dedupeOutput" class="settings-output" role="status" aria-live="polite"></div>
+                  </section>
+                  <section class="settings-tool-subpanel">
+                    <h4>坏链</h4>
+                    <div class="settings-actions">
+                      <button type="button" class="ghost" id="brokenLinkScanBtn">扫描坏链</button>
+                      <button type="button" class="ghost" id="brokenLinkTasksBtn">查看坏链任务</button>
+                    </div>
+                    <div id="brokenLinkOutput" class="settings-output" role="status" aria-live="polite"></div>
+                  </section>
                 </div>
-                <div id="dedupeResults" class="dedupe-results hidden" aria-live="polite"></div>
-                <pre id="searchToolsOutput"></pre>
               </section>
 
               <section class="settings-panel">
@@ -219,9 +271,20 @@
                   <button type="button" class="ghost" id="backupCreateBtn">创建备份</button>
                   <button type="button" class="ghost" id="backupRefreshBtn">刷新备份列表</button>
                 </div>
+                <div id="backupOutput" class="settings-output" role="status" aria-live="polite"></div>
                 <div id="backupList" class="io-task-list"></div>
               </section>
+            </div>
+          </section>
 
+          <section id="settingsSectionAi" class="settings-section" data-settings-section="ai">
+            <div class="settings-section-head">
+              <div>
+                <h2>AI 工具</h2>
+                <p class="muted">自动打标签、Digest、阅读优先级、规则引擎与历史回填。</p>
+              </div>
+            </div>
+            <div class="settings-section-grid">
               <section class="settings-panel settings-panel-span-2">
                 <h3>AI 自动打标签</h3>
                 <p class="muted">支持 OpenAI 兼容协议（如硅基流动）和 Cloudflare AI（Workers AI）。</p>
@@ -283,6 +346,44 @@
                   <button type="button" class="ghost" id="aiLoadConfigBtn">刷新 AI 配置</button>
                   <button type="button" class="ghost" id="aiSaveConfigBtn">保存 AI 配置</button>
                   <button type="button" class="ghost" id="aiTestBtn">测试连接</button>
+                </div>
+
+                <div class="settings-panel-subsection">
+                  <h4>AI 评估、反馈与治理（AI-601~AI-605）</h4>
+                  <div class="settings-form">
+                    <label>
+                      <span>AI 功能总开关</span>
+                      <select id="aiFeatureEnabledSelect">
+                        <option value="true">开启</option>
+                        <option value="false">关闭</option>
+                      </select>
+                    </label>
+                    <label>
+                      <span>模型入参匿名化</span>
+                      <select id="aiPrivacyAnonymizeSelect">
+                        <option value="true">开启</option>
+                        <option value="false">关闭</option>
+                      </select>
+                    </label>
+                    <label>反馈任务 ID<input id="aiFeedbackJobIdInput" placeholder="ai_..." /></label>
+                    <label>
+                      <span>反馈动作</span>
+                      <select id="aiFeedbackActionSelect">
+                        <option value="accepted">接受</option>
+                        <option value="rejected">拒绝</option>
+                        <option value="edited">已修改</option>
+                        <option value="rated">评分</option>
+                      </select>
+                    </label>
+                  </div>
+                  <div class="settings-actions">
+                    <button type="button" class="ghost" id="aiEvalRunBtn">运行评估基线</button>
+                    <button type="button" class="ghost" id="aiFeedbackSendBtn">提交反馈</button>
+                    <button type="button" class="ghost" id="aiPrivacySaveBtn">保存隐私策略</button>
+                    <button type="button" class="ghost" id="aiFeatureSaveBtn">保存功能开关</button>
+                    <button type="button" class="ghost" id="aiHealthLoadBtn">查看健康</button>
+                    <button type="button" class="ghost" id="aiHealthProbeBtn">探测 Provider</button>
+                  </div>
                 </div>
 
                 <div class="settings-panel-subsection">
@@ -476,7 +577,7 @@
                       <button type="button" class="ghost" id="aiRulesManualRunBtn">手动执行规则</button>
                     </div>
                   </div>
-                  <pre id="aiRulesOutput"></pre>
+                  <div id="aiRulesOutput" class="settings-output" role="status" aria-live="polite"></div>
                 </div>
 
                 <div class="settings-panel-subsection">
@@ -561,7 +662,7 @@
                       <button type="button" class="ghost" id="aiBackfillResumeBtn">恢复任务</button>
                     </div>
                   </div>
-                  <pre id="aiBackfillOutput"></pre>
+                  <div id="aiBackfillOutput" class="settings-output" role="status" aria-live="polite"></div>
                 </div>
 
                 <div class="settings-panel-subsection">
@@ -628,13 +729,27 @@
                     <button type="button" class="ghost" id="aiJobsBtn">查看 AI 任务</button>
                   </div>
                 </div>
-                <pre id="aiOutput"></pre>
+                <div id="aiOutput" class="settings-output" role="status" aria-live="polite"></div>
               </section>
             </div>
           </section>
         </div>
       </section>
     </main>
+
+    <dialog id="settingsConfirmDialog">
+      <div class="dialog-form compact settings-confirm-shell">
+        <div class="dialog-header">
+          <h3 id="settingsConfirmTitle" class="dialog-title">确认操作</h3>
+          <p id="settingsConfirmMessage" class="dialog-subtitle">请确认是否继续。</p>
+        </div>
+        <div id="settingsConfirmImpact" class="state-block state-block-compact" data-state="error"></div>
+        <div class="dialog-actions dialog-footer">
+          <button type="button" id="settingsConfirmCancelBtn" class="ghost">取消</button>
+          <button type="button" id="settingsConfirmOkBtn" class="danger">确认</button>
+        </div>
+      </div>
+    </dialog>
 
     <script type="module" src="/settings.mjs"></script>
   </body>

@@ -62,9 +62,9 @@ class MemoryProcessorQueue {
 }
 
 class MemoryJobQueueBroker {
-  constructor({ prefix = 'rainboard' } = {}) {
+  constructor({ prefix = 'rainbow' } = {}) {
     this.backend = 'memory';
-    this.prefix = String(prefix || 'rainboard');
+    this.prefix = String(prefix || 'rainbow');
     this.queues = [];
     this.meta = { fallbackReason: '' };
   }
@@ -86,7 +86,7 @@ class MemoryJobQueueBroker {
 }
 
 class BullMqProcessorQueue {
-  constructor({ name, handler, concurrency = 1, prefix = 'rainboard', connection, bullmq }) {
+  constructor({ name, handler, concurrency = 1, prefix = 'rainbow', connection, bullmq }) {
     if (!name) throw new Error('queue name is required');
     if (typeof handler !== 'function') throw new Error('queue handler is required');
     const { Queue, Worker } = bullmq;
@@ -128,9 +128,9 @@ class BullMqProcessorQueue {
 }
 
 class BullMqJobQueueBroker {
-  constructor({ prefix = 'rainboard', connection, bullmq, redisUrl }) {
+  constructor({ prefix = 'rainbow', connection, bullmq, redisUrl }) {
     this.backend = 'bullmq';
-    this.prefix = String(prefix || 'rainboard');
+    this.prefix = String(prefix || 'rainbow');
     this.connection = connection;
     this.bullmq = bullmq;
     this.redisUrl = String(redisUrl || '');
@@ -138,7 +138,7 @@ class BullMqJobQueueBroker {
     this.meta = { redisUrlConfigured: Boolean(this.redisUrl) };
   }
 
-  static async create({ prefix = 'rainboard', redisUrl } = {}) {
+  static async create({ prefix = 'rainbow', redisUrl } = {}) {
     const bullmq = require('bullmq');
     const IORedis = require('ioredis');
     const connection = new IORedis(String(redisUrl || ''), {
@@ -174,7 +174,7 @@ class BullMqJobQueueBroker {
 
 async function createJobQueueBroker(config = {}) {
   const requested = String(config.queueBackend || 'memory').toLowerCase();
-  const prefix = String(config.queuePrefix || 'rainboard');
+  const prefix = String(config.queuePrefix || 'rainbow');
   const redisUrl = String(config.redisUrl || '');
 
   if (requested === 'bullmq') {

@@ -2,6 +2,31 @@ import { quickViews } from './js/constants.mjs';
 import { byId, escapeHtml, hostFromUrl, safeUrl } from './js/utils.mjs';
 import { api, queryString } from './js/api.mjs';
 import { createAppStore } from './js/stateStore.mjs';
+import { emptyStateHtml as uiEmptyStateHtml, statusBadgeHtml, taskProgressHtml, uiButtonHtml } from './js/uiComponents.mjs';
+import { focusableElementsWithin, handleMenuArrowNavigation, hasModalOpen } from './js/app/a11y.mjs';
+import { currentAppPath, redirectToLoginPage } from './js/app/auth.mjs';
+import { inferItemKind, kindLabel } from './js/app/bookmarks.mjs';
+import { loadDetailSectionsUi, persistDetailSectionsUi } from './js/app/detail.mjs';
+import {
+  bindActionDialog,
+  bindInlineValidation,
+  clearFormFieldError,
+  clearFormValidation,
+  setFormBannerError,
+  setFormFieldError,
+  uiConfirm,
+  uiPrompt
+} from './js/app/dialogs.mjs';
+import { previewStateLabel } from './js/app/preview.mjs';
+import { loadSidebarTagsUi, persistSidebarTagsUi } from './js/app/sidebar.mjs';
+import {
+  formatMetadataTaskInfo,
+  isAiBatchTaskTerminalStatus,
+  isIoTaskTerminal,
+  isMetadataTaskTerminal
+} from './js/app/tasks.mjs';
+import { SEARCH_RECENT_LIMIT, SEARCH_RECENT_STORAGE_KEY, SEARCH_TOKEN_SUGGESTIONS } from './js/app/search.mjs';
+import './js/uiPreferences.mjs';
 
 const store = createAppStore();
 const state = store.state;
@@ -9,6 +34,13 @@ const SAVED_SEARCHES_UI_ENABLED = false;
 let draggedFolderId = null;
 let toastTimer = null;
 let toastUndoHandler = null;
+let realtimeEventsSource = null;
+let realtimePollTimer = null;
+let realtimeNotificationsOpen = false;
+let realtimeLastSignature = '';
+let realtimeInitialSnapshotSeen = false;
+let realtimeRefreshTimer = null;
+let realtimeNotifications = [];
 let pluginTaskPollTimer = null;
 let metadataTaskPollTimer = null;
 let detailMetadataTaskBookmarkId = null;
@@ -30,6 +62,7 @@ let detailRelatedBookmarksState = {
 };
 let mobileSidebarOpen = false;
 let mobileSidebarReturnFocus = null;
+let detailDrawerReturnFocus = null;
 let aiQaDialogState = {
   loading: false,
   question: '',
@@ -41,6 +74,18 @@ let aiQaDialogState = {
   bookmarkId: '',
   scope: 'auto',
   limit: 6
+};
+const AI_DRAWER_HISTORY_STORAGE_KEY = 'rainbow.aiDrawerHistory';
+let aiSideDrawerState = {
+  open: false,
+  loading: false,
+  question: '',
+  answer: '',
+  sources: [],
+  scope: 'auto',
+  limit: 6,
+  error: '',
+  history: loadAiDrawerHistory()
 };
 let aiFolderSummaryDialogState = {
   loading: false,
@@ -63,11 +108,11 @@ let detailAiQaRunning = false;
 let bulkAiAutoTagRunning = false;
 let ioTaskPollTimer = null;
 let ioActiveTaskId = null;
-let actionDialogSession = null;
 let bookmarksLoading = false;
 let bookmarksLoadError = '';
 let listVirtualRenderRaf = 0;
 let collectionsTreeVirtualRenderRaf = 0;
+let sidebarAuxVirtualRenderRaf = 0;
 let refreshAllInFlight = null;
 let refreshAllQueued = false;
 let folderDragAutoExpandTimer = null;
@@ -87,6 +132,9 @@ const LIST_VIRTUAL_OVERSCAN = 8;
 const COLLECTIONS_TREE_VIRTUAL_THRESHOLD = 140;
 const COLLECTIONS_TREE_VIRTUAL_ROW_HEIGHT = 32;
 const COLLECTIONS_TREE_VIRTUAL_OVERSCAN = 10;
+const SIDEBAR_AUX_VIRTUAL_THRESHOLD = 80;
+const SIDEBAR_AUX_VIRTUAL_ROW_HEIGHT = 34;
+const SIDEBAR_AUX_VIRTUAL_OVERSCAN = 8;
 let authState = {
   loading: false,
   authenticated: false,
@@ -94,6 +142,12 @@ let authState = {
   auth: null,
   tokens: [],
   latestPlainToken: ''
+};
+let sidebarSyncHealthState = {
+  loading: false,
+  error: '',
+  health: null,
+  updatedAt: 0
 };
 let authGuardLastCheckAt = 0;
 let authGuardInFlight = null;
@@ -132,18 +186,6 @@ let advancedSearchState = {
   lastResultMeta: null,
   lastAiParseMeta: null
 };
-const SEARCH_RECENT_STORAGE_KEY = 'rainboard.searchRecentQueries';
-const SEARCH_RECENT_LIMIT = 12;
-const SEARCH_TOKEN_SUGGESTIONS = [
-  { id: 'tag', token: 'tag:', label: '标签', desc: '例如 tag:AI', icon: 'tag' },
-  { id: 'type', token: 'type:', label: '类型', desc: '例如 type:web / type:pdf', icon: 'type' },
-  { id: 'created', token: 'created:', label: '创建日期', desc: '例如 created:2026-02', icon: 'calendar' },
-  { id: 'link', token: 'link:', label: '在 URL', desc: '例如 link:example.com', icon: 'link' },
-  { id: 'info', token: 'info:', label: '标题/描述', desc: '在标题或摘要中查找', icon: 'info' },
-  { id: 'note', token: 'note:true', label: '备注', desc: '仅显示有备注的条目', icon: 'note' },
-  { id: 'highlights', token: 'highlights:true', label: '高亮', desc: '仅显示有高亮的条目', icon: 'highlights' },
-  { id: 'notag', token: 'notag:true', label: '没有标签', desc: '仅显示未打标签条目', icon: 'tag' }
-];
 let searchSuggestState = {
   open: false,
   activeIndex: -1,
@@ -154,10 +196,10 @@ let searchSuggestCloseTimer = null;
 let searchRecentCommitTimer = null;
 let searchInputApplyTimer = null;
 const SEARCH_INPUT_DEBOUNCE_MS = 180;
-const BOOKMARK_LAYOUT_STORAGE_KEY = 'rainboard.bookmarkLayoutMode';
+const BOOKMARK_LAYOUT_STORAGE_KEY = 'rainbow.bookmarkLayoutMode';
 const BOOKMARK_LAYOUT_MODES = ['list', 'card', 'headline', 'moodboard'];
 let bookmarkLayoutMode = loadBookmarkLayoutMode();
-const LIST_COLUMNS_STORAGE_KEY = 'rainboard.listColumns';
+const LIST_COLUMNS_STORAGE_KEY = 'rainbow.listColumns';
 const DEFAULT_LIST_COLUMNS = Object.freeze({
   folder: true,
   type: true,
@@ -166,9 +208,11 @@ const DEFAULT_LIST_COLUMNS = Object.freeze({
   time: true
 });
 let listColumns = loadListColumns();
-const COLLAPSED_FOLDERS_STORAGE_KEY = 'rainboard.collapsedFolders';
-const SIDEBAR_TAGS_UI_STORAGE_KEY = 'rainboard.sidebarTagsUi';
-const DETAIL_SECTIONS_UI_STORAGE_KEY = 'rainboard.detailSectionsUi';
+const COLLAPSED_FOLDERS_STORAGE_KEY = 'rainbow.collapsedFolders';
+const SIDEBAR_WIDTH_STORAGE_KEY = 'rainbow.sidebarWidth';
+const DETAIL_WIDTH_STORAGE_KEY = 'rainbow.detailWidth';
+const SIDEBAR_WIDTH_LIMITS = Object.freeze({ min: 300, max: 360, fallback: 300 });
+const DETAIL_WIDTH_LIMITS = Object.freeze({ min: 320, max: 560, fallback: 420 });
 let collapsedFolderIds = loadCollapsedFolderIds();
 let sidebarTagsUi = loadSidebarTagsUi();
 let detailSectionsUi = loadDetailSectionsUi();
@@ -194,6 +238,23 @@ function setSavedSearchesUiVisible(visible) {
 function normalizeBookmarkLayoutMode(value) {
   const mode = String(value || '').trim().toLowerCase();
   return BOOKMARK_LAYOUT_MODES.includes(mode) ? mode : 'list';
+}
+
+function loadAiDrawerHistory() {
+  try {
+    const raw = JSON.parse(window.localStorage.getItem(AI_DRAWER_HISTORY_STORAGE_KEY) || '[]');
+    return Array.isArray(raw) ? raw.slice(0, 12) : [];
+  } catch (_err) {
+    return [];
+  }
+}
+
+function persistAiDrawerHistory(history) {
+  try {
+    window.localStorage.setItem(AI_DRAWER_HISTORY_STORAGE_KEY, JSON.stringify((Array.isArray(history) ? history : []).slice(0, 12)));
+  } catch (_err) {
+    // ignore localStorage failures
+  }
 }
 
 function loadBookmarkLayoutMode() {
@@ -336,10 +397,7 @@ function collectionTreeRowHtml(f, {
     }
     <button class="tree-item ${active ? 'active' : ''}" data-folder="${f.id}" draggable="true">
       <span class="tree-item-inner">
-        ${f.icon
-      ? `<span class="tree-folder-icon" aria-hidden="true">${escapeHtml(String(f.icon || ''))}</span>`
-      : `<span class="tree-color-dot" style="background:${escapeHtml(f.color)}"></span>`
-    }
+        <span class="tree-folder-icon" aria-hidden="true">${iconSvg('folder')}</span>
         <span class="tree-item-name">${escapeHtml(f.name)}</span>
         <span class="muted tree-item-count">${Number(badge || 0)}</span>
       </span>
@@ -397,6 +455,54 @@ function collectionsTreeVirtualWindow(tree, totalItems) {
   const topPad = start * COLLECTIONS_TREE_VIRTUAL_ROW_HEIGHT;
   const bottomPad = Math.max(0, (count - safeEnd) * COLLECTIONS_TREE_VIRTUAL_ROW_HEIGHT);
   return { start, end: safeEnd, topPad, bottomPad };
+}
+
+function sidebarAuxVirtualWindow(root, totalItems, rowHeight = SIDEBAR_AUX_VIRTUAL_ROW_HEIGHT, overscan = SIDEBAR_AUX_VIRTUAL_OVERSCAN) {
+  const count = Math.max(0, Number(totalItems || 0));
+  if (!count) return { start: 0, end: 0, topPad: 0, bottomPad: 0 };
+  const scroller = root?.closest('.sidebar') || document.scrollingElement || document.documentElement;
+  const rootTop = collectionsTreeOffsetTopWithinScroller(root, scroller);
+  const scrollTop = Number(scroller.scrollTop || 0);
+  const viewportHeight = Number(scroller.clientHeight || window.innerHeight || 0);
+  const visibleTop = Math.max(0, scrollTop - rootTop);
+  const visibleBottom = Math.max(0, visibleTop + viewportHeight);
+  const start = Math.max(0, Math.floor(visibleTop / rowHeight) - overscan);
+  const end = Math.min(count, Math.ceil(visibleBottom / rowHeight) + overscan);
+  const safeEnd = Math.max(start + 1, end);
+  return {
+    start,
+    end: safeEnd,
+    topPad: start * rowHeight,
+    bottomPad: Math.max(0, (count - safeEnd) * rowHeight)
+  };
+}
+
+function renderSidebarVirtualList(root, items, renderItem, {
+  threshold = SIDEBAR_AUX_VIRTUAL_THRESHOLD,
+  rowHeight = SIDEBAR_AUX_VIRTUAL_ROW_HEIGHT,
+  overscan = SIDEBAR_AUX_VIRTUAL_OVERSCAN,
+  virtualClass = 'is-virtualized',
+  spacerClass = 'sidebar-aux-virtual-spacer'
+} = {}) {
+  const list = Array.isArray(items) ? items : [];
+  if (!root || list.length < threshold || window.innerWidth <= 920) {
+    root?.classList.remove(virtualClass);
+    if (root) {
+      delete root.dataset.virtualCount;
+      delete root.dataset.virtualStart;
+      delete root.dataset.virtualEnd;
+      delete root.dataset.virtualKind;
+    }
+    return list.map((item, index) => renderItem(item, index)).join('');
+  }
+  const win = sidebarAuxVirtualWindow(root, list.length, rowHeight, overscan);
+  root.classList.add(virtualClass);
+  root.dataset.virtualCount = String(list.length);
+  root.dataset.virtualStart = String(win.start);
+  root.dataset.virtualEnd = String(win.end);
+  root.dataset.virtualKind = 'sidebar-aux';
+  const visible = list.slice(win.start, win.end).map((item, index) => renderItem(item, win.start + index)).join('');
+  return `${win.topPad ? `<div class="${spacerClass}" style="height:${win.topPad}px" aria-hidden="true"></div>` : ''}${visible}${win.bottomPad ? `<div class="${spacerClass}" style="height:${win.bottomPad}px" aria-hidden="true"></div>` : ''}`;
 }
 
 function canUseCollectionsTreeVirtualization(tree, visibleRowsCount) {
@@ -723,56 +829,6 @@ async function activateSystemView(viewKey) {
   store.clearSelection();
   await loadBookmarks();
   renderSidebar();
-}
-
-function loadSidebarTagsUi() {
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(SIDEBAR_TAGS_UI_STORAGE_KEY) || '{}');
-    return {
-      expanded: Boolean(raw.expanded),
-      sort: raw && raw.sort === 'name' ? 'name' : 'count'
-    };
-  } catch (_err) {
-    return { expanded: false, sort: 'count' };
-  }
-}
-
-function persistSidebarTagsUi() {
-  try {
-    window.localStorage.setItem(SIDEBAR_TAGS_UI_STORAGE_KEY, JSON.stringify(sidebarTagsUi));
-  } catch (_err) {
-    // ignore
-  }
-}
-
-function loadDetailSectionsUi() {
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(DETAIL_SECTIONS_UI_STORAGE_KEY) || '{}');
-    const value = (key, fallback) => Object.prototype.hasOwnProperty.call(raw, key) ? Boolean(raw[key]) : fallback;
-    return {
-      basic: value('basic', false),
-      status: value('status', false),
-      fetch: value('fetch', true),
-      highlights: value('highlights', true),
-      related: value('related', true)
-    };
-  } catch (_err) {
-    return {
-      basic: false,
-      status: false,
-      fetch: true,
-      highlights: true,
-      related: true
-    };
-  }
-}
-
-function persistDetailSectionsUi() {
-  try {
-    window.localStorage.setItem(DETAIL_SECTIONS_UI_STORAGE_KEY, JSON.stringify(detailSectionsUi));
-  } catch (_err) {
-    // ignore
-  }
 }
 
 function loadSearchRecentQueries() {
@@ -1599,78 +1655,6 @@ function setListColumn(key, value) {
   renderCards();
 }
 
-function currentAppPath() {
-  const path = `${window.location.pathname || '/'}${window.location.search || ''}${window.location.hash || ''}`;
-  return path || '/';
-}
-
-function redirectToLoginPage({ next = currentAppPath() } = {}) {
-  const target = String(next || '/').startsWith('/') ? String(next || '/') : '/';
-  const url = new URL('/login.html', window.location.origin);
-  url.searchParams.set('next', target);
-  window.location.replace(`${url.pathname}${url.search}${url.hash}`);
-}
-
-function setFormBannerError(errorId, message = '') {
-  const el = byId(errorId);
-  if (!el) return;
-  const text = String(message || '').trim();
-  el.textContent = text;
-  el.classList.toggle('hidden', !text);
-}
-
-function clearFormFieldError(input) {
-  if (!input) return;
-  input.classList.remove('is-invalid');
-  input.removeAttribute('aria-invalid');
-  const label = input.closest('.form-field');
-  if (label && label.dataset && 'error' in label.dataset) {
-    delete label.dataset.error;
-  }
-}
-
-function setFormFieldError(input, message) {
-  if (!input) return false;
-  const text = String(message || '').trim();
-  if (!text) {
-    clearFormFieldError(input);
-    return true;
-  }
-  input.classList.add('is-invalid');
-  input.setAttribute('aria-invalid', 'true');
-  const label = input.closest('.form-field');
-  if (label) label.dataset.error = text;
-  return false;
-}
-
-function clearFormValidation(formId, errorId = null) {
-  const form = byId(formId);
-  if (form) {
-    form.querySelectorAll('.is-invalid').forEach((el) => clearFormFieldError(el));
-    form.querySelectorAll('.form-field[data-error]').forEach((el) => {
-      delete el.dataset.error;
-    });
-  }
-  if (errorId) setFormBannerError(errorId, '');
-}
-
-function bindInlineValidation(formId, { errorId = null } = {}) {
-  const form = byId(formId);
-  if (!form || form.dataset.inlineValidationBound === '1') return;
-  form.dataset.inlineValidationBound = '1';
-  const onChange = (e) => {
-    const target = e.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (target.matches('input, textarea, select')) {
-      clearFormFieldError(target);
-      if (errorId) setFormBannerError(errorId, '');
-    }
-  };
-  form.addEventListener('input', onChange);
-  form.addEventListener('change', onChange);
-  form.addEventListener('close', () => clearFormValidation(formId, errorId));
-}
-
 function isLikelyHttpUrl(value) {
   try {
     const url = new URL(String(value || '').trim());
@@ -1726,13 +1710,7 @@ function setPreviewUiState(stateName, message = '') {
   const surface = byId('previewDialog')?.querySelector('.preview-surface');
   if (badge) {
     badge.dataset.state = next;
-    badge.textContent = ({
-      idle: '未加载',
-      loading: '加载中',
-      ready: '已加载',
-      fallback: '降级预览',
-      error: '加载失败'
-    }[next] || '状态未知');
+    badge.textContent = previewStateLabel(next);
   }
   if (note) note.textContent = String(message || '');
   if (loading) loading.classList.toggle('hidden', next !== 'loading');
@@ -1759,146 +1737,12 @@ function hydratePreviewToolbarIcons() {
   });
 }
 
-function bindActionDialog() {
-  const dlg = byId('actionDialog');
-  if (!dlg || dlg.dataset.bound === '1') return;
-  dlg.dataset.bound = '1';
-  const cancelBtn = byId('actionDialogCancelBtn');
-  const confirmBtn = byId('actionDialogConfirmBtn');
-  const input = byId('actionDialogInput');
-  const closeWith = (result) => {
-    const session = actionDialogSession;
-    if (!session) return;
-    actionDialogSession = null;
-    try {
-      dlg.close();
-    } catch (_err) {
-      // ignore
-    }
-    session.resolve(result);
-  };
-  cancelBtn?.addEventListener('click', () => closeWith({ ok: false, cancelled: true, value: null }));
-  confirmBtn?.addEventListener('click', () => {
-    const session = actionDialogSession;
-    if (!session) return;
-    const mode = session.mode;
-    const rawValue = String(input?.value ?? '');
-    if (mode === 'prompt') {
-      const trimmed = session.options?.trim === false ? rawValue : rawValue.trim();
-      const required = Boolean(session.options?.required);
-      if (required && !trimmed) {
-        setFormBannerError('actionDialogError', session.options?.requiredMessage || '请输入内容后再继续。');
-        if (input) setFormFieldError(input, session.options?.requiredMessage || '必填');
-        input?.focus();
-        return;
-      }
-      if (typeof session.options?.validate === 'function') {
-        const errMsg = session.options.validate(trimmed);
-        if (errMsg) {
-          setFormBannerError('actionDialogError', errMsg);
-          if (input) setFormFieldError(input, errMsg);
-          input?.focus();
-          return;
-        }
-      }
-      closeWith({ ok: true, cancelled: false, value: trimmed });
-      return;
-    }
-    closeWith({ ok: true, cancelled: false, value: true });
-  });
-  input?.addEventListener('input', () => {
-    clearFormFieldError(input);
-    setFormBannerError('actionDialogError', '');
-  });
-  dlg.addEventListener('cancel', (e) => {
-    e.preventDefault();
-    closeWith({ ok: false, cancelled: true, value: null });
-  });
-}
-
-function openActionDialog({
-  mode = 'confirm',
-  title = '确认操作',
-  message = '请确认继续。',
-  confirmText = '确定',
-  cancelText = '取消',
-  danger = false,
-  inputLabel = '输入',
-  placeholder = '',
-  defaultValue = '',
-  trim = true,
-  required = false,
-  requiredMessage = '',
-  validate = null
-} = {}) {
-  bindActionDialog();
-  const dlg = byId('actionDialog');
-  if (!dlg) return Promise.resolve({ ok: false, cancelled: true, value: null });
-  if (actionDialogSession) {
-    actionDialogSession.resolve({ ok: false, cancelled: true, value: null });
-    actionDialogSession = null;
-  }
-  if (dlg.open) {
-    try {
-      dlg.close();
-    } catch (_err) {
-      // ignore
-    }
-  }
-  const inputWrap = byId('actionDialogInputWrap');
-  const input = byId('actionDialogInput');
-  const titleEl = byId('actionDialogTitle');
-  const msgEl = byId('actionDialogMessage');
-  const inputLabelEl = byId('actionDialogInputLabel');
-  const confirmBtn = byId('actionDialogConfirmBtn');
-  const cancelBtn = byId('actionDialogCancelBtn');
-  clearFormValidation('actionDialog', 'actionDialogError');
-  if (titleEl) titleEl.textContent = String(title || '确认操作');
-  if (msgEl) msgEl.textContent = String(message || '');
-  if (confirmBtn) {
-    confirmBtn.textContent = String(confirmText || '确定');
-    confirmBtn.classList.toggle('danger', Boolean(danger));
-  }
-  if (cancelBtn) cancelBtn.textContent = String(cancelText || '取消');
-  if (inputWrap) inputWrap.classList.toggle('hidden', mode !== 'prompt');
-  if (inputLabelEl) inputLabelEl.textContent = String(inputLabel || '输入');
-  if (input) {
-    input.value = String(defaultValue ?? '');
-    input.placeholder = String(placeholder || '');
-    clearFormFieldError(input);
-  }
-  const promise = new Promise((resolve) => {
-    actionDialogSession = {
-      resolve,
-      mode,
-      options: { trim, required, requiredMessage, validate }
-    };
-  });
-  if (!dlg.open) dlg.showModal();
-  queueMicrotask(() => {
-    if (mode === 'prompt') input?.focus();
-    else confirmBtn?.focus();
-  });
-  return promise;
-}
-
-async function uiConfirm(message, options = {}) {
-  const out = await openActionDialog({ ...options, mode: 'confirm', message });
-  return Boolean(out?.ok);
-}
-
-async function uiPrompt(message, options = {}) {
-  const out = await openActionDialog({ ...options, mode: 'prompt', message });
-  if (!out?.ok) return null;
-  return out.value;
-}
-
 function iconSvg(name, { title = '' } = {}) {
   const n = String(name || '').trim().toLowerCase();
   const common = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
   let body = '';
   if (n === 'all') {
-    body = `<rect x="4" y="4" width="6" height="6" rx="1"></rect><rect x="14" y="4" width="6" height="6" rx="1"></rect><rect x="4" y="14" width="6" height="6" rx="1"></rect><rect x="14" y="14" width="6" height="6" rx="1"></rect>`;
+    body = `<path d="M7 18h10a4 4 0 0 0 .8-7.9A6 6 0 0 0 6.4 11.8 3.2 3.2 0 0 0 7 18z"></path>`;
   } else if (n === 'inbox') {
     body = `<path d="M4 6h16l-2 10H6L4 6z"></path><path d="M9 11a3 3 0 0 0 6 0"></path>`;
   } else if (n === 'star') {
@@ -1917,6 +1761,14 @@ function iconSvg(name, { title = '' } = {}) {
     body = `<rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M4 14l4-4 4 3 3-2 5 5"></path><path d="M15.5 8.5h.01"></path>`;
   } else if (n === 'refresh') {
     body = `<path d="M20 11a8 8 0 1 0-2.3 5.7"></path><path d="M20 4v7h-7"></path>`;
+  } else if (n === 'sort') {
+    body = `<path d="M7 5v14"></path><path d="M4 8l3-3 3 3"></path><path d="M17 19V5"></path><path d="M14 16l3 3 3-3"></path>`;
+  } else if (n === 'bell') {
+    body = `<path d="M18 9a6 6 0 1 0-12 0c0 7-2.5 7-2.5 7h17S18 16 18 9z"></path><path d="M9.8 20a2.4 2.4 0 0 0 4.4 0"></path>`;
+  } else if (n === 'settings') {
+    body = `<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1-2 3.4-.2-.1a1.6 1.6 0 0 0-1.8.3 1.6 1.6 0 0 0-.8 1.5H9a1.6 1.6 0 0 0-.8-1.5 1.6 1.6 0 0 0-1.8-.3l-.2.1-2-3.4.1-.1A1.6 1.6 0 0 0 4.6 15 1.6 1.6 0 0 0 3 14V10a1.6 1.6 0 0 0 1.6-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1 2-3.4.2.1a1.6 1.6 0 0 0 1.8-.3A1.6 1.6 0 0 0 9 2h6a1.6 1.6 0 0 0 .8 1.5 1.6 1.6 0 0 0 1.8.3l.2-.1 2 3.4-.1.1a1.6 1.6 0 0 0-.3 1.8A1.6 1.6 0 0 0 21 10v4a1.6 1.6 0 0 0-1.6 1z"></path>`;
+  } else if (n === 'user') {
+    body = `<circle cx="12" cy="8" r="4"></circle><path d="M4.5 20a7.5 7.5 0 0 1 15 0"></path>`;
   } else if (n === 'edit') {
     body = `<path d="M4 20l4.5-1 9-9a2 2 0 0 0-2.8-2.8l-9 9L4 20z"></path><path d="M13.5 6.5l4 4"></path>`;
   } else if (n === 'close') {
@@ -1933,6 +1785,8 @@ function iconSvg(name, { title = '' } = {}) {
     body = `<path d="M7 3h7l4 4v14H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M14 3v5h5"></path>`;
   } else if (n === 'copy') {
     body = `<rect x="9" y="9" width="10" height="10" rx="2"></rect><rect x="5" y="5" width="10" height="10" rx="2"></rect>`;
+  } else if (n === 'download') {
+    body = `<path d="M12 4v10"></path><path d="M8 10l4 4 4-4"></path><path d="M5 20h14"></path>`;
   } else if (n === 'preview') {
     body = `<path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"></path><circle cx="12" cy="12" r="2.8"></circle>`;
   } else if (n === 'search') {
@@ -2120,7 +1974,7 @@ function hydrateWorkbenchHeaderIcons() {
 
   const askBtn = byId('askAiBtn');
   if (askBtn && !askBtn.dataset.iconHydrated) {
-    setIconButtonLabel(askBtn, 'ai', '询问');
+    setIconButtonLabel(askBtn, 'ai', '询问 AI', { srOnly: true });
     askBtn.dataset.iconHydrated = '1';
   }
 
@@ -2140,6 +1994,27 @@ function hydrateWorkbenchHeaderIcons() {
   if (openViewBtn && !openViewBtn.dataset.iconHydrated) {
     openViewBtn.innerHTML = `${iconSvg('open', { title: '在新标签页打开当前视图' })}<span class="sr-only">在新标签页打开当前视图</span>`;
     openViewBtn.dataset.iconHydrated = '1';
+  }
+
+  const toolbarMappings = [
+    ['refreshBtn', 'refresh', '刷新', true],
+    ['headerSortBtn', 'sort', '排序', false],
+    ['headerViewBtn', 'grid', '视图', false],
+    ['headerMoreBtn', 'more', '更多', false],
+    ['exportBtn', 'download', '导出书签', false],
+    ['settingsBtn', 'settings', '设置', true]
+  ];
+  toolbarMappings.forEach(([id, icon, label, srOnly]) => {
+    const btn = byId(id);
+    if (!btn || btn.dataset.iconHydrated) return;
+    setIconButtonLabel(btn, icon, btn.textContent || label, { srOnly });
+    btn.dataset.iconHydrated = '1';
+  });
+
+  const notificationBtn = byId('realtimeNotificationsBtn');
+  if (notificationBtn && !notificationBtn.dataset.iconHydrated) {
+    notificationBtn.innerHTML = `${iconSvg('bell', { title: '实时通知' })}<span class="sr-only">实时通知</span><span id="realtimeNotificationsBadge" class="realtime-notifications-badge hidden">0</span>`;
+    notificationBtn.dataset.iconHydrated = '1';
   }
 }
 
@@ -2201,10 +2076,72 @@ function renderSidebarStatusCard() {
   const total = Number(state.stats?.total || state.allBookmarks?.length || 0);
   const folders = Math.max(0, (state.folders || []).filter((f) => String(f.id || '') !== 'root').length);
   const tags = Number((state.tags || []).length || 0);
-  badge.textContent = '就绪';
-  badge.dataset.tone = 'success';
-  meta.textContent = `${total} 条书签 · ${folders} 个集合 · ${tags} 个标签`;
+  const syncSummary = getSidebarSyncHealthSummary();
+  badge.textContent = syncSummary.badge;
+  badge.dataset.tone = syncSummary.tone;
+  meta.textContent = `${total} 条书签 · ${folders} 个集合 · ${tags} 个标签 · ${syncSummary.meta}`;
   syncBtn.disabled = false;
+}
+
+function getSidebarSyncHealthSummary() {
+  const { loading, error, health, updatedAt } = sidebarSyncHealthState;
+  if (loading && !health) {
+    return {
+      badge: '同步检查中',
+      label: '检查中',
+      meta: '同步状态检查中',
+      tone: 'neutral'
+    };
+  }
+  if (error && !health) {
+    return {
+      badge: '同步不可用',
+      label: '不可用',
+      meta: '同步状态不可用',
+      tone: 'warning'
+    };
+  }
+  if (!health) {
+    return {
+      badge: '就绪',
+      label: '未检查',
+      meta: '同步状态未检查',
+      tone: 'success'
+    };
+  }
+
+  const flags = health.healthFlags || {};
+  const queue = health.queue || {};
+  const failures = health.failures?.totals || {};
+  const activeCount = Number(queue.activeTasks || 0);
+  const failedCount = Number(failures.failedTasks || 0) + Number(failures.failedRuns || 0);
+  const generatedAt = Number(health.generatedAt || updatedAt || 0);
+  const ageMs = generatedAt ? Math.max(0, Date.now() - generatedAt) : 0;
+  const ageLabel = ageMs < 60_000 ? '刚刚' : `${Math.max(1, Math.round(ageMs / 60_000))} 分钟前`;
+  const hasRisk = Boolean(flags.hasQueueBacklog || flags.hasStaleRunningTasks || flags.hasOfflineDevices || flags.hasRecentFailures);
+
+  if (activeCount > 0) {
+    return {
+      badge: '同步中',
+      label: `${activeCount} 个任务`,
+      meta: `同步中 · ${activeCount} 个活动任务 · ${ageLabel}`,
+      tone: 'info'
+    };
+  }
+  if (hasRisk) {
+    return {
+      badge: '同步需关注',
+      label: failedCount ? `${failedCount} 个失败` : '需关注',
+      meta: failedCount ? `同步需关注 · ${failedCount} 个失败 · ${ageLabel}` : `同步需关注 · ${ageLabel}`,
+      tone: 'warning'
+    };
+  }
+  return {
+    badge: '云端已同步',
+    label: '正常',
+    meta: `云端同步正常 · ${ageLabel}`,
+    tone: 'success'
+  };
 }
 
 function renderAuthTokens() {
@@ -2265,7 +2202,8 @@ function renderAuthUi() {
   if (!authBtn || !dialogTitle || !status || !guestPanel || !userPanel) return;
 
   if (!authState.authenticated) {
-    authBtn.textContent = '登录';
+    setIconButtonLabel(authBtn, 'user', '登录', { srOnly: true });
+    authBtn.dataset.iconHydrated = '1';
     dialogTitle.textContent = '账号登录';
     status.textContent = authState.loading ? '正在检查会话...' : '未登录';
     guestPanel.classList.remove('hidden');
@@ -2273,7 +2211,8 @@ function renderAuthUi() {
     if (createTokenBtn) createTokenBtn.disabled = true;
     if (refreshTokensBtn) refreshTokensBtn.disabled = true;
   } else {
-    authBtn.textContent = '账号';
+    setIconButtonLabel(authBtn, 'user', '账号', { srOnly: true });
+    authBtn.dataset.iconHydrated = '1';
     dialogTitle.textContent = '账号';
     status.textContent = `已登录（方式：${authState.auth?.method || 'session'}）`;
     guestPanel.classList.add('hidden');
@@ -2502,6 +2441,7 @@ function syncAdvancedSearchInputs() {
     if ([...savedSelect.options].some((o) => o.value === current)) savedSelect.value = current;
   }
 
+  renderToolbarSemanticHints();
   const meta = byId('advancedSearchMeta');
   if (!meta) return;
   if (!advancedSearchState.panelOpen) {
@@ -2700,6 +2640,7 @@ async function logoutCurrentUser({ next = '/' } = {}) {
   } catch (_err) {
     // ignore
   }
+  stopRealtimeEvents();
   authState = {
     loading: false,
     authenticated: false,
@@ -2712,26 +2653,6 @@ async function logoutCurrentUser({ next = '/' } = {}) {
   renderAuthUi();
   if (byId('authDialog')?.open) byId('authDialog').close();
   redirectToLoginPage({ next });
-}
-
-function inferItemKind(item = {}) {
-  const url = String(item.url || '').toLowerCase();
-  const contentType = String(item?.metadata?.contentType || item?.article?.contentType || '').toLowerCase();
-  if (/youtube\.com|youtu\.be|vimeo\.com/.test(url)) return 'video';
-  if (contentType.includes('pdf') || /\.pdf([?#]|$)/.test(url)) return 'pdf';
-  if (contentType.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)([?#]|$)/.test(url)) return 'image';
-  if (contentType.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v)([?#]|$)/.test(url)) return 'video';
-  if (/\.(txt|md|json|csv)([?#]|$)/.test(url)) return 'file';
-  return 'web';
-}
-
-function kindLabel(kind) {
-  const k = String(kind || 'web');
-  if (k === 'pdf') return 'PDF';
-  if (k === 'image') return '图片';
-  if (k === 'video') return '视频';
-  if (k === 'file') return '文件';
-  return '网页';
 }
 
 function itemExcerpt(item = {}) {
@@ -2976,6 +2897,41 @@ async function loadState() {
   renderDialogsFolderOptions();
 }
 
+async function loadSidebarSyncHealth({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && sidebarSyncHealthState.loading) return sidebarSyncHealthState.health;
+  if (!force && sidebarSyncHealthState.updatedAt && now - sidebarSyncHealthState.updatedAt < 30_000) {
+    return sidebarSyncHealthState.health;
+  }
+
+  sidebarSyncHealthState = {
+    ...sidebarSyncHealthState,
+    loading: true,
+    error: ''
+  };
+  renderSidebarStatusCard();
+  try {
+    const health = await api('/api/plugins/raindropSync/health');
+    sidebarSyncHealthState = {
+      loading: false,
+      error: '',
+      health,
+      updatedAt: Date.now()
+    };
+    return health;
+  } catch (err) {
+    sidebarSyncHealthState = {
+      ...sidebarSyncHealthState,
+      loading: false,
+      error: err.message || '同步状态加载失败',
+      updatedAt: Date.now()
+    };
+    return sidebarSyncHealthState.health;
+  } finally {
+    renderSidebarStatusCard();
+  }
+}
+
 async function fetchBookmarksPagePayload({ page = state.filters.page, pageSize = state.filters.pageSize } = {}) {
   if (isAdvancedSearchActive()) {
     const qs = queryString({
@@ -3023,16 +2979,14 @@ function renderListLoadMoreBar() {
   const total = Number((sameQuery ? listLoadMoreState.total : page.total) || page.total || displayedCount || 0);
   const hasNext = Boolean(sameQuery ? listLoadMoreState.hasNext : page.hasNext);
   const loadedPages = sameQuery ? Math.max(1, Number(listLoadMoreState.lastLoadedPage || page.page || 1) - Number(listLoadMoreState.basePage || page.page || 1) + 1) : 1;
-  const canShow = inList && displayedCount > 0;
+  const canShow = inList && displayedCount > 0 && hasNext;
 
   bar.classList.toggle('hidden', !canShow);
   if (!canShow) return;
 
-  btn.disabled = listLoadMoreState.loading || !hasNext;
-  btn.textContent = listLoadMoreState.loading ? '加载中…' : (hasNext ? '更多…' : '已加载全部');
-  meta.textContent = hasNext
-    ? `已显示 ${displayedCount} / ${total} 条 · 已加载 ${loadedPages} 页`
-    : `已显示 ${displayedCount} / ${total} 条`;
+  btn.disabled = listLoadMoreState.loading;
+  btn.textContent = listLoadMoreState.loading ? '加载中…' : '更多…';
+  meta.textContent = `已显示 ${displayedCount} / ${total} 条 · 已加载 ${loadedPages} 页`;
 }
 
 async function loadBookmarks() {
@@ -3191,8 +3145,7 @@ function renderSidebar() {
   const nav = byId('quickNav');
   nav?.classList.add('sidebar-system-list');
   const folderIsAll = String(state.filters.folderId || 'all') === 'all';
-  nav.innerHTML = quickViews
-    .map((item) => {
+  nav.innerHTML = renderSidebarVirtualList(nav, quickViews, (item) => {
       const active = folderIsAll && state.filters.view === item.key ? 'active' : '';
       let count = state.stats.total || 0;
       if (item.key === 'favorites') count = state.stats.favorites || 0;
@@ -3208,8 +3161,7 @@ function renderSidebar() {
         </button>
         <button type="button" class="sidebar-row-more ghost" data-system-view-menu="${escapeHtml(item.key)}" title="更多" aria-label="更多">…</button>
       </div>`;
-    })
-    .join('');
+    });
 
   nav.querySelectorAll('[data-system-view]').forEach((el) => {
     el.addEventListener('click', async () => {
@@ -3290,7 +3242,7 @@ function renderSidebar() {
   const quickFilterItems = buildSidebarQuickFilters().filter((x) => Number(x.count || 0) > 0);
   if (quickFiltersList) {
     quickFiltersList.innerHTML = quickFilterItems.length
-      ? quickFilterItems.map((item) => {
+      ? renderSidebarVirtualList(quickFiltersList, quickFilterItems, (item) => {
         const active = isQuickFilterActiveQuery(item.query) ? 'active' : '';
         return `<div class="sidebar-row sidebar-filter-row ${active}" data-quick-filter-row="${escapeHtml(item.id)}" data-quick-filter-query="${escapeHtml(item.query)}">
             <button type="button" class="sidebar-row-main" data-quick-filter="${escapeHtml(item.id)}">
@@ -3300,8 +3252,8 @@ function renderSidebar() {
             </button>
             <button type="button" class="sidebar-row-more ghost" data-quick-filter-menu="${escapeHtml(item.id)}" title="更多" aria-label="更多">…</button>
           </div>`;
-      }).join('')
-      : `<div class="sidebar-empty muted">暂无快速过滤</div>`;
+      })
+      : renderSidebarVirtualList(quickFiltersList, [], () => '') || `<div class="sidebar-empty muted">暂无快速过滤</div>`;
 
     quickFiltersList.querySelectorAll('[data-quick-filter]').forEach((el) => {
       el.addEventListener('click', async (e) => {
@@ -3357,8 +3309,7 @@ function renderSidebar() {
   if (tagsSectionTitle) {
     tagsSectionTitle.textContent = `标签${tagItems.length ? ` (${tagItems.length})` : ''}`;
   }
-  tagsList.innerHTML = visibleTags
-    .map((t) => {
+  tagsList.innerHTML = renderSidebarVirtualList(tagsList, visibleTags, (t) => {
       const active = state.filters.tags === t.name ? 'active' : '';
       return `<div class="sidebar-row tag-row ${active}" data-tag-row="${escapeHtml(t.name)}">
         <button type="button" class="sidebar-row-main tag-row-main" data-tag="${escapeHtml(t.name)}">
@@ -3368,10 +3319,10 @@ function renderSidebar() {
         </button>
         <button type="button" class="sidebar-row-more ghost" data-tag-menu="${escapeHtml(t.name)}" title="标签菜单" aria-label="标签菜单">…</button>
       </div>`;
-    })
-    .join('');
+    });
   if (tagsMeta) {
-    tagsMeta.textContent = `${tagItems.length} 个标签 · ${sidebarTagsUi.sort === 'name' ? '按名称' : '按数量'}${activeTag ? ` · 当前 #${activeTag}` : ''}`;
+    const syncSummary = getSidebarSyncHealthSummary();
+    tagsMeta.textContent = `${tagItems.length} 个标签 · ${sidebarTagsUi.sort === 'name' ? '按名称' : '按数量'} · 同步 ${syncSummary.label}${activeTag ? ` · 当前 #${activeTag}` : ''}`;
   }
   if (tagsSortBtn) {
     tagsSortBtn.textContent = sidebarTagsUi.sort === 'name' ? 'A' : '#';
@@ -3487,10 +3438,61 @@ function renderHeader() {
   const bulkCount = byId('bulkSelectionCount');
   if (bulkBar) bulkBar.classList.toggle('hidden', selectedCount <= 0);
   if (bulkCount) bulkCount.textContent = `已选 ${selectedCount} 项`;
+  renderToolbarSemanticHints({ selectedCount });
   renderBookmarkLayoutSwitch();
   renderListColumnsMenu();
   renderHeaderMenuControls();
   renderAiFolderSummaryDialogUi();
+}
+
+function renderToolbarSemanticHints({ selectedCount = state.selected.size } = {}) {
+  const searchBadge = byId('searchModeBadge');
+  const aiBadge = byId('askAiModeBadge');
+  const bulkHint = byId('bulkModeHint');
+  const shortcutHints = byId('toolbarShortcutHints');
+
+  if (searchBadge) {
+    let label = '关键词';
+    let title = '关键词搜索';
+    if (isAdvancedSearchActive()) {
+      if (advancedSearchState.semanticEnabled && advancedSearchState.rerankEnabled) {
+        label = 'AI 混合';
+        title = '高级搜索、语义搜索与 AI 重排已启用';
+      } else if (advancedSearchState.semanticEnabled) {
+        label = advancedSearchState.semanticMode === 'semantic' ? '语义' : '混合';
+        title = advancedSearchState.semanticMode === 'semantic' ? '纯语义搜索已启用' : '关键词与语义混合搜索已启用';
+      } else if (advancedSearchState.rerankEnabled) {
+        label = 'AI 重排';
+        title = 'AI 结果重排已启用';
+      } else {
+        label = '高级';
+        title = '高级筛选已启用';
+      }
+    } else if (advancedSearchState.lastResultMeta?.usedFullText) {
+      label = '全文';
+      title = '全文索引结果';
+    }
+    searchBadge.textContent = label;
+    searchBadge.title = title;
+    searchBadge.dataset.mode = label;
+  }
+
+  if (aiBadge) {
+    const activeItem = state.activeId
+      ? (state.bookmarks.find((x) => String(x.id) === String(state.activeId)) || state.allBookmarks.find((x) => String(x.id) === String(state.activeId)))
+      : null;
+    const label = activeItem ? '当前书签' : (selectedCount > 0 ? `已选 ${selectedCount}` : '当前视图');
+    aiBadge.textContent = label;
+    aiBadge.title = activeItem ? 'AI 将优先围绕当前书签问答' : (selectedCount > 0 ? 'AI 可结合已选书签批量操作' : 'AI 将围绕当前视图问答');
+  }
+
+  if (bulkHint) {
+    bulkHint.textContent = selectedCount > 0 ? `批量模式 · 可移动、归档、删除或 AI 打标签` : '批量模式';
+  }
+
+  if (shortcutHints) {
+    shortcutHints.innerHTML = '';
+  }
 }
 
 function renderBookmarkLayoutSwitch() {
@@ -3520,6 +3522,7 @@ function renderBookmarkLayoutSwitch() {
 
 function renderPager() {
   const page = state.page || { page: 1, totalPages: 1, total: state.bookmarks.length, hasPrev: false, hasNext: false, pageSize: 24 };
+  byId('pager')?.classList.toggle('hidden', Number(page.totalPages || 1) <= 1);
   byId('pagerMeta').textContent = `${page.total || 0} 条`;
   byId('pageLabel').textContent = `第 ${page.page || 1} / ${page.totalPages || 1} 页`;
   byId('prevPageBtn').disabled = !page.hasPrev;
@@ -3561,8 +3564,8 @@ function cardMetadataStatusHtml(item) {
   }
 
   return `<div class="card-meta">
-    <span class="meta-chip type">${escapeHtml(kindLabel(inferItemKind(item)))}</span>
-    <span class="meta-chip ${tone}">${escapeHtml(label)}</span>
+    ${statusBadgeHtml(kindLabel(inferItemKind(item)), 'neutral', 'type')}
+    ${statusBadgeHtml(label, tone)}
     ${detail ? `<span class="muted">${escapeHtml(detail)}</span>` : ''}
   </div>`;
 }
@@ -3603,13 +3606,46 @@ function bookmarkTagsHtml(item, { max = 4, className = 'card-tag' } = {}) {
     .join('');
 }
 
+function bookmarkMetaParts(item, { include = {}, timeFormat = 'long' } = {}) {
+  const all = {
+    host: true,
+    folder: true,
+    type: true,
+    time: true
+  };
+  const visible = { ...all, ...include };
+  const parts = [];
+  const host = hostFromUrl(item.url);
+  const folderLabel = folderName(item.folderId || 'root');
+  const kind = kindLabel(inferItemKind(item));
+  const timeText = timeFormat === 'short' ? bookmarkListDateText(item) : bookmarkTimeText(item);
+  if (visible.host && host) parts.push({ key: 'host', label: host });
+  if (visible.folder && folderLabel) parts.push({ key: 'folder', label: folderLabel });
+  if (visible.type && kind) parts.push({ key: 'type', label: kind });
+  if (visible.time && timeText) parts.push({ key: 'time', label: timeText });
+  return parts;
+}
+
+function bookmarkMetaHtml(item, { className = 'bookmark-meta', include = {}, timeFormat = 'long' } = {}) {
+  const parts = bookmarkMetaParts(item, { include, timeFormat });
+  if (!parts.length) return '';
+  return `<div class="${className}" aria-label="书签信息">
+    ${parts.map((part) => `<span class="bookmark-meta-part bookmark-meta-${part.key}" data-bookmark-meta="${part.key}">${escapeHtml(part.label)}</span>`).join('')}
+  </div>`;
+}
+
 function bookmarkActionButtonHtml({ dataAttr, id, label, icon, iconOnly = false, className = 'ghost', hidden = false }) {
-  const attrs = [`type="button"`, `class="${className}${hidden ? ' hidden' : ''}"`, `${dataAttr}="${escapeHtml(String(id || ''))}"`];
-  if (iconOnly) attrs.push(`title="${escapeHtml(label)}"`, `aria-label="${escapeHtml(label)}"`);
-  const content = iconOnly
-    ? `${iconSvg(icon, { title: label })}<span class="sr-only">${escapeHtml(label)}</span>`
-    : escapeHtml(label);
-  return `<button ${attrs.join(' ')}>${content}</button>`;
+  return uiButtonHtml({
+    label,
+    iconHtml: iconOnly ? iconSvg(icon, { title: label }) : '',
+    iconOnly,
+    hidden,
+    danger: /\bdanger\b/.test(className),
+    className: className.replace(/\bdanger\b/g, '').replace(/\bicon-action-btn\b/g, '').trim() || 'ghost',
+    attrs: {
+      [dataAttr]: String(id || '')
+    }
+  });
 }
 
 function bookmarkActionButtonsHtml(item, { compact = false, iconOnly = false } = {}) {
@@ -3617,7 +3653,6 @@ function bookmarkActionButtonsHtml(item, { compact = false, iconOnly = false } =
   const out = [];
   if (!compact) {
     out.push(bookmarkActionButtonHtml({ dataAttr: 'data-open', id: item.id, label: '新标签页打开', icon: 'open', iconOnly, className: btnClass }));
-    out.push(bookmarkActionButtonHtml({ dataAttr: 'data-preview-card', id: item.id, label: '预览模式', icon: 'preview', iconOnly, className: btnClass }));
   }
   out.push(bookmarkActionButtonHtml({ dataAttr: 'data-favorite', id: item.id, label: item.favorite ? '取消收藏' : '收藏', icon: item.favorite ? 'unfavorite' : 'favorite', iconOnly, className: btnClass }));
   if (!compact) {
@@ -3650,23 +3685,25 @@ function cardHtml(item) {
   const coverUrl = bookmarkCoverUrl(item);
   const cover = coverUrl
     ? `<button type="button" class="card-cover" data-preview-card="${item.id}" title="预览">
-        <img src="${escapeHtml(coverUrl)}" alt="cover" loading="lazy" />
+        <img src="${escapeHtml(coverUrl)}" alt="${escapeHtml(item.title || '书签封面')}" loading="lazy" />
       </button>`
     : '';
   const previewTitle = `<button type="button" class="card-title-link" data-preview-card="${item.id}" title="打开预览">${escapeHtml(item.title)}</button>`;
-  const timeText = bookmarkTimeText(item);
+  const metaHtml = bookmarkMetaHtml(item, { className: 'card-host-row bookmark-meta' });
 
   return `<article class="card ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
     ${cover}
     <div class="card-top">
       <div class="card-top-row">
-        <label><input type="checkbox" data-select="${item.id}" ${selected}/> 选择</label>
+        <label class="card-select"><input type="checkbox" data-select="${item.id}" ${selected}/> <span class="sr-only">选择</span></label>
         <span>${bookmarkFlagsText(item)}</span>
       </div>
-      <div class="card-host-row">
-        <img alt="icon" src="${favicon}" width="18" height="18" />
-        <span class="host">${escapeHtml(hostFromUrl(item.url))}</span>
-        ${timeText ? `<span class="muted">${escapeHtml(timeText)}</span>` : ''}
+      <div class="card-host-row-wrap">
+        <span class="card-favicon" aria-hidden="true">
+          <img data-card-favicon-img src="${escapeHtml(favicon)}" alt="" width="18" height="18" loading="lazy" />
+          <span class="card-favicon-fallback">${iconSvg('web')}</span>
+        </span>
+        ${metaHtml}
       </div>
     </div>
     <div class="card-body">
@@ -3691,31 +3728,18 @@ function listRowHtml(item) {
   const excerpt = itemExcerpt(item);
   const tags = bookmarkTagsHtml(item, { max: 3, className: 'row-tag' });
   const coverUrl = bookmarkCoverUrl(item);
-  const host = hostFromUrl(item.url);
   const metaStatus = cardMetadataStatusHtml(item);
-  const timeText = bookmarkListDateText(item);
-  const folderLabel = folderName(item.folderId || 'root');
-  const kind = kindLabel(inferItemKind(item));
   const showFolder = Boolean(listColumns.folder);
   const showType = Boolean(listColumns.type);
   const showExcerpt = Boolean(listColumns.excerpt);
   const showTags = Boolean(listColumns.tags);
   const showTime = Boolean(listColumns.time);
   const rowFlags = `${item.favorite ? '★' : ''}${item.archived ? '📦' : ''}`;
-  const folderPart = showFolder
-    ? `<span class="subline-part subline-folder"><span class="subline-icon" aria-hidden="true">${iconSvg(item.folderId === 'root' ? 'folder' : 'folder')}</span><span class="muted">${escapeHtml(folderLabel)}</span></span>`
-    : '';
-  const hostPart = `<span class="subline-part subline-host"><span class="host">${escapeHtml(host)}</span></span>`;
-  const timePart = showTime && timeText
-    ? `<span class="subline-part subline-time"><span class="muted">${escapeHtml(timeText)}</span></span>`
-    : '';
-  const typePart = showType
-    ? `<span class="subline-part subline-type"><span class="muted">${escapeHtml(kind)}</span></span>`
-    : '';
-  const subParts = [folderPart, hostPart, timePart, typePart].filter(Boolean);
-  const sublineHtml = subParts
-    .map((part, idx) => (idx === 0 ? part : `<span class="bookmark-row-sep">•</span>${part}`))
-    .join('');
+  const sublineHtml = bookmarkMetaHtml(item, {
+    className: 'bookmark-row-subline bookmark-meta',
+    include: { folder: showFolder, type: showType, time: showTime },
+    timeFormat: 'short'
+  });
   const kindIcon = inferItemKind(item) === 'pdf'
     ? 'type'
     : inferItemKind(item) === 'image'
@@ -3725,7 +3749,7 @@ function listRowHtml(item) {
         : 'web';
   const thumbInner = coverUrl
     ? `<span class="bookmark-row-thumb-placeholder" aria-hidden="true">${iconSvg(kindIcon)}</span>
-       <img data-row-thumb-img="${item.id}" src="${escapeHtml(coverUrl)}" alt="cover" loading="lazy" />`
+       <img data-row-thumb-img="${item.id}" src="${escapeHtml(coverUrl)}" alt="${escapeHtml(item.title || '书签封面')}" loading="lazy" />`
     : `<span class="bookmark-row-thumb-fallback" aria-hidden="true">
          <span class="bookmark-row-thumb-fallback-icon">${iconSvg(kindIcon)}</span>
          <img class="bookmark-row-thumb-favicon" alt="" src="${bookmarkFaviconUrl(item)}" width="16" height="16" loading="lazy" />
@@ -3753,7 +3777,7 @@ function listRowHtml(item) {
     </div>
     <div class="bookmark-row-mobile-bottom">
       ${showTags && tags ? `<div class="bookmark-row-tags">${tags}</div>` : ''}
-      <div class="bookmark-row-actions">${bookmarkActionButtonsHtml(item, { compact: true })}</div>
+      <div class="bookmark-row-actions">${bookmarkActionButtonsHtml(item, { compact: true, iconOnly: true })}</div>
     </div>
   </article>`;
 }
@@ -3762,19 +3786,12 @@ function headlineHtml(item) {
   const active = state.activeId === item.id ? 'active' : '';
   const selected = state.selected.has(item.id) ? 'checked' : '';
   const selectedClass = state.selected.has(item.id) ? 'selected' : '';
-  const host = hostFromUrl(item.url);
-  const timeText = bookmarkTimeText(item);
-  const kind = kindLabel(inferItemKind(item));
-  const folderLabel = folderName(item.folderId || 'root');
   return `<article class="bookmark-headline ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
     <label class="bookmark-headline-select"><input type="checkbox" data-select="${item.id}" ${selected}/></label>
-    <img alt="icon" src="${bookmarkFaviconUrl(item)}" width="16" height="16" />
+    <img alt="" src="${bookmarkFaviconUrl(item)}" width="16" height="16" />
     <button type="button" class="bookmark-headline-title" data-preview-card="${item.id}" title="打开预览">${escapeHtml(item.title)}</button>
-    <div class="bookmark-headline-meta muted">
-      <span>${escapeHtml(host)}</span>
-      <span>${escapeHtml(folderLabel)}</span>
-      <span>${escapeHtml(kind)}</span>
-      ${timeText ? `<span>${escapeHtml(timeText)}</span>` : ''}
+    <div class="bookmark-headline-meta muted bookmark-meta">
+      ${bookmarkMetaParts(item).map((part) => `<span class="bookmark-meta-part bookmark-meta-${part.key}" data-bookmark-meta="${part.key}">${escapeHtml(part.label)}</span>`).join('')}
       ${item.favorite ? '<span>★</span>' : ''}
       ${item.archived ? '<span>📦</span>' : ''}
     </div>
@@ -3798,9 +3815,9 @@ function moodboardHtml(item) {
   const excerpt = itemExcerpt(item);
   const title = escapeHtml(item.title || host || '未命名');
   const bg = coverUrl
-    ? `<img src="${escapeHtml(coverUrl)}" alt="cover" loading="lazy" />`
+    ? `<img src="${escapeHtml(coverUrl)}" alt="${escapeHtml(item.title || '书签封面')}" loading="lazy" />`
     : `<div class="bookmark-board-fallback">
-        <img alt="icon" src="${bookmarkFaviconUrl(item)}" width="28" height="28" />
+        <img alt="" src="${bookmarkFaviconUrl(item)}" width="28" height="28" />
         <div>${escapeHtml(host || '网页')}</div>
       </div>`;
   return `<article class="bookmark-board ${moodboardSizeClass(item)} ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
@@ -3811,10 +3828,7 @@ function moodboardHtml(item) {
         <span>${escapeHtml(bookmarkFlagsText(item))}</span>
       </div>
       <button type="button" class="bookmark-board-title" data-preview-card="${item.id}">${title}</button>
-      <div class="bookmark-board-meta">
-        <span>${escapeHtml(host)}</span>
-        <span>${escapeHtml(kindLabel(inferItemKind(item)))}</span>
-      </div>
+      ${bookmarkMetaHtml(item, { className: 'bookmark-board-meta bookmark-meta', timeFormat: 'short' })}
       ${excerpt ? `<div class="bookmark-board-excerpt">${escapeHtml(excerpt)}</div>` : ''}
       <div class="bookmark-board-actions">
         ${coverUrl ? `<button class="ghost" data-preview-card="${item.id}">预览</button>` : `<button class="ghost" data-fetch-home-preview="${item.id}">${escapeHtml(moodboardFetchLabel(item))}</button>`}
@@ -3840,30 +3854,91 @@ function isTypingContext(target) {
   return ['input', 'textarea', 'select'].includes(tag);
 }
 
-function hasModalOpen() {
-  return Boolean(document.querySelector('dialog[open]'));
+function clampNumber(value, { min, max, fallback }) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
 }
 
-function isVisibleFocusable(el) {
-  if (!(el instanceof HTMLElement)) return false;
-  if (el.hidden) return false;
-  if (el.getAttribute('aria-hidden') === 'true') return false;
-  if (el.matches('[disabled], [inert]')) return false;
-  if (el.closest('.hidden')) return false;
-  return el.getClientRects().length > 0;
+function readStoredSplitWidth(storageKey, limits) {
+  try {
+    return clampNumber(window.localStorage.getItem(storageKey), limits);
+  } catch (_err) {
+    return limits.fallback;
+  }
 }
 
-function focusableElementsWithin(root) {
-  if (!(root instanceof HTMLElement)) return [];
-  const selector = [
-    'a[href]',
-    'button:not([disabled])',
-    'input:not([disabled]):not([type="hidden"])',
-    'select:not([disabled])',
-    'textarea:not([disabled])',
-    '[tabindex]:not([tabindex="-1"])'
-  ].join(',');
-  return Array.from(root.querySelectorAll(selector)).filter(isVisibleFocusable);
+function writeStoredSplitWidth(storageKey, value, limits) {
+  const next = clampNumber(value, limits);
+  try {
+    window.localStorage.setItem(storageKey, String(next));
+  } catch (_err) {
+    // ignore storage failures
+  }
+  return next;
+}
+
+function applySplitViewDimensions() {
+  const root = document.documentElement;
+  const sidebarWidth = readStoredSplitWidth(SIDEBAR_WIDTH_STORAGE_KEY, SIDEBAR_WIDTH_LIMITS);
+  const detailWidth = readStoredSplitWidth(DETAIL_WIDTH_STORAGE_KEY, DETAIL_WIDTH_LIMITS);
+  root.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+  root.style.setProperty('--detail-width', `${detailWidth}px`);
+}
+
+function bindSplitResizeHandle(handle, {
+  storageKey,
+  limits,
+  cssVar,
+  side = 'right'
+}) {
+  if (!(handle instanceof HTMLElement)) return;
+  const apply = (value) => {
+    const next = writeStoredSplitWidth(storageKey, value, limits);
+    document.documentElement.style.setProperty(cssVar, `${next}px`);
+    handle.setAttribute('aria-valuenow', String(next));
+    handle.setAttribute('aria-valuemin', String(limits.min));
+    handle.setAttribute('aria-valuemax', String(limits.max));
+    return next;
+  };
+
+  apply(readStoredSplitWidth(storageKey, limits));
+
+  handle.addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const current = readStoredSplitWidth(storageKey, limits);
+    if (e.key === 'Home') apply(limits.min);
+    else if (e.key === 'End') apply(limits.max);
+    else {
+      const step = e.shiftKey ? 24 : 8;
+      const direction = e.key === 'ArrowRight' ? 1 : -1;
+      apply(current + direction * step);
+    }
+  });
+
+  handle.addEventListener('pointerdown', (e) => {
+    if (window.innerWidth <= 920) return;
+    e.preventDefault();
+    const startX = Number(e.clientX || 0);
+    const start = readStoredSplitWidth(storageKey, limits);
+    document.body.classList.add('split-resizing');
+    handle.setPointerCapture?.(e.pointerId);
+
+    const onMove = (moveEvent) => {
+      const dx = Number(moveEvent.clientX || 0) - startX;
+      apply(start + (side === 'left' ? -dx : dx));
+    };
+    const onUp = () => {
+      document.body.classList.remove('split-resizing');
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    window.addEventListener('pointercancel', onUp, { once: true });
+  });
 }
 
 function setMobileSidebarOpen(open, { restoreFocus = true } = {}) {
@@ -3946,30 +4021,27 @@ function trapDetailDrawerTabFocus(e) {
   return false;
 }
 
-function menuItemsWithin(menu) {
-  if (!(menu instanceof HTMLElement)) return [];
-  return Array.from(menu.querySelectorAll('[role="menuitem"]')).filter(isVisibleFocusable);
-}
-
-function handleMenuArrowNavigation(e) {
-  if (e.defaultPrevented) return false;
-  const target = e.target instanceof HTMLElement ? e.target : null;
-  if (!target) return false;
-  const item = target.closest('[role="menuitem"]');
-  const menu = item?.closest?.('[role="menu"]');
-  if (!(item instanceof HTMLElement) || !(menu instanceof HTMLElement)) return false;
-  const items = menuItemsWithin(menu);
-  if (!items.length) return false;
-  const currentIndex = Math.max(0, items.indexOf(item));
-  let nextIndex = -1;
-  if (e.key === 'ArrowDown') nextIndex = (currentIndex + 1) % items.length;
-  if (e.key === 'ArrowUp') nextIndex = (currentIndex - 1 + items.length) % items.length;
-  if (e.key === 'Home') nextIndex = 0;
-  if (e.key === 'End') nextIndex = items.length - 1;
-  if (nextIndex < 0) return false;
-  e.preventDefault();
-  items[nextIndex]?.focus();
-  return true;
+function syncDetailDrawerShellState(item) {
+  const open = Boolean(item);
+  const shell = document.querySelector('.shell');
+  const detail = document.querySelector('.shell .detail');
+  const closeBtn = byId('detailCloseBtn');
+  const backdrop = byId('detailPanelBackdrop');
+  const isMobile = window.innerWidth <= 920;
+  if (open && !detailDrawerReturnFocus) {
+    detailDrawerReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+  shell?.classList.toggle('detail-panel-open', open);
+  document.body.classList.toggle('detail-drawer-open', open && isMobile);
+  if (detail instanceof HTMLElement) {
+    detail.setAttribute('aria-hidden', String(!open && isMobile));
+  }
+  closeBtn?.classList.toggle('hidden', !open);
+  backdrop?.classList.toggle('hidden', !open);
+  if (!open) {
+    document.body.classList.remove('detail-drawer-open');
+    detailDrawerReturnFocus = null;
+  }
 }
 
 function visibleBookmarkIds() {
@@ -4084,14 +4156,26 @@ function skeletonCardsHtml() {
     </article>`).join('');
 }
 
+function stateBlockHtml({
+  state = 'empty',
+  eyebrow = '状态',
+  title = '',
+  message = '',
+  actions = '',
+  hints = []
+} = {}) {
+  return uiEmptyStateHtml({ state, eyebrow, title, message, actions, hints });
+}
+
 function emptyCardsStateHtml() {
   if (bookmarksLoadError) {
-    return `<div class="empty-state error">
-      <div class="empty-state-eyebrow">加载状态</div>
-      <div class="empty-state-title">加载书签失败</div>
-      <div class="muted">${escapeHtml(bookmarksLoadError)}</div>
-      <div class="empty-state-actions"><button type="button" class="ghost" id="cardsRetryBtn">重试</button></div>
-    </div>`;
+    return stateBlockHtml({
+      state: 'error',
+      eyebrow: '加载状态',
+      title: '加载书签失败',
+      message: bookmarksLoadError,
+      actions: '<button type="button" class="ghost" id="cardsRetryBtn">重试</button>'
+    });
   }
   const hints = [];
   if (String(state.filters.q || '').trim()) hints.push(`搜索：${String(state.filters.q || '').trim()}`);
@@ -4103,16 +4187,15 @@ function emptyCardsStateHtml() {
   }
   if (isAdvancedSearchActive()) hints.push('高级搜索已启用');
   const hasScopedFilters = hints.length > 0;
-  return `<div class="empty-state">
-    <div class="empty-state-eyebrow">Rainboard</div>
-    <div class="empty-state-title">当前视图暂无书签</div>
-    <div class="muted">你可以切换筛选、切换集合，或直接添加新的收藏内容。</div>
-    ${hints.length ? `<div class="empty-state-hints">${hints.map((hint) => `<span class="empty-state-hint">${escapeHtml(hint)}</span>`).join('')}</div>` : ''}
-    <div class="empty-state-actions">
-      <button type="button" class="ghost" id="emptyStateCreateBtn">添加书签</button>
-      <button type="button" class="ghost" id="emptyStateResetBtn">${hasScopedFilters ? '回到全部书签' : '刷新当前视图'}</button>
-    </div>
-  </div>`;
+  return stateBlockHtml({
+    state: 'empty',
+    eyebrow: 'Rainbow',
+    title: '当前视图暂无书签',
+    message: '你可以切换筛选、切换集合，或直接添加新的收藏内容。',
+    hints,
+    actions: `<button type="button" class="ghost" id="emptyStateCreateBtn">添加书签</button>
+      <button type="button" class="ghost" id="emptyStateResetBtn">${hasScopedFilters ? '回到全部书签' : '刷新当前视图'}</button>`
+  });
 }
 
 function canUseListVirtualization(root = byId('cards')) {
@@ -4195,6 +4278,18 @@ function scheduleCollectionsTreeVirtualRender() {
       }
     }
     renderCollectionsTreeSection();
+  });
+}
+
+function scheduleSidebarAuxiliaryVirtualRender() {
+  if (sidebarAuxVirtualRenderRaf) return;
+  sidebarAuxVirtualRenderRaf = window.requestAnimationFrame(() => {
+    sidebarAuxVirtualRenderRaf = 0;
+    const roots = [byId('quickNav'), byId('quickFiltersList'), byId('tagsList')].filter(Boolean);
+    const hasVirtualRoot = roots.some((root) => root.classList.contains('is-virtualized'));
+    const maybeLarge = (state.tags || []).length >= SIDEBAR_AUX_VIRTUAL_THRESHOLD;
+    if (!hasVirtualRoot && !maybeLarge) return;
+    renderSidebar();
   });
 }
 
@@ -4319,6 +4414,28 @@ function renderCards() {
     const markError = () => {
       thumbBtn.classList.remove('is-loading');
       thumbBtn.classList.add('is-error');
+      img.removeAttribute('src');
+    };
+    if (img.complete && img.naturalWidth > 0) {
+      markLoaded();
+    } else if (img.complete && img.naturalWidth === 0) {
+      markError();
+    } else {
+      img.addEventListener('load', markLoaded, { once: true });
+      img.addEventListener('error', markError, { once: true });
+    }
+  });
+
+  root.querySelectorAll('img[data-card-favicon-img]').forEach((img) => {
+    const host = img.closest('.card-favicon');
+    if (!host) return;
+    const markLoaded = () => {
+      host.classList.remove('is-error');
+      host.classList.add('is-loaded');
+    };
+    const markError = () => {
+      host.classList.remove('is-loaded');
+      host.classList.add('is-error');
       img.removeAttribute('src');
     };
     if (img.complete && img.naturalWidth > 0) {
@@ -4495,23 +4612,6 @@ function stopMetadataTaskPoll() {
   }
 }
 
-function isMetadataTaskTerminal(status) {
-  return ['succeeded', 'failed'].includes(String(status || ''));
-}
-
-function formatMetadataTaskInfo(task) {
-  if (!task) return '元数据任务：无';
-  const parts = [`元数据任务：${task.status || 'unknown'}`];
-  if (task.attempt) parts.push(`尝试 ${task.attempt}/${task.maxAttempts || '?'}`);
-  if (task.nextRunAt && String(task.status) === 'retry_scheduled') {
-    parts.push(`下次重试：${new Date(Number(task.nextRunAt)).toLocaleTimeString()}`);
-  }
-  if (task.updatedAt) parts.push(`更新于：${new Date(Number(task.updatedAt)).toLocaleTimeString()}`);
-  const msg = task.error?.message || task.lastError?.message || '';
-  if (msg) parts.push(`错误：${msg}`);
-  return parts.join(' · ');
-}
-
 function renderDetailFetchStatusSummary({ item = null, task = null } = {}) {
   const chipsEl = byId('detailFetchSummaryChips');
   const detailsEl = byId('detailFetchDetails');
@@ -4632,7 +4732,7 @@ function setDetailSectionCollapsed(key, collapsed) {
   const k = String(key || '').trim();
   if (!k) return;
   detailSectionsUi = { ...detailSectionsUi, [k]: Boolean(collapsed) };
-  persistDetailSectionsUi();
+  persistDetailSectionsUi(detailSectionsUi);
   applyDetailSectionUi();
 }
 
@@ -4790,10 +4890,6 @@ async function runAiAutoTagForActiveBookmark() {
     const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
     updateDetailPanelHeadUi(latest);
   }
-}
-
-function isAiBatchTaskTerminalStatus(status) {
-  return new Set(['succeeded', 'failed', 'partial', 'cancelled']).has(String(status || ''));
 }
 
 function waitMs(ms) {
@@ -6081,6 +6177,158 @@ function getAiQaContextBookmark() {
     || null;
 }
 
+function aiDrawerContextBookmark() {
+  const preferredId = String(state.activeId || aiQaDialogState.bookmarkId || '').trim();
+  if (!preferredId) return null;
+  return state.bookmarks.find((x) => String(x.id) === preferredId)
+    || state.allBookmarks.find((x) => String(x.id) === preferredId)
+    || null;
+}
+
+function setAiSideDrawerOpen(open) {
+  aiSideDrawerState.open = Boolean(open);
+  const drawer = byId('aiSideDrawer');
+  const backdrop = byId('aiSideDrawerBackdrop');
+  if (drawer) {
+    drawer.classList.toggle('hidden', !aiSideDrawerState.open);
+    drawer.setAttribute('aria-hidden', String(!aiSideDrawerState.open));
+  }
+  if (backdrop) backdrop.classList.toggle('hidden', !aiSideDrawerState.open);
+  document.body.classList.toggle('ai-side-drawer-open', aiSideDrawerState.open);
+  renderAiSideDrawer();
+}
+
+function renderAiDrawerSuggestions(item = aiDrawerContextBookmark()) {
+  const root = byId('aiDrawerSuggestions');
+  if (!root) return;
+  if (!item) {
+    root.innerHTML = '<div class="muted">选择书签后显示建议。</div>';
+    return;
+  }
+  const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean).slice(0, 8) : [];
+  const summary = String(item.aiSuggestions?.summary || item.note || item.excerpt || '').trim();
+  root.innerHTML = `
+    ${tags.length ? `<div class="ai-drawer-suggestion-tags">${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>` : '<div class="muted">暂无标签建议。</div>'}
+    ${summary ? `<div>${escapeHtml(summary.slice(0, 220))}${summary.length > 220 ? '…' : ''}</div>` : '<div class="muted">暂无摘要建议。</div>'}
+  `;
+}
+
+function renderAiDrawerHistory() {
+  const root = byId('aiDrawerHistory');
+  if (!root) return;
+  const history = Array.isArray(aiSideDrawerState.history) ? aiSideDrawerState.history : [];
+  root.innerHTML = history.length
+    ? history.map((item, idx) => `<button type="button" class="ghost" data-ai-drawer-history="${idx}">${escapeHtml(String(item.question || '').slice(0, 80))}</button>`).join('')
+    : '<div class="muted">暂无历史提问。</div>';
+  root.querySelectorAll('[data-ai-drawer-history]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const item = history[Number(el.dataset.aiDrawerHistory || 0)] || null;
+      if (!item) return;
+      aiSideDrawerState = {
+        ...aiSideDrawerState,
+        question: String(item.question || ''),
+        answer: String(item.answer || ''),
+        sources: Array.isArray(item.sources) ? item.sources : [],
+        scope: String(item.scope || 'auto'),
+        limit: Math.max(1, Math.min(10, Number(item.limit || 6) || 6)),
+        error: ''
+      };
+      renderAiSideDrawer();
+    });
+  });
+}
+
+function renderAiSideDrawer() {
+  const drawer = byId('aiSideDrawer');
+  if (!drawer) return;
+  const questionEl = byId('aiDrawerQuestion');
+  const scopeEl = byId('aiDrawerScope');
+  const limitEl = byId('aiDrawerLimit');
+  const askBtn = byId('aiDrawerAskBtn');
+  const answerEl = byId('aiDrawerAnswer');
+  const sourcesEl = byId('aiDrawerSources');
+  const contextMeta = byId('aiDrawerContextMeta');
+  const item = aiDrawerContextBookmark();
+
+  if (questionEl && questionEl.value !== String(aiSideDrawerState.question || '')) questionEl.value = String(aiSideDrawerState.question || '');
+  if (scopeEl) scopeEl.value = ['auto', 'all', 'current_only'].includes(String(aiSideDrawerState.scope || 'auto')) ? String(aiSideDrawerState.scope || 'auto') : 'auto';
+  if (limitEl) limitEl.value = String(Math.max(1, Math.min(10, Number(aiSideDrawerState.limit || 6) || 6)));
+  if (askBtn) {
+    askBtn.disabled = Boolean(aiSideDrawerState.loading);
+    askBtn.textContent = aiSideDrawerState.loading ? '提问中…' : '提问';
+    askBtn.setAttribute('aria-busy', String(Boolean(aiSideDrawerState.loading)));
+  }
+  if (contextMeta) {
+    contextMeta.textContent = item ? `当前书签：${item.title || item.id}` : '当前视图';
+  }
+  renderAiDrawerSuggestions(item);
+
+  if (answerEl) {
+    const answer = String(aiSideDrawerState.answer || '');
+    answerEl.textContent = aiSideDrawerState.loading
+      ? 'AI 正在分析，请稍候…'
+      : (aiSideDrawerState.error ? `失败：${aiSideDrawerState.error}` : (answer || '暂无回答。'));
+    answerEl.classList.toggle('muted', !answer);
+  }
+  const sources = Array.isArray(aiSideDrawerState.sources) ? aiSideDrawerState.sources : [];
+  if (sourcesEl) {
+    sourcesEl.innerHTML = sources.length
+      ? sources.slice(0, 6).map((src, idx) => `<button type="button" class="ai-qa-source-item" data-ai-drawer-source="${escapeHtml(String(src.id || ''))}">
+          <div class="ai-qa-source-row"><span class="ai-qa-source-index">${idx + 1}</span><span class="ai-qa-source-title">${escapeHtml(String(src.title || src.id || '出处'))}</span></div>
+          <div class="ai-qa-source-meta muted">${escapeHtml([src.folderPath, src.host || hostFromUrl(src.url || '')].filter(Boolean).join(' · '))}</div>
+        </button>`).join('')
+      : '<div class="muted">暂无出处。</div>';
+    sourcesEl.querySelectorAll('[data-ai-drawer-source]').forEach((el) => {
+      el.addEventListener('click', () => {
+        const id = String(el.dataset.aiDrawerSource || '');
+        if (!id) return;
+        store.setActiveId(id);
+        renderCards();
+        renderDetail();
+        renderAiSideDrawer();
+      });
+    });
+  }
+  renderAiDrawerHistory();
+}
+
+async function runAiSideDrawerAsk() {
+  const question = String(byId('aiDrawerQuestion')?.value || aiSideDrawerState.question || '').trim();
+  if (!question) {
+    showToast('请输入问题', { timeoutMs: 2500 });
+    byId('aiDrawerQuestion')?.focus?.();
+    return;
+  }
+  const scope = String(byId('aiDrawerScope')?.value || 'auto');
+  const limit = Math.max(1, Math.min(10, Number(byId('aiDrawerLimit')?.value || 6) || 6));
+  const item = aiDrawerContextBookmark();
+  if (scope === 'current_only' && !item) {
+    showToast('仅当前书签需要先选择一条书签', { timeoutMs: 3000 });
+    return;
+  }
+  aiSideDrawerState = { ...aiSideDrawerState, loading: true, question, scope, limit, error: '', answer: '', sources: [] };
+  renderAiSideDrawer();
+  try {
+    const body = { question, scope, limit };
+    if (item && scope !== 'all') body.bookmarkId = item.id;
+    const out = await api('/api/product/ai/qa', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    const answer = String(out?.answer || '');
+    const sources = Array.isArray(out?.sources) ? out.sources : [];
+    const nextHistory = [{ question, answer, sources, scope, limit, createdAt: Date.now() }, ...aiSideDrawerState.history].slice(0, 12);
+    aiSideDrawerState = { ...aiSideDrawerState, loading: false, answer, sources, error: '', history: nextHistory };
+    persistAiDrawerHistory(nextHistory);
+    renderAiSideDrawer();
+    showToast(sources.length ? `AI 已回答（${sources.length} 条出处）` : 'AI 已回答', { timeoutMs: 3200 });
+  } catch (err) {
+    aiSideDrawerState = { ...aiSideDrawerState, loading: false, error: String(err.message || err) };
+    renderAiSideDrawer();
+    showToast(err.message || 'AI 提问失败', { timeoutMs: 4200 });
+  }
+}
+
 function renderAiQaDialogUi() {
   const dialog = byId('aiQaDialog');
   if (!dialog) return;
@@ -6391,6 +6639,8 @@ function closeDetailPanel({ restoreFocus = true } = {}) {
     requestAnimationFrame(() => {
       const origin = document.querySelector(`[data-id="${CSS.escape(previousId)}"]`);
       if (origin instanceof HTMLElement) origin.focus();
+      else detailDrawerReturnFocus?.focus?.();
+      detailDrawerReturnFocus = null;
     });
   }
 }
@@ -6399,12 +6649,7 @@ function renderDetail() {
   const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
   const form = byId('detailForm');
   const empty = byId('emptyDetail');
-  const shell = document.querySelector('.shell');
-  const closeBtn = byId('detailCloseBtn');
-  const backdrop = byId('detailPanelBackdrop');
-  if (shell) shell.classList.toggle('detail-panel-open', Boolean(item));
-  if (closeBtn) closeBtn.classList.toggle('hidden', !item);
-  if (backdrop) backdrop.classList.toggle('hidden', !item);
+  syncDetailDrawerShellState(item);
   if (!item) setDetailPanelMoreMenuOpen(false);
 
   if (!item) {
@@ -6451,6 +6696,7 @@ function renderDetail() {
     renderDetailEditUi(null);
     applyDetailSectionUi();
     renderAiQaDialogUi();
+    renderAiSideDrawer();
     return;
   }
 
@@ -6503,6 +6749,7 @@ function renderDetail() {
   renderDetailEditUi(item);
   applyDetailSectionUi();
   renderAiQaDialogUi();
+  renderAiSideDrawer();
   renderDetailRelatedBookmarksUi(item);
   const meta = item.metadata || {};
   const parts = [];
@@ -6570,6 +6817,25 @@ function hydrateDetailHeaderIcons(item = null) {
   if (byId('detailHeaderPreviewBtn')) byId('detailHeaderPreviewBtn').disabled = !String(item?.id || '').trim();
 }
 
+function syncDetailReadonlyField(id, editable) {
+  const el = byId(id);
+  if (!el) return;
+  const label = el.closest('label');
+  if (!label) return;
+  label.classList.toggle('detail-readonly-label', !editable);
+  if (editable) {
+    label.removeAttribute('data-readonly-value');
+    return;
+  }
+  let value = '';
+  if (el instanceof HTMLSelectElement) {
+    value = el.selectedOptions?.[0]?.textContent || el.value || '';
+  } else {
+    value = el.value || '';
+  }
+  label.dataset.readonlyValue = String(value || '—').trim() || '—';
+}
+
 function renderDetailEditUi(item = null) {
   const editableTextIds = ['detailTitle', 'detailUrl', 'detailTags', 'detailNote', 'detailReminder'];
   const editableSelectIds = ['detailFolder'];
@@ -6581,12 +6847,14 @@ function renderDetailEditUi(item = null) {
     if (!el) return;
     if ('readOnly' in el) el.readOnly = !editable;
     el.classList.toggle('readonly-input', !editable);
+    syncDetailReadonlyField(id, editable);
   });
   editableSelectIds.forEach((id) => {
     const el = byId(id);
     if (!el) return;
     el.disabled = !editable;
     el.classList.toggle('readonly-input', !editable);
+    syncDetailReadonlyField(id, editable);
   });
   editableCheckIds.forEach((id) => {
     const el = byId(id);
@@ -6853,13 +7121,17 @@ async function refreshAll() {
     do {
       refreshAllQueued = false;
       if (!authState.authenticated) {
+        sidebarSyncHealthState = { loading: false, error: '', health: null, updatedAt: 0 };
         renderAuthUi();
         redirectToLoginPage();
         return;
       }
       await loadState();
       syncAdvancedSearchInputs();
-      await loadBookmarks();
+      await Promise.all([
+        loadSidebarSyncHealth(),
+        loadBookmarks()
+      ]);
     } while (refreshAllQueued);
   })();
 
@@ -6900,6 +7172,155 @@ function showToast(message, { undoHandler = null, timeoutMs = 5000 } = {}) {
   toastTimer = setTimeout(() => {
     hideToast();
   }, timeoutMs);
+}
+
+function realtimeTaskActiveCount(snapshot) {
+  return Object.values(snapshot?.tasks || {}).reduce((sum, section) => sum + Number(section?.active || 0), 0);
+}
+
+function realtimeTaskFailureCount(snapshot) {
+  return Object.values(snapshot?.tasks || {}).reduce((sum, section) => (
+    sum + Number(section?.counts?.failed || 0) + Number(section?.counts?.partial || 0)
+  ), 0);
+}
+
+function realtimeSnapshotMessage(snapshot) {
+  const active = realtimeTaskActiveCount(snapshot);
+  const failed = realtimeTaskFailureCount(snapshot);
+  const due = Number(snapshot?.reminders?.due || 0);
+  const parts = [];
+  if (active) parts.push(`${active} 个任务进行中`);
+  if (failed) parts.push(`${failed} 个任务需关注`);
+  if (due) parts.push(`${due} 个提醒到期`);
+  return parts.length ? parts.join(' · ') : '实时状态已更新';
+}
+
+function addRealtimeNotification(title, message) {
+  realtimeNotifications.unshift({
+    id: `rt_${Date.now()}_${Math.random().toString(16).slice(2)}`,
+    title: String(title || '实时更新'),
+    message: String(message || ''),
+    createdAt: Date.now(),
+    unread: true
+  });
+  realtimeNotifications = realtimeNotifications.slice(0, 20);
+  renderRealtimeNotifications();
+}
+
+function renderRealtimeNotifications() {
+  const btn = byId('realtimeNotificationsBtn');
+  const badge = byId('realtimeNotificationsBadge');
+  const menu = byId('realtimeNotificationsMenu');
+  if (btn) btn.setAttribute('aria-expanded', String(realtimeNotificationsOpen));
+  if (menu) menu.classList.toggle('hidden', !realtimeNotificationsOpen);
+  const unread = realtimeNotifications.filter((item) => item.unread).length;
+  if (badge) {
+    badge.textContent = String(Math.min(99, unread));
+    badge.classList.toggle('hidden', unread <= 0);
+  }
+  if (!menu) return;
+  if (!realtimeNotifications.length) {
+    menu.innerHTML = '<div class="realtime-notification-item"><div class="realtime-notification-title">暂无通知</div><div class="realtime-notification-meta">实时任务和提醒更新会显示在这里。</div></div>';
+    return;
+  }
+  menu.innerHTML = realtimeNotifications
+    .map((item) => `<div class="realtime-notification-item" role="menuitem">
+      <div class="realtime-notification-title">${escapeHtml(item.title)}</div>
+      <div class="realtime-notification-meta">${escapeHtml(item.message)} · ${new Date(item.createdAt).toLocaleTimeString()}</div>
+    </div>`)
+    .join('');
+}
+
+function scheduleRealtimeUiRefresh(snapshot) {
+  if (realtimeRefreshTimer) return;
+  realtimeRefreshTimer = setTimeout(() => {
+    realtimeRefreshTimer = null;
+    loadSidebarSyncHealth({ force: true }).catch(() => {});
+    loadIoTasks().catch(() => {});
+    if (state.activeId) {
+      loadLatestMetadataTaskForBookmark(state.activeId, { force: true }).catch(() => {});
+    }
+    if (Number(snapshot?.reminders?.due || 0) > 0 || realtimeTaskActiveCount(snapshot) === 0) {
+      refreshAll().catch(() => {});
+    }
+  }, 700);
+}
+
+function handleRealtimeSnapshot(snapshot, { source = 'sse' } = {}) {
+  const signature = String(snapshot?.signature || JSON.stringify(snapshot || {}));
+  if (!signature || signature === realtimeLastSignature) return;
+  const wasInitial = !realtimeInitialSnapshotSeen;
+  realtimeInitialSnapshotSeen = true;
+  realtimeLastSignature = signature;
+  if (!wasInitial) {
+    const message = realtimeSnapshotMessage(snapshot);
+    addRealtimeNotification(source === 'poll' ? '状态轮询更新' : '实时状态更新', message);
+    showToast(message, { timeoutMs: 3200 });
+    scheduleRealtimeUiRefresh(snapshot);
+  }
+}
+
+async function pollRealtimeSnapshot() {
+  try {
+    const snapshot = await api('/api/events-snapshot');
+    handleRealtimeSnapshot(snapshot, { source: 'poll' });
+  } catch (_err) {
+    try {
+      const health = await api('/api/product/task-health?limit=100');
+      handleRealtimeSnapshot({
+        generatedAt: health.generatedAt || Date.now(),
+        tasks: health.sections || {},
+        reminders: { due: 0 },
+        signature: JSON.stringify(health.sections || {})
+      }, { source: 'poll' });
+    } catch (__err) {
+      // Keep the realtime fallback quiet; normal manual refresh still works.
+    }
+  }
+}
+
+function stopRealtimeEvents() {
+  if (realtimeEventsSource) {
+    realtimeEventsSource.close();
+    realtimeEventsSource = null;
+  }
+  if (realtimePollTimer) {
+    clearInterval(realtimePollTimer);
+    realtimePollTimer = null;
+  }
+}
+
+function startRealtimePolling() {
+  if (realtimePollTimer) return;
+  pollRealtimeSnapshot().catch(() => {});
+  realtimePollTimer = setInterval(() => {
+    pollRealtimeSnapshot().catch(() => {});
+  }, 5000);
+}
+
+function startRealtimeEvents() {
+  stopRealtimeEvents();
+  if (!authState.authenticated) return;
+  if (!('EventSource' in window)) {
+    startRealtimePolling();
+    return;
+  }
+  try {
+    realtimeEventsSource = new EventSource('/api/events');
+    realtimeEventsSource.addEventListener('rainbow:update', (event) => {
+      try {
+        handleRealtimeSnapshot(JSON.parse(event.data || '{}'), { source: 'sse' });
+      } catch (_err) {
+        // Ignore malformed transient event payloads.
+      }
+    });
+    realtimeEventsSource.onerror = () => {
+      stopRealtimeEvents();
+      startRealtimePolling();
+    };
+  } catch (_err) {
+    startRealtimePolling();
+  }
 }
 
 async function runToastUndo() {
@@ -6966,6 +7387,22 @@ async function fetchPluginTasks(limit = 20) {
 }
 
 function bindActions() {
+  bindSplitResizeHandle(byId('sidebarResizeHandle'), {
+    storageKey: SIDEBAR_WIDTH_STORAGE_KEY,
+    limits: SIDEBAR_WIDTH_LIMITS,
+    cssVar: '--sidebar-width',
+    side: 'right'
+  });
+  bindSplitResizeHandle(byId('detailResizeHandle'), {
+    storageKey: DETAIL_WIDTH_STORAGE_KEY,
+    limits: DETAIL_WIDTH_LIMITS,
+    cssVar: '--detail-width',
+    side: 'left'
+  });
+  byId('mobileSidebar')?.addEventListener('scroll', () => {
+    scheduleCollectionsTreeVirtualRender();
+    scheduleSidebarAuxiliaryVirtualRender();
+  }, { passive: true });
   bindActionDialog();
   bindInlineValidation('bookmarkForm', { errorId: 'bookmarkFormError' });
   bindInlineValidation('collectionForm', { errorId: 'collectionFormError' });
@@ -7005,7 +7442,16 @@ function bindActions() {
     closeHeaderMenus({ keep: next ? 'more' : '' });
     setHeaderMoreMenuOpen(next);
   });
-  byId('addMenuToggleBtn')?.addEventListener('click', (e) => {
+  const addMenuToggleBtn = byId('addMenuToggleBtn');
+  addMenuToggleBtn?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const next = !addToolbarMenuOpen;
+    closeHeaderMenus({ keep: next ? 'add' : '' });
+    setAddToolbarMenuOpen(next);
+  });
+  addMenuToggleBtn?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
     e.preventDefault();
     e.stopPropagation();
     const next = !addToolbarMenuOpen;
@@ -7113,6 +7559,11 @@ function bindActions() {
   byId('sidebarAccountMenuLogout')?.addEventListener('click', async (e) => {
     e.preventDefault();
     await logoutCurrentUser({ next: '/' });
+  });
+  byId('sidebarTopNewBtn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    setSidebarAccountMenuOpen(false);
+    byId('newCollectionBtn')?.click();
   });
   byId('collectionContextMenu')?.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-folder-menu-action]');
@@ -7247,6 +7698,13 @@ function bindActions() {
       const menu = byId('tagContextMenu');
       if (menu && !menu.contains(e.target)) setTagContextMenuOpen(false);
     }
+    if (realtimeNotificationsOpen) {
+      const area = byId('realtimeNotificationsWrap');
+      if (area && !area.contains(e.target)) {
+        realtimeNotificationsOpen = false;
+        renderRealtimeNotifications();
+      }
+    }
     if (!sidebarAccountMenuOpen) return;
     const area = byId('sidebarAccountArea');
     if (area && !area.contains(e.target)) {
@@ -7256,15 +7714,18 @@ function bindActions() {
   window.addEventListener('resize', () => {
     if (window.innerWidth > 920 && mobileSidebarOpen) setMobileSidebarOpen(false, { restoreFocus: false });
     document.querySelector('.shell .sidebar')?.setAttribute('aria-hidden', String(window.innerWidth <= 920 && !mobileSidebarOpen));
+    syncDetailDrawerShellState(state.activeId ? (state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null) : null);
     if (collectionContextMenuState.open) positionCollectionContextMenu();
     if (systemViewContextMenuState.open) setSystemViewContextMenuOpen(false);
     if (collectionsHeaderMenuState.open) setCollectionsHeaderMenuOpen(false);
     if (quickFiltersMenuOpen) setQuickFiltersMenuOpen(true);
     if (quickFilterContextMenuState.open) setQuickFilterContextMenuOpen(false);
     if (tagContextMenuState.open) setTagContextMenuOpen(false);
+    if (realtimeNotificationsOpen) { realtimeNotificationsOpen = false; renderRealtimeNotifications(); }
     if (detailPanelMoreMenuOpen) setDetailPanelMoreMenuOpen(false);
     scheduleListVirtualRender();
     scheduleCollectionsTreeVirtualRender();
+    scheduleSidebarAuxiliaryVirtualRender();
   });
   window.addEventListener('scroll', () => {
     if (collectionContextMenuState.open) setCollectionContextMenuOpen(false);
@@ -7273,9 +7734,11 @@ function bindActions() {
     if (quickFiltersMenuOpen) setQuickFiltersMenuOpen(false);
     if (quickFilterContextMenuState.open) setQuickFilterContextMenuOpen(false);
     if (tagContextMenuState.open) setTagContextMenuOpen(false);
+    if (realtimeNotificationsOpen) { realtimeNotificationsOpen = false; renderRealtimeNotifications(); }
     if (detailPanelMoreMenuOpen) setDetailPanelMoreMenuOpen(false);
     scheduleListVirtualRender();
     scheduleCollectionsTreeVirtualRender();
+    scheduleSidebarAuxiliaryVirtualRender();
   }, { capture: true, passive: true });
   document.addEventListener('keydown', (e) => {
     if (trapMobileSidebarTabFocus(e)) return;
@@ -7297,6 +7760,8 @@ function bindActions() {
       if (quickFiltersMenuOpen) { setQuickFiltersMenuOpen(false); closedTransient = true; }
       if (quickFilterContextMenuState.open) { setQuickFilterContextMenuOpen(false); closedTransient = true; }
       if (tagContextMenuState.open) { setTagContextMenuOpen(false); closedTransient = true; }
+      if (realtimeNotificationsOpen) { realtimeNotificationsOpen = false; renderRealtimeNotifications(); closedTransient = true; }
+      if (aiSideDrawerState.open) { setAiSideDrawerOpen(false); closedTransient = true; }
       if (detailPanelMoreMenuOpen) { setDetailPanelMoreMenuOpen(false); closedTransient = true; }
       if (!closedTransient && !hasModalOpen() && state.activeId && !isTypingContext(e.target)) {
         closeDetailPanel();
@@ -7718,12 +8183,12 @@ function bindActions() {
   });
   byId('tagsSortToggleBtn')?.addEventListener('click', () => {
     sidebarTagsUi = { ...sidebarTagsUi, sort: sidebarTagsUi.sort === 'count' ? 'name' : 'count' };
-    persistSidebarTagsUi();
+    persistSidebarTagsUi(sidebarTagsUi);
     renderSidebar();
   });
   byId('tagsExpandToggleBtn')?.addEventListener('click', () => {
     sidebarTagsUi = { ...sidebarTagsUi, expanded: !sidebarTagsUi.expanded };
-    persistSidebarTagsUi();
+    persistSidebarTagsUi(sidebarTagsUi);
     renderSidebar();
   });
   byId('settingsBtn').addEventListener('click', () => {
@@ -7733,6 +8198,15 @@ function bindActions() {
   byId('sidebarStatusSettingsBtn')?.addEventListener('click', () => {
     setSidebarAccountMenuOpen(false);
     window.location.assign('/settings.html');
+  });
+  byId('realtimeNotificationsBtn')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    realtimeNotificationsOpen = !realtimeNotificationsOpen;
+    if (realtimeNotificationsOpen) {
+      realtimeNotifications = realtimeNotifications.map((item) => ({ ...item, unread: false }));
+    }
+    renderRealtimeNotifications();
   });
   byId('authBtn').addEventListener('click', async () => {
     setSidebarAccountMenuOpen(false);
@@ -7766,6 +8240,7 @@ function bindActions() {
       await loadAuthTokens();
       byId('authDialog').close();
       await refreshAll();
+      startRealtimeEvents();
       showToast(`已登录：${out?.user?.email || '用户'}`, { timeoutMs: 2500 });
     } catch (err) {
       byId('authTokenOutput').textContent = `登录失败: ${err.message}`;
@@ -7787,6 +8262,7 @@ function bindActions() {
       await loadAuthTokens();
       byId('authDialog').close();
       await refreshAll();
+      startRealtimeEvents();
       showToast(`已注册：${out?.user?.email || '用户'}`, { timeoutMs: 2500 });
     } catch (err) {
       byId('authTokenOutput').textContent = `注册失败: ${err.message}`;
@@ -7877,7 +8353,40 @@ function bindActions() {
   });
 
   byId('askAiBtn')?.addEventListener('click', () => {
-    openAiQaDialog({ bookmarkId: state.activeId || null, scope: 'auto' });
+    setAiSideDrawerOpen(true);
+    queueMicrotask(() => byId('aiDrawerQuestion')?.focus?.());
+  });
+  byId('aiSideDrawerBackdrop')?.addEventListener('click', () => setAiSideDrawerOpen(false));
+  byId('aiDrawerCloseBtn')?.addEventListener('click', () => setAiSideDrawerOpen(false));
+  byId('aiDrawerAskBtn')?.addEventListener('click', async () => {
+    await runAiSideDrawerAsk();
+  });
+  byId('aiDrawerOpenDialogBtn')?.addEventListener('click', () => {
+    openAiQaDialog({
+      bookmarkId: state.activeId || null,
+      question: String(byId('aiDrawerQuestion')?.value || aiSideDrawerState.question || ''),
+      scope: String(byId('aiDrawerScope')?.value || aiSideDrawerState.scope || 'auto')
+    });
+  });
+  byId('aiDrawerQuestion')?.addEventListener('input', (e) => {
+    aiSideDrawerState.question = String(e.target?.value || '');
+  });
+  byId('aiDrawerScope')?.addEventListener('change', (e) => {
+    aiSideDrawerState.scope = String(e.target?.value || 'auto');
+    renderAiSideDrawer();
+  });
+  byId('aiDrawerLimit')?.addEventListener('change', (e) => {
+    aiSideDrawerState.limit = Math.max(1, Math.min(10, Number(e.target?.value || 6) || 6));
+    renderAiSideDrawer();
+  });
+  document.querySelectorAll('[data-ai-drawer-action]').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const action = String(el.dataset.aiDrawerAction || '');
+      if (action === 'autotag') await runAiAutoTagForActiveBookmark();
+      if (action === 'summary') await runAiSummaryForActiveBookmark();
+      if (action === 'folder-summary') openAiFolderSummaryDialog();
+      renderAiSideDrawer();
+    });
   });
   byId('aiQaAskBtn')?.addEventListener('click', async () => {
     await runAiQaFromDialog();
@@ -8444,9 +8953,7 @@ function bindActions() {
   });
 
   byId('exportBtn')?.addEventListener('click', async () => {
-    await loadIoTasks();
-    byId('ioTaskOutput').textContent = '就绪';
-    byId('exportDialog').showModal();
+    await openIoTaskPanel();
   });
 
   byId('importCloseBtn')?.addEventListener('click', () => {
@@ -8900,33 +9407,39 @@ function stopIoTaskPoll() {
   }
 }
 
-function isIoTaskTerminal(status) {
-  return ['succeeded', 'failed'].includes(String(status || ''));
-}
-
 function renderIoTaskList(tasks = []) {
   const listEl = byId('ioTaskList');
   if (!listEl) return;
   if (!Array.isArray(tasks) || !tasks.length) {
-    listEl.innerHTML = `<div class="muted">暂无导入/导出任务。</div>`;
+    listEl.innerHTML = stateBlockHtml({
+      state: 'empty',
+      eyebrow: '任务状态',
+      title: '暂无导入/导出任务',
+      message: '新建导入或导出任务后，这里会显示队列状态、进度和结果。'
+    });
     return;
   }
   listEl.innerHTML = tasks
     .map((t) => {
       const active = ioActiveTaskId && ioActiveTaskId === t.id ? 'active' : '';
       const resultText = t.result ? JSON.stringify(t.result) : (t.error?.message || '');
+      const startedLabel = t.startedAt || t.createdAt ? new Date(Number(t.startedAt || t.createdAt)).toLocaleString() : '-';
+      const updatedLabel = t.updatedAt ? new Date(Number(t.updatedAt)).toLocaleString() : '-';
       return `<div class="io-task-item ${active}" data-io-task="${t.id}">
         <div class="io-task-row">
           <strong>${escapeHtml(String(t.type || 'task'))}</strong>
-          <span class="meta-chip ${t.status === 'succeeded' ? 'success' : t.status === 'failed' ? 'danger' : t.status === 'running' ? 'info' : 'neutral'}">${escapeHtml(String(t.status || 'unknown'))}</span>
         </div>
-        <div class="muted">${escapeHtml(`${t.progress?.percent ?? 0}% · ${t.progress?.step || ''}`)}</div>
-        <div class="muted">${escapeHtml(resultText ? resultText.slice(0, 180) : '')}</div>
+        ${taskProgressHtml({
+          status: String(t.status || 'unknown'),
+          progress: `${t.progress?.percent ?? 0}% · ${t.progress?.step || ''}`,
+          startedAt: startedLabel,
+          updatedAt: updatedLabel,
+          detail: resultText ? resultText.slice(0, 180) : ''
+        })}
         <div class="io-task-row">
-          <div class="muted">${t.updatedAt ? new Date(Number(t.updatedAt)).toLocaleString() : ''}</div>
           <div class="detail-inline-actions">
             <button type="button" class="ghost" data-io-open="${t.id}">详情</button>
-            ${t.outputFile?.url ? `<button type="button" data-io-download="${t.id}">⬇️ 下载</button>` : ''}
+            ${t.outputFile?.url ? `<button type="button" data-io-download="${t.id}">下载</button>` : ''}
             ${t.reportFile?.url ? `<button type="button" class="ghost" data-io-report="${t.id}">日志</button>` : ''}
             ${t.status === 'failed' ? `<button type="button" class="ghost danger" data-io-retry="${t.id}">重试</button>` : ''}
           </div>
@@ -9000,6 +9513,15 @@ async function loadIoTasks() {
     byId('ioTaskList').innerHTML = `<div class="muted">${escapeHtml(err.message || '加载任务失败')}</div>`;
     return [];
   }
+}
+
+async function openIoTaskPanel({ output = '就绪' } = {}) {
+  populateIoFolderSelects();
+  await loadIoTasks();
+  if (byId('ioTaskOutput')) byId('ioTaskOutput').textContent = output;
+  const dialog = byId('exportDialog');
+  if (dialog && !dialog.open) dialog.showModal();
+  queueMicrotask(() => byId('ioRefreshTasksBtn')?.focus?.());
 }
 
 function startIoTaskPoll(taskId) {
@@ -9076,8 +9598,8 @@ async function queueIoImportTask() {
     })
   });
   ioActiveTaskId = out?.task?.id || null;
-  byId('ioTaskOutput').textContent = JSON.stringify(out, null, 2);
-  await loadIoTasks();
+  if (byId('importDialog')?.open) byId('importDialog').close();
+  await openIoTaskPanel({ output: JSON.stringify(out, null, 2) });
   startIoTaskPoll(ioActiveTaskId);
   showToast('导入任务已入队', { timeoutMs: 2500 });
 }
@@ -9094,14 +9616,14 @@ async function queueIoExportTask() {
     })
   });
   ioActiveTaskId = out?.task?.id || null;
-  byId('ioTaskOutput').textContent = JSON.stringify(out, null, 2);
-  await loadIoTasks();
+  await openIoTaskPanel({ output: JSON.stringify(out, null, 2) });
   startIoTaskPoll(ioActiveTaskId);
   showToast('导出任务已入队', { timeoutMs: 2500 });
 }
 
 async function init() {
   if (window.location.pathname === '/login.html') return;
+  applySplitViewDimensions();
   setSavedSearchesUiVisible(SAVED_SEARCHES_UI_ENABLED);
   bindActions();
   setMobileSidebarOpen(false, { restoreFocus: false });
@@ -9120,6 +9642,7 @@ async function init() {
   await loadAuthTokens().catch(() => []);
   await loadSavedSearches().catch(() => []);
   await refreshAll();
+  startRealtimeEvents();
 }
 
 function showFatalAppError(error) {

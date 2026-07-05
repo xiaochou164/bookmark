@@ -1,4 +1,4 @@
-// popup.js — Rainboard Sync Chrome Extension Popup
+// popup.js — Rainbow Sync Chrome Extension Popup
 
 const rbPreviewBtn = document.getElementById('rbPreviewBtn');
 const rbSyncBtn = document.getElementById('rbSyncBtn');
@@ -6,12 +6,14 @@ const statusBox = document.getElementById('statusBox');
 const openOptions = document.getElementById('openOptions');
 
 function showStatus(msg, type = 'info') {
-  statusBox.className = `status-box visible ${type}`;
+  const state = type === 'ok' ? 'success' : type;
+  statusBox.className = 'state-box status-box visible';
+  statusBox.dataset.state = state;
   statusBox.textContent = msg;
 }
 
-// ── Format Rainboard (cloud DB) sync result ────────────────────────────────
-function formatRainboardResult(result, title) {
+// ── Format Rainbow (cloud DB) sync result ────────────────────────────────
+function formatRainbowResult(result, title) {
   const c = result.chrome || {};
   const s = result.server || {};
   const lines = [
@@ -23,10 +25,10 @@ function formatRainboardResult(result, title) {
     `从 Chrome 删除: ${c.toDeleteCount || 0}${result.preview ? ' (预览，未删除)' : ` → 已删除 ${c.deletedFromChrome || 0} 条`}`,
     ``,
     `--- 云端 DB 侧 ---`,
-    `新增到 Rainboard: ${s.createdInDb || 0}`,
-    `更新/移动到 Rainboard: ${s.updatedInDb || 0} / ${s.movedInDb || 0}`,
-    `本地删除同步到 Rainboard: ${s.deletedInDb || 0}`,
-    `本地文件夹删除同步到 Rainboard: ${s.deletedFoldersInDb || 0}`,
+    `新增到 Rainbow: ${s.createdInDb || 0}`,
+    `更新/移动到 Rainbow: ${s.updatedInDb || 0} / ${s.movedInDb || 0}`,
+    `本地删除同步到 Rainbow: ${s.deletedInDb || 0}`,
+    `本地文件夹删除同步到 Rainbow: ${s.deletedFoldersInDb || 0}`,
     `已跳过重复: ${s.skippedDuplicate || 0}`,
   ];
 
@@ -55,7 +57,14 @@ function call(type) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage({ type }, (resp) => {
       if (chrome.runtime.lastError) {
-        resolve({ ok: false, error: chrome.runtime.lastError.message });
+        const raw = String(chrome.runtime.lastError.message || '');
+        const sourceUnavailable = /message port closed|receiving end does not exist/i.test(raw);
+        resolve({
+          ok: false,
+          error: sourceUnavailable
+            ? '扩展后台未运行。项目已更名为 Rainbow，请在 chrome://extensions 中重新加载此扩展后再试。'
+            : raw
+        });
         return;
       }
       resolve(resp || { ok: false, error: '未知错误' });
@@ -65,30 +74,30 @@ function call(type) {
 
 const ALL_BTNS = [rbPreviewBtn, rbSyncBtn];
 
-// Rainboard (cloud DB) preview
+// Rainbow (cloud DB) preview
 rbPreviewBtn.addEventListener('click', async () => {
   setBusy(ALL_BTNS, true);
-  showStatus('预览中（Chrome ↔ 云书签 Rainboard）...', 'info');
-  const resp = await call('PREVIEW_RAINBOARD_SYNC');
+  showStatus('预览中（Chrome ↔ 云书签 Rainbow）...', 'info');
+  const resp = await call('PREVIEW_RAINBOW_SYNC');
   setBusy(ALL_BTNS, false);
   if (!resp.ok) {
     showStatus(resp.error || '预览失败', 'error');
     return;
   }
-  showStatus(formatRainboardResult(resp, '🔍 云书签预览（未写入）'), 'ok');
+  showStatus(formatRainbowResult(resp, '云书签预览（未写入）'), 'ok');
 });
 
-// Rainboard (cloud DB) sync
+// Rainbow (cloud DB) sync
 rbSyncBtn.addEventListener('click', async () => {
   setBusy(ALL_BTNS, true);
-  showStatus('同步中（Chrome ↔ 云书签 Rainboard）...', 'info');
-  const resp = await call('SYNC_WITH_RAINBOARD');
+  showStatus('同步中（Chrome ↔ 云书签 Rainbow）...', 'info');
+  const resp = await call('SYNC_WITH_RAINBOW');
   setBusy(ALL_BTNS, false);
   if (!resp.ok) {
     showStatus(resp.error || '同步失败', 'error');
     return;
   }
-  showStatus(formatRainboardResult(resp, '✅ 云书签同步完成！'), 'ok');
+  showStatus(formatRainbowResult(resp, '云书签同步完成'), 'ok');
 });
 
 // Open options
@@ -102,10 +111,10 @@ async function loadLastStatus() {
   const { lastSyncStatus } = await chrome.storage.local.get({ lastSyncStatus: null });
   if (!lastSyncStatus) return;
   if (lastSyncStatus.ok) {
-    if (lastSyncStatus.rainboardSync) {
-      showStatus(formatRainboardResult(lastSyncStatus.rainboardSync, '上次云书签同步成功'), 'ok');
+    if (lastSyncStatus.rainbowSync) {
+      showStatus(formatRainbowResult(lastSyncStatus.rainbowSync, '上次云书签同步成功'), 'ok');
     } else {
-      showStatus('上次同步成功。请在设置页使用最新的 Rainboard 同步入口。', 'ok');
+      showStatus('上次同步成功。请在设置页使用最新的 Rainbow 同步入口。', 'ok');
     }
   } else {
     showStatus(`上次失败: ${lastSyncStatus.error || '未知错误'}`, 'error');

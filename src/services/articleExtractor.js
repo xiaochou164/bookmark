@@ -90,7 +90,7 @@ async function extractArticleFromUrl(targetUrl, { timeoutMs = 15_000 } = {}) {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'RainboardBot/0.1 (+article-extractor)',
+        'User-Agent': 'RainbowBot/0.1 (+article-extractor)',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
     });

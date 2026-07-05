@@ -478,7 +478,7 @@ async function exportJson({ dbRepo, userId = '', options = {} }) {
   const folderIds = new Set(['root', ...bookmarks.map((b) => String(b.folderId || 'root'))]);
   const folders = (db.folders || []).filter((f) => (!userId || hasOwner(f, userId)) && folderIds.has(String(f.id)));
   return {
-    filename: `rainboard-export-${Date.now()}.json`,
+    filename: `rainbow-export-${Date.now()}.json`,
     contentType: 'application/json; charset=utf-8',
     body: JSON.stringify({ exportedAt: Date.now(), folders, bookmarks }, null, 2),
     summary: { format: 'json', bookmarks: bookmarks.length, folders: folders.length }
@@ -524,7 +524,7 @@ async function exportCsv({ dbRepo, userId = '', options = {} }) {
     lines.push(row.map(escapeCsvField).join(','));
   }
   return {
-    filename: `rainboard-export-${Date.now()}.csv`,
+    filename: `rainbow-export-${Date.now()}.csv`,
     contentType: 'text/csv; charset=utf-8',
     body: `${lines.join('\n')}\n`,
     summary: { format: 'csv', bookmarks: bookmarks.length }
@@ -584,7 +584,7 @@ async function exportBookmarksHtml({ dbRepo, userId = '', options = {} }) {
   emitFolder('root', 0);
 
   return {
-    filename: `rainboard-bookmarks-${Date.now()}.html`,
+    filename: `rainbow-bookmarks-${Date.now()}.html`,
     contentType: 'text/html; charset=utf-8',
     body: `${lines.join('\n')}\n`,
     summary: { format: 'bookmarks_html', bookmarks: bookmarks.length }

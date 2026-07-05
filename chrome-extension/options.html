@@ -4,161 +4,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Rainboard Sync 设置</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      max-width: 900px;
-      margin: 24px auto;
-      padding: 0 16px;
-      color: #111;
-    }
-
-    h1 {
-      font-size: 22px;
-      margin-bottom: 16px;
-    }
-
-    h2 {
-      font-size: 16px;
-      margin: 16px 0 10px;
-    }
-
-    .group {
-      margin-bottom: 14px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 6px;
-      font-weight: 600;
-    }
-
-    input[type='text'],
-    input[type='number'],
-    input[type='password'] {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-sizing: border-box;
-    }
-
-    .row {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .row>div {
-      flex: 1;
-    }
-
-    .btn {
-      padding: 10px 14px;
-      border: 0;
-      border-radius: 8px;
-      background: #0b63f3;
-      color: #fff;
-      cursor: pointer;
-    }
-
-    .btn-lite {
-      background: #eef3ff;
-      color: #1a3f92;
-    }
-
-    .btn[disabled] {
-      opacity: 0.6;
-      cursor: wait;
-    }
-
-    .map-item {
-      border: 1px solid #e4e4e4;
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 10px;
-    }
-
-    .map-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .small {
-      font-size: 12px;
-      color: #666;
-    }
-
-    #msg {
-      margin-top: 12px;
-      font-size: 13px;
-    }
-
-    .actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    select {
-      width: 100%;
-      padding: 10px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      box-sizing: border-box;
-    }
-
-    .token-row {
-      display: flex;
-      gap: 10px;
-      align-items: end;
-    }
-
-    .token-row .group {
-      flex: 1;
-    }
-
-    .id-row {
-      display: none;
-      margin-top: 8px;
-    }
-
-    .mapping-tools {
-      display: flex;
-      gap: 10px;
-      margin: 10px 0;
-    }
-  </style>
+  <title>Rainbow Sync 设置</title>
+  <link rel="stylesheet" href="shared.css" />
 </head>
 
-<body>
-  <h1>Rainboard Sync 设置</h1>
+<body class="options-body">
+  <main class="options-shell">
+  <section class="options-section">
+    <h1>Rainbow Sync 设置</h1>
+    <p class="small">配置 Chrome 扩展与 Rainbow 服务之间的连接、自动同步和手动同步操作。</p>
+  </section>
 
+  <section class="options-section">
   <h2>云端连接</h2>
   <div class="group">
-    <label for="cloudApiBaseUrl">Rainboard 地址</label>
+    <label for="cloudApiBaseUrl">Rainbow 地址</label>
     <input id="cloudApiBaseUrl" type="text" placeholder="https://bookmark.sundays.ink" />
   </div>
-  <div class="small">插件通过这个 Rainboard 服务完成 Chrome ↔ 云书签 双向同步。默认已指向当前线上 Cloudflare 部署。</div>
+  <div class="small">插件通过这个 Rainbow 服务完成 Chrome ↔ 云书签 双向同步。默认已指向当前线上 Cloudflare 部署。</div>
 
   <div class="token-row">
     <div class="group">
-      <label for="cloudApiToken">Rainboard API Token</label>
+      <label for="cloudApiToken">Rainbow API Token</label>
       <input id="cloudApiToken" type="password" placeholder="手动输入或点击自动获取" />
     </div>
-    <button id="autoFetchTokenBtn" class="btn btn-lite" type="button"
-      style="background:#d4edda;color:#155724;font-weight:bold;">✨ 一键自动识别</button>
+    <button id="toggleTokenBtn" class="btn btn-lite" type="button">显示 Token</button>
+    <button id="clearTokenBtn" class="btn btn-lite" type="button">清除 Token</button>
+    <button id="autoFetchTokenBtn" class="btn btn-lite" type="button">一键自动识别</button>
     <button id="testCloudBtn" class="btn btn-lite" type="button">测试连接</button>
   </div>
+  <div id="msg" class="state-box status-line" data-state="info" role="status" aria-live="polite"></div>
+  </section>
 
-  <h2>云书签双向同步（Chrome ↔ Rainboard）</h2>
-  <div class="small" style="margin-bottom:10px;">Chrome 有的会写入 Rainboard；Rainboard 有的会推送到 Chrome。</div>
+  <section class="options-section">
+  <h2>云书签双向同步（Chrome ↔ Rainbow）</h2>
+  <div class="small">Chrome 有的会写入 Rainbow；Rainbow 有的会推送到 Chrome。</div>
   <div class="row">
     <div class="group">
-      <label for="rbAutoSyncEnabled">启用自动同步（Chrome ↔ Rainboard）</label>
+      <label for="rbAutoSyncEnabled">启用自动同步（Chrome ↔ Rainbow）</label>
       <input id="rbAutoSyncEnabled" type="checkbox" />
     </div>
     <div class="group">
@@ -166,16 +49,19 @@
       <input id="rbAutoSyncMinutes" type="number" min="5" value="30" />
     </div>
   </div>
-  <div class="actions" style="margin-top:8px;">
-    <button id="rbSyncNowBtn" class="btn btn-lite" type="button">🔄 立即同步 Chrome ↔ 云书签</button>
-    <button id="rbPreviewNowBtn" class="btn btn-lite" type="button">🔍 预览变更（不写入）</button>
+  <div class="actions">
+    <button id="rbSyncNowBtn" class="btn btn-lite" type="button">立即同步 Chrome ↔ 云书签</button>
+    <button id="rbPreviewNowBtn" class="btn btn-lite" type="button">预览变更（不写入）</button>
   </div>
-  <div id="rbSyncMsg" style="margin-top:8px;font-size:13px;"></div>
+  <div id="rbSyncMsg" class="state-box status-line" data-state="info" role="status" aria-live="polite"></div>
+  </section>
 
+  <section class="options-section">
   <div class="actions">
     <button id="saveBtn" class="btn">保存设置</button>
   </div>
-  <div id="msg"></div>
+  </section>
+  </main>
 
   <script src="options.js"></script>
 </body>

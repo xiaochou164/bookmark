@@ -1,4 +1,4 @@
-# Rainboard（Cloud Bookmarks）
+# Rainbow（Cloud Bookmarks）
 
 一个参考 Raindrop 工作流实现的云书签管理软件（本地可运行），包含 Web 工作台、插件系统、Raindrop 双向同步插件、抓取/预览/阅读模式、导入导出、协作与产品化接口等能力。
 
@@ -67,7 +67,7 @@
 ## 快速启动（Cloudflare-first）
 
 ```bash
-cd /Users/xiaochou164/Desktop/bookmarktorain
+cd /Users/xiaochou164/Desktop/mycode/Rainbow
 npm install
 npm run cf:d1:create
 npm run cf:d1:migrate:local
@@ -95,7 +95,7 @@ npm start
 ```bash
 npm run cf:check
 npm run cf:smoke
-npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
+npm run cf:smoke:remote -- https://rainbow.<subdomain>.workers.dev
 npm run cf:d1:create
 npm run cf:d1:migrate:local
 npm run cf:dev
@@ -113,7 +113,7 @@ npm run cf:release
 
 ```bash
 npm run cf:migrate:data
-npx wrangler d1 execute rainboard --remote --file data/cf-import.sql
+npx wrangler d1 execute rainbow --remote --file data/cf-import.sql
 ```
 
 如果希望一键发布时连同本地数据一起导入：
@@ -126,7 +126,7 @@ npm run cf:release -- --import-local-data
 
 - 发布前请先登录 Cloudflare：`npx wrangler login`
 - `wrangler.toml` 已预留 `D1/R2/Queues/Cron` 绑定
-- 主任务队列默认是 `rainboard-tasks`，死信队列默认是 `rainboard-tasks-dlq`
+- 主任务队列默认是 `rainbow-tasks`，死信队列默认是 `rainbow-tasks-dlq`
 - Worker 侧任务默认记录 `attemptCount/maxAttempts`，Cron 会对卡住的任务做补偿重投
 - 导入脚本会把现有 `JSON/SQLite app_state` 转换成 D1 可执行 SQL
 - `/api/assets/*` 现在优先从 R2 读取对象
@@ -136,7 +136,7 @@ npm run cf:release -- --import-local-data
 当前 Cloudflare-first 迁移已经达到“主路径可部署、主界面核心 API 可运行、长任务可入队和恢复”的阶段。
 
 - 验收清单：`docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`
-- 迁移 TODO：`docs/CLOUDFLARE_WORKERS_MIGRATION_TODO.md`
+- 迁移收口清单：`docs/CLOUDFLARE_WORKERS_MIGRATION_TODO.md`
 - 远端验收与失败恢复演练：`docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`
 
 最低本地验收命令：
@@ -149,7 +149,7 @@ npm run cf:smoke
 远端 Worker 基础验收：
 
 ```bash
-npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
+npm run cf:smoke:remote -- https://rainbow.<subdomain>.workers.dev
 ```
 
 这两条通过时，当前仓库至少已经覆盖：
@@ -158,6 +158,48 @@ npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
 - D1 / R2 / Queues / DLQ / Cron 主路径
 - auth / bookmarks / folders / tags / reminders
 - metadata / article / preview / highlights
+
+## 本地 Node 基础设施配置
+
+Cloudflare Worker 是生产主路径，本地 Node 服务仍保留同等基础设施抽象，便于开发和回归。
+
+```bash
+# Redis/BullMQ 队列；未设置 REDIS_URL 时会自动回退 memory broker
+QUEUE_BACKEND=bullmq
+REDIS_URL=redis://127.0.0.1:6379
+QUEUE_PREFIX=rainbow
+
+# 本地对象存储
+OBJECT_STORAGE_BACKEND=local
+OBJECT_STORAGE_DIR=./data/objects
+
+# S3/R2 兼容对象存储
+OBJECT_STORAGE_BACKEND=r2
+R2_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
+R2_BUCKET=rainbow
+R2_ACCESS_KEY_ID=...
+R2_SECRET_ACCESS_KEY=...
+OBJECT_STORAGE_PUBLIC_BASE_URL=https://assets.example.com
+
+# 安全、日志与限流
+LOG_LEVEL=info
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=600
+```
+
+本地服务暴露：
+
+- `/api/health`：服务、队列、对象存储健康摘要
+- `/api/metrics`：请求计数、状态码分布、平均/最大耗时
+
+基础验收命令：
+
+```bash
+npm test
+npm run cf:smoke
+npm run ui:check
+npm run ops:drill
+```
 - plugin tasks / io tasks / ai tasks / backup tasks
 - collab shares / public links / `/public/c/:token(.json)`
 
@@ -165,8 +207,8 @@ npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
 
 旧的本地状态仍可用于迁移：
 
-- 数据库文件：`/Users/xiaochou164/Desktop/bookmarktorain/data/db.sqlite`
-- 对象存储目录（本地）：`/Users/xiaochou164/Desktop/bookmarktorain/data/objects`
+- 数据库文件：`/Users/xiaochou164/Desktop/mycode/Rainbow/data/db.sqlite`
+- 对象存储目录（本地）：`/Users/xiaochou164/Desktop/mycode/Rainbow/data/objects`
 
 常用命令：
 
@@ -178,7 +220,7 @@ npm run cf:migrate:data          # SQLite/JSON -> D1 SQL
 
 ## 常用环境变量
 
-- `CF_D1_DB_NAME`：D1 数据库名称（默认 `rainboard`）
+- `CF_D1_DB_NAME`：D1 数据库名称（默认 `rainbow`）
 - `CF_D1_MIGRATION_FILE`：D1 迁移文件（默认 `migrations/0001_cloudflare_core.sql`）
 - `DATA_FILE`：旧 JSON 状态文件路径
 - `SQLITE_FILE`：旧 SQLite 状态文件路径
@@ -285,39 +327,44 @@ AI 与任务治理：
 - `GET /public/c/:token`
 - `GET /public/c/:token.json`
 
-## Chrome 扩展（本地目录）
+## 浏览器扩展（Chrome / Safari）
 
-仓库包含 Chrome 扩展（用于与云端/同步插件配合）：
+仓库包含浏览器书签同步扩展，用于与 Rainbow 云端同步能力配合：
 
-- 目录：`/Users/xiaochou164/Desktop/bookmarktorain/chrome-extension`
+- Chrome 源目录：`/Users/xiaochou164/Desktop/mycode/Rainbow/chrome-extension`
+- Safari 生成目录：`/Users/xiaochou164/Desktop/mycode/Rainbow/safari-extension`
 
-加载方式（开发者模式）：
+Chrome 加载方式（开发者模式）：
 
 1. 打开 `chrome://extensions/`
 2. 开启“开发者模式”
 3. “加载已解压的扩展程序”
-4. 选择 `/Users/xiaochou164/Desktop/bookmarktorain/chrome-extension`
+4. 选择 `/Users/xiaochou164/Desktop/mycode/Rainbow/chrome-extension`
+
+Safari 生成与转换：
+
+```bash
+npm run extension:safari:build
+xcrun safari-web-extension-converter safari-extension --project-location output/safari --app-name "Rainbow Sync"
+```
+
+转换后打开 Xcode 项目，设置 Team 和 Bundle Identifier，运行 macOS 容器 App，再到 Safari 设置中启用扩展。
 
 ## 项目文档
 
-- 实施计划：`/Users/xiaochou164/Desktop/bookmarktorain/docs/IMPLEMENTATION_PLAN.md`
-- 待办清单：`/Users/xiaochou164/Desktop/bookmarktorain/docs/TODO.md`
-- 开发日志：`/Users/xiaochou164/Desktop/bookmarktorain/docs/DEV_LOG.md`
-- OpenAPI 基线：`/Users/xiaochou164/Desktop/bookmarktorain/docs/openapi.json`
+- 工程文档索引：`docs/README.md`
+- 实施计划：`docs/IMPLEMENTATION_PLAN.md`
+- 项目收口清单：`docs/TODO.md`
+- 开发日志：`docs/DEV_LOG.md`
+- OpenAPI 基线：`docs/openapi.json`
+- 浏览器扩展说明：`chrome-extension/README.md`、`safari-extension/README.md`
 
-前端对齐与验收：
-
-- `RA_UI` 验收：`/Users/xiaochou164/Desktop/bookmarktorain/docs/RA_UI_ACCEPTANCE_CHECKLIST.md`
-- `RA_UI` 截图：`/Users/xiaochou164/Desktop/bookmarktorain/docs/RA_UI_SCREENSHOT_COMPARE.md`
-- `/my/0` DOM 对齐验收：`/Users/xiaochou164/Desktop/bookmarktorain/docs/RA_DOM_MY0_ACCEPTANCE_CHECKLIST.md`
-- `/my/0` 截图对比：`/Users/xiaochou164/Desktop/bookmarktorain/docs/RA_DOM_MY0_SCREENSHOT_COMPARE.md`
-- `/my/0` 交互回归：`/Users/xiaochou164/Desktop/bookmarktorain/docs/RA_DOM_MY0_INTERACTION_REGRESSION_CHECKLIST.md`
-- 通用前端回归：`/Users/xiaochou164/Desktop/bookmarktorain/docs/FRONTEND_REGRESSION_CHECKLIST.md`
+前端对齐、Cloudflare 验收、UI/UX 测试和截图基线的入口均在 `docs/README.md` 中维护。
 
 ## 说明
 
 - 当前项目以“功能/交互/信息架构对标 Raindrop”为目标，不直接复制品牌与商标资源。
-- 当前未建立完整自动化测试体系（已有较多命令级/冒烟验证与开发日志记录）。
+- 当前已建立命令级自动化验收体系，覆盖 `npm test`、`npm run cf:check`、`npm run cf:smoke`、`npm run ui:check`、`npm run ui:browser`、`npm run ops:drill` 与 CI 基线。
 - 生产主路径已不再依赖 `BullMQ` / `Redis` / 本地磁盘；Cloudflare Worker + D1 + R2 + Queues + Cron 是当前默认部署模型。
 - AI / 扫描 / 恢复类长任务默认会记录任务状态、尝试次数与重试入口；Cron 会对卡住的任务做补偿重投。
-- 当前仍在持续增强的重点主要是更深的 `article` 云端提取、外部资源探测精度，以及更完整的失败治理与集成测试覆盖。
+- 默认验收路径以 Cloudflare Worker 本地冒烟、UI 静态/浏览器审计、Node 单测和运维演练为基线；远端 Worker 验收通过 `npm run cf:smoke:remote -- <worker-url>` 执行。

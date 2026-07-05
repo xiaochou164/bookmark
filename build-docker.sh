@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-IMAGE_NAME="bookmarktorain"
+IMAGE_NAME="rainbow"
 REGISTRY="ghcr.io/xiaochou164" # Optional: Change to your registry or Docker Hub username
 TAG="latest"
 

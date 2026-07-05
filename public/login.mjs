@@ -1,4 +1,5 @@
 import { api } from './js/api.mjs';
+import './js/uiPreferences.mjs';
 
 function byId(id) {
   return document.getElementById(id);
@@ -9,6 +10,20 @@ function setStatus(text, { error = false } = {}) {
   if (!el) return;
   el.textContent = String(text || '');
   el.classList.toggle('danger-text', Boolean(error));
+  el.setAttribute('role', error ? 'alert' : 'status');
+  el.setAttribute('aria-live', error ? 'assertive' : 'polite');
+}
+
+function setFieldInvalid(ids = [], invalid = false) {
+  for (const id of ids) {
+    const el = byId(id);
+    if (!el) continue;
+    el.setAttribute('aria-invalid', String(Boolean(invalid)));
+  }
+}
+
+function clearFieldErrors() {
+  setFieldInvalid(['loginEmail', 'loginPassword', 'registerEmail', 'registerPassword'], false);
 }
 
 function safeNextPath(raw) {
@@ -40,12 +55,15 @@ function setTab(mode) {
   const isRegister = mode === 'register';
   byId('registerForm')?.classList.toggle('hidden', !isRegister);
   byId('loginForm')?.classList.toggle('hidden', isRegister);
+  byId('registerForm')?.setAttribute('aria-hidden', String(!isRegister));
+  byId('loginForm')?.setAttribute('aria-hidden', String(isRegister));
   byId('registerTabBtn')?.classList.toggle('active', isRegister);
   byId('loginTabBtn')?.classList.toggle('active', !isRegister);
   byId('registerTabBtn')?.setAttribute('aria-selected', String(isRegister));
   byId('loginTabBtn')?.setAttribute('aria-selected', String(!isRegister));
   byId('registerTabBtn')?.setAttribute('tabindex', isRegister ? '0' : '-1');
   byId('loginTabBtn')?.setAttribute('tabindex', isRegister ? '-1' : '0');
+  clearFieldErrors();
 }
 
 async function loadAuthMe() {
@@ -91,18 +109,24 @@ async function init() {
   byId('loginTabBtn')?.addEventListener('click', () => setTab('login'));
   byId('registerTabBtn')?.addEventListener('click', () => setTab('register'));
   byId('loginTabBtn')?.parentElement?.addEventListener('keydown', (event) => {
-    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const nextMode = byId('loginTabBtn')?.getAttribute('aria-selected') === 'true' ? 'register' : 'login';
+    const nextMode = event.key === 'Home'
+      ? 'login'
+      : event.key === 'End'
+        ? 'register'
+        : byId('loginTabBtn')?.getAttribute('aria-selected') === 'true' ? 'register' : 'login';
     setTab(nextMode);
     byId(nextMode === 'register' ? 'registerTabBtn' : 'loginTabBtn')?.focus();
   });
 
   byId('loginForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    clearFieldErrors();
     const email = byId('loginEmail')?.value?.trim() || '';
     const password = byId('loginPassword')?.value || '';
     if (!email || !password) {
+      setFieldInvalid([!email ? 'loginEmail' : '', !password ? 'loginPassword' : ''].filter(Boolean), true);
       setStatus('请输入邮箱和密码', { error: true });
       return;
     }
@@ -118,10 +142,12 @@ async function init() {
 
   byId('registerForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
+    clearFieldErrors();
     const displayName = byId('registerName')?.value?.trim() || '';
     const email = byId('registerEmail')?.value?.trim() || '';
     const password = byId('registerPassword')?.value || '';
     if (!email || !password) {
+      setFieldInvalid([!email ? 'registerEmail' : '', !password ? 'registerPassword' : ''].filter(Boolean), true);
       setStatus('请输入邮箱和密码', { error: true });
       return;
     }

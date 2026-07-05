@@ -40,7 +40,7 @@ function createErrorResponse(message, init = {}) {
 function getState(env) {
   return {
     runtime: 'cloudflare-workers',
-    service: 'rainboard',
+    service: 'rainbow',
     nodeServer: false,
     hasAssets: Boolean(env?.ASSETS),
     hasD1: Boolean(env?.DB),

@@ -1,13 +1,13 @@
 /**
  * chromeSyncRoutes.js
- * Chrome 书签 ↔ Rainboard 本地书签数据库双向同步 API
+ * Chrome 书签 ↔ Rainbow 本地书签数据库双向同步 API
  *
  * POST /api/chrome-sync
- *   接收 Chrome 书签快照（folder 分组数组），与 Rainboard DB 做双向同步
+ *   接收 Chrome 书签快照（folder 分组数组），与 Rainbow DB 做双向同步
  *   返回需要在 Chrome 侧 "增加" 和 "删除" 的书签列表
  *
  * GET /api/chrome-sync/bookmarks
- *   返回 Rainboard DB 中此用户的所有书签（带 folderName），供插件拉取
+ *   返回 Rainbow DB 中此用户的所有书签（带 folderName），供插件拉取
  *
  * POST /api/chrome-sync/push
  *   Chrome → DB 单向推送（幂等，只新增）
@@ -99,10 +99,10 @@ function normalizeMirrorIndex(input) {
     const out = {};
     if (!input || typeof input !== 'object') return out;
     for (const [key, raw] of Object.entries(input)) {
-        const rainboardId = String(raw?.rainboardId || key || '').trim();
-        if (!rainboardId) continue;
-        out[rainboardId] = {
-            rainboardId,
+        const rainbowId = String(raw?.rainbowId || key || '').trim();
+        if (!rainbowId) continue;
+        out[rainbowId] = {
+            rainbowId,
             chromeId: String(raw?.chromeId || ''),
             url: String(raw?.url || ''),
             normalizedUrl: String(raw?.normalizedUrl || normalizeUrl(raw?.url) || ''),
@@ -121,7 +121,7 @@ function registerChromeSyncRoutes(app, deps) {
 
     /**
      * GET /api/chrome-sync/bookmarks
-     * 返回 Rainboard DB 中此用户所有书签（带 folderName），供 Chrome 插件展示/对比
+     * 返回 Rainbow DB 中此用户所有书签（带 folderName），供 Chrome 插件展示/对比
      */
     app.get('/api/chrome-sync/bookmarks', async (req, res, next) => {
         try {
@@ -243,10 +243,10 @@ function registerChromeSyncRoutes(app, deps) {
                     }
                 }
 
-                // 0. Chrome local timeline: use the previous rainboardId ↔ chromeId mirror
+                // 0. Chrome local timeline: use the previous rainbowId ↔ chromeId mirror
                 // to detect local deletes, moves, title edits, and URL edits.
-                for (const [rainboardId, snapshot] of Object.entries(mirrorIndex)) {
-                    const dbBm = dbById.get(String(rainboardId));
+                for (const [rainbowId, snapshot] of Object.entries(mirrorIndex)) {
+                    const dbBm = dbById.get(String(rainbowId));
                     if (!dbBm || dbBm.deletedAt) continue;
 
                     const currentById = snapshot.chromeId ? chromeById.get(String(snapshot.chromeId)) : null;
@@ -432,7 +432,7 @@ function registerChromeSyncRoutes(app, deps) {
                     if (!chromeBm) continue;
                     const folder = folderById.get(bm.folderId);
                     nextMirrorIndex[bm.id] = {
-                        rainboardId: bm.id,
+                        rainbowId: bm.id,
                         chromeId: chromeBm.chromeId || '',
                         url: bm.url,
                         normalizedUrl: normed,

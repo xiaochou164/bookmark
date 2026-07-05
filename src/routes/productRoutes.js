@@ -22,7 +22,8 @@ const {
   generateRelatedBookmarksRecommendations,
   generateReadingPriorityRecommendations,
   generateBookmarksQaAnswer,
-  buildAiJobRecord
+  buildAiJobRecord,
+  sanitizeAiModelInput
 } = require('../services/aiProviderService');
 
 function normalizeUrlLoose(input = '') {
@@ -98,6 +99,243 @@ function requireFeature(db, userId, feature, badRequest) {
     throw err;
   }
   return ent;
+}
+
+const DEFAULT_AI_PROMPT_TEMPLATES = Object.freeze([
+  { key: 'bookmark.autotag', name: '书签自动打标签', version: 1, body: '根据标题、URL、摘要、正文和已有标签生成精简标签。' },
+  { key: 'bookmark.summary', name: '书签摘要', version: 1, body: '用简洁中文总结书签内容，保留关键结论和适用场景。' },
+  { key: 'bookmarks.qa', name: '书签问答', version: 1, body: '基于检索到的书签材料回答问题，并提供出处。' },
+  { key: 'bookmark.classify', name: '集合分类', version: 1, body: '根据书签内容推荐最合适的集合，并解释原因。' },
+  { key: 'team.tags', name: '团队标签规范', version: 1, body: '根据团队共享集合内标签，建议统一命名、合并和本地化策略。' }
+]);
+
+const DEFAULT_AI_EVAL_SAMPLES = Object.freeze([
+  {
+    id: 'eval_autotag_ai_article',
+    task: 'bookmark.autotag',
+    input: { title: 'OpenAI API structured outputs guide', url: 'https://platform.openai.com/docs/guides/structured-outputs', note: 'schema constrained JSON' },
+    expected: { tags: ['AI', 'OpenAI', 'API'], keywords: ['structured', 'json'] }
+  },
+  {
+    id: 'eval_summary_product',
+    task: 'bookmark.summary',
+    input: { title: 'Rainbow product roadmap', url: 'https://example.com/roadmap', note: 'product planning and release priorities' },
+    expected: { tags: ['产品', '路线图'], keywords: ['规划', '优先级', '发布'] }
+  },
+  {
+    id: 'eval_classify_design',
+    task: 'bookmark.classify',
+    input: { title: 'Design system accessibility checklist', url: 'https://example.com/a11y', note: 'contrast, focus, keyboard navigation' },
+    expected: { tags: ['设计系统', '可访问性'], keywords: ['contrast', 'keyboard', 'focus'] }
+  }
+]);
+
+const DEFAULT_AI_PRIVACY_POLICY = Object.freeze({
+  anonymize: true,
+  stripFields: ['apiKey', 'apiToken', 'password', 'rawHtml', 'cookies'],
+  maxPromptChars: 12_000,
+  redactPatterns: ['email', 'phone', 'token']
+});
+
+const DEFAULT_AI_FEATURE_POLICY = Object.freeze({
+  enabled: true,
+  role: 'owner',
+  capabilities: {
+    autoTag: true,
+    summarize: true,
+    qa: true,
+    search: true,
+    rules: true,
+    bulkTasks: true
+  }
+});
+
+function ensureAiPromptTemplates(db) {
+  db.aiPromptTemplates = Array.isArray(db.aiPromptTemplates) ? db.aiPromptTemplates : [];
+  return db.aiPromptTemplates;
+}
+
+function aiPromptTemplatesForUser(db, userId) {
+  const overrides = ensureAiPromptTemplates(db).filter((t) => String(t.userId || '') === String(userId || ''));
+  const byKey = new Map(DEFAULT_AI_PROMPT_TEMPLATES.map((t) => [t.key, { ...t, userId: String(userId || ''), source: 'default', updatedAt: 0 }]));
+  for (const item of overrides) {
+    byKey.set(String(item.key || ''), { ...item, source: 'custom' });
+  }
+  return [...byKey.values()].sort((a, b) => String(a.key).localeCompare(String(b.key)));
+}
+
+function ensureAiEvalRuns(db) {
+  db.aiEvalRuns = Array.isArray(db.aiEvalRuns) ? db.aiEvalRuns : [];
+  return db.aiEvalRuns;
+}
+
+function aiEvalSamplesForUser(db, userId) {
+  const custom = Array.isArray(db.aiEvalSamples) ? db.aiEvalSamples.filter((s) => String(s.userId || '') === String(userId || '')) : [];
+  return [...DEFAULT_AI_EVAL_SAMPLES.map((s) => ({ ...s, userId: String(userId || ''), source: 'default' })), ...custom];
+}
+
+function tokenOverlapScore(expected = {}, actual = {}) {
+  const expectedTokens = tokenize([
+    ...(Array.isArray(expected.tags) ? expected.tags : []),
+    ...(Array.isArray(expected.keywords) ? expected.keywords : [])
+  ].join(' '));
+  const actualTokens = tokenize([
+    ...(Array.isArray(actual.tags) ? actual.tags : []),
+    actual.summary,
+    actual.title,
+    actual.reason,
+    JSON.stringify(actual || {})
+  ].join(' '));
+  if (!expectedTokens.length) return 1;
+  const actualSet = new Set(actualTokens);
+  const matched = expectedTokens.filter((token) => actualSet.has(token)).length;
+  return Number((matched / expectedTokens.length).toFixed(4));
+}
+
+function runAiEvalBaseline(db, userId, candidates = []) {
+  const samples = aiEvalSamplesForUser(db, userId).slice(0, 50);
+  const candidateBySampleId = new Map((Array.isArray(candidates) ? candidates : []).map((item) => [String(item.sampleId || item.id || ''), item]));
+  const rows = samples.map((sample) => {
+    const candidate = candidateBySampleId.get(String(sample.id || '')) || {};
+    const score = tokenOverlapScore(sample.expected || {}, candidate.output || candidate.result || {});
+    return {
+      sampleId: sample.id,
+      task: sample.task,
+      score,
+      passed: score >= 0.5,
+      expected: sample.expected,
+      actual: candidate.output || candidate.result || null
+    };
+  });
+  const avgScore = rows.length ? rows.reduce((sum, row) => sum + Number(row.score || 0), 0) / rows.length : 0;
+  return {
+    id: `ai_eval_${crypto.randomUUID()}`,
+    userId: String(userId || ''),
+    createdAt: Date.now(),
+    sampleCount: rows.length,
+    passed: rows.filter((row) => row.passed).length,
+    failed: rows.filter((row) => !row.passed).length,
+    avgScore: Number(avgScore.toFixed(4)),
+    rows
+  };
+}
+
+function ensureAiFeedbackItems(db) {
+  db.aiFeedbackItems = Array.isArray(db.aiFeedbackItems) ? db.aiFeedbackItems : [];
+  return db.aiFeedbackItems;
+}
+
+function aiFeedbackSummary(items = []) {
+  const counts = items.reduce((acc, item) => {
+    const action = String(item.action || 'unknown');
+    acc[action] = (acc[action] || 0) + 1;
+    return acc;
+  }, {});
+  const ratings = items.map((item) => Number(item.rating || 0)).filter((n) => Number.isFinite(n) && n > 0);
+  return {
+    total: items.length,
+    counts,
+    avgRating: ratings.length ? Number((ratings.reduce((sum, n) => sum + n, 0) / ratings.length).toFixed(2)) : 0
+  };
+}
+
+function aiPrivacyPolicyForUser(db, userId) {
+  db.aiPrivacyPolicies = db.aiPrivacyPolicies && typeof db.aiPrivacyPolicies === 'object' ? db.aiPrivacyPolicies : {};
+  return {
+    ...DEFAULT_AI_PRIVACY_POLICY,
+    ...(db.aiPrivacyPolicies[String(userId || '')] || {})
+  };
+}
+
+function setAiPrivacyPolicy(db, userId, patch = {}) {
+  db.aiPrivacyPolicies = db.aiPrivacyPolicies && typeof db.aiPrivacyPolicies === 'object' ? db.aiPrivacyPolicies : {};
+  const current = aiPrivacyPolicyForUser(db, userId);
+  const next = {
+    ...current,
+    anonymize: typeof patch.anonymize === 'boolean' ? patch.anonymize : current.anonymize,
+    stripFields: Array.isArray(patch.stripFields) ? patch.stripFields.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 30) : current.stripFields,
+    maxPromptChars: Math.max(1000, Math.min(50_000, Number(patch.maxPromptChars || current.maxPromptChars) || current.maxPromptChars)),
+    redactPatterns: Array.isArray(patch.redactPatterns) ? patch.redactPatterns.map((x) => String(x || '').trim()).filter(Boolean).slice(0, 20) : current.redactPatterns,
+    updatedAt: Date.now()
+  };
+  db.aiPrivacyPolicies[String(userId || '')] = next;
+  return next;
+}
+
+function aiFeaturePolicyForUser(db, userId) {
+  db.aiFeaturePolicies = db.aiFeaturePolicies && typeof db.aiFeaturePolicies === 'object' ? db.aiFeaturePolicies : {};
+  const ent = entitlementForUser(db, userId);
+  const stored = db.aiFeaturePolicies[String(userId || '')] || {};
+  return {
+    ...DEFAULT_AI_FEATURE_POLICY,
+    ...stored,
+    plan: ent.plan,
+    enabled: Boolean(ent.features.aiSuggestions) && (typeof stored.enabled === 'boolean' ? stored.enabled : DEFAULT_AI_FEATURE_POLICY.enabled),
+    capabilities: {
+      ...DEFAULT_AI_FEATURE_POLICY.capabilities,
+      ...(stored.capabilities && typeof stored.capabilities === 'object' ? stored.capabilities : {})
+    }
+  };
+}
+
+function setAiFeaturePolicy(db, userId, patch = {}) {
+  db.aiFeaturePolicies = db.aiFeaturePolicies && typeof db.aiFeaturePolicies === 'object' ? db.aiFeaturePolicies : {};
+  const current = aiFeaturePolicyForUser(db, userId);
+  const next = {
+    ...current,
+    enabled: typeof patch.enabled === 'boolean' ? patch.enabled : current.enabled,
+    role: ['owner', 'editor', 'viewer'].includes(String(patch.role || '')) ? String(patch.role) : current.role,
+    capabilities: {
+      ...current.capabilities,
+      ...(patch.capabilities && typeof patch.capabilities === 'object' ? Object.fromEntries(Object.entries(patch.capabilities).map(([k, v]) => [k, Boolean(v)])) : {})
+    },
+    updatedAt: Date.now()
+  };
+  db.aiFeaturePolicies[String(userId || '')] = next;
+  return next;
+}
+
+function aiCapabilityForPath(path = '') {
+  const p = String(path || '');
+  if (/\/(?:batch|backfill)\//.test(p)) return 'bulkTasks';
+  if (/\/rules\//.test(p)) return 'rules';
+  if (/\/qa(?:[/?]|$)/.test(p)) return 'qa';
+  if (/\/(?:search-to-filters|dedupe|related|reading-priority)/.test(p)) return 'search';
+  if (/\/(?:summary|reader-summary|folder-summary|digest|highlight)/.test(p)) return 'summarize';
+  if (/\/(?:suggest|autotag|title-clean|folder-recommend|tags\/)/.test(p)) return 'autoTag';
+  return '';
+}
+
+function assertAiFeaturePolicy(db, userId, path, badRequest) {
+  const policy = aiFeaturePolicyForUser(db, userId);
+  const capability = aiCapabilityForPath(path);
+  if (!capability) return policy;
+  if (!policy.enabled || !policy.capabilities?.[capability]) {
+    const err = badRequest(`AI capability disabled: ${capability}`);
+    err.code = 'AI_FEATURE_DISABLED';
+    err.details = { capability, policy };
+    throw err;
+  }
+  return policy;
+}
+
+function buildAiProviderHealth(db, userId) {
+  const jobs = (db.aiSuggestionJobs || []).filter((j) => String(j.userId || '') === String(userId || '')).slice(0, 100);
+  const checks = (db.aiProviderHealthChecks || []).filter((j) => String(j.userId || '') === String(userId || '')).slice(0, 20);
+  const failures = jobs.filter((j) => String(j.status || '') === 'failed');
+  const durations = jobs
+    .map((j) => Number(j.finishedAt || 0) - Number(j.createdAt || j.startedAt || 0))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  const lastCheck = checks[0] || null;
+  const availability = jobs.length ? Number(((jobs.length - failures.length) / jobs.length).toFixed(4)) : (lastCheck?.ok ? 1 : 0);
+  return {
+    availability,
+    avgLatencyMs: durations.length ? Math.round(durations.reduce((sum, n) => sum + n, 0) / durations.length) : Number(lastCheck?.latencyMs || 0) || 0,
+    recentFailures: failures.slice(0, 5).map((j) => ({ id: j.id, type: j.type, message: j.error?.message || '', createdAt: j.createdAt })),
+    lastCheck,
+    checks,
+    jobsSampled: jobs.length
+  };
 }
 
 function tokenize(text = '') {
@@ -403,15 +641,47 @@ function registerProductRoutes(app, deps) {
   function quotaSummary(db, userId) {
     const ent = entitlementForUser(db, userId);
     const limits = ent.plan === 'pro'
-      ? { bookmarks: 50000, importsPerDay: 100, metadataFetchesPerDay: 5000, backups: 200 }
-      : { bookmarks: 5000, importsPerDay: 20, metadataFetchesPerDay: 500, backups: 10 };
+      ? { bookmarks: 50000, importsPerDay: 100, metadataFetchesPerDay: 5000, backups: 200, aiCallsPerDay: 2000, aiBatchItemsPerTask: 2000 }
+      : { bookmarks: 5000, importsPerDay: 20, metadataFetchesPerDay: 500, backups: 10, aiCallsPerDay: 80, aiBatchItemsPerTask: 120 };
+    const dayStart = new Date();
+    dayStart.setHours(0, 0, 0, 0);
+    const since = dayStart.getTime();
+    const aiJobsToday = (db.aiSuggestionJobs || []).filter((j) => String(j.userId) === userId && Number(j.createdAt || j.startedAt || 0) >= since);
+    const aiBatchToday = (db.aiBatchTasks || []).filter((t) => String(t.userId) === userId && Number(t.createdAt || 0) >= since);
+    const aiBackfillToday = (db.aiBackfillTasks || []).filter((t) => String(t.userId) === userId && Number(t.createdAt || 0) >= since);
     const usage = {
       bookmarks: userBookmarks(db, userId).filter((b) => !b.deletedAt).length,
       importsPerDay: (db.ioTasks || []).filter((t) => String(t.userId) === userId && String(t.type || '').startsWith('import_')).length,
       metadataFetchesPerDay: (db.metadataTasks || []).filter((t) => String(t.userId) === userId).length,
-      backups: (db.backups || []).filter((b) => String(b.userId) === userId).length
+      backups: (db.backups || []).filter((b) => String(b.userId) === userId).length,
+      aiCallsPerDay: aiJobsToday.length + aiBatchToday.length + aiBackfillToday.length
     };
     return { plan: ent.plan, usage, limits };
+  }
+
+  function estimateAiQuotaUnits(req) {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    if (Array.isArray(body.bookmarkIds)) return Math.max(1, body.bookmarkIds.length);
+    if (typeof body.limit !== 'undefined') return Math.max(1, Math.min(2000, Number(body.limit) || 1));
+    return 1;
+  }
+
+  function assertAiQuota(db, userId, units, req) {
+    const quota = quotaSummary(db, userId);
+    const nextCalls = Number(quota.usage.aiCallsPerDay || 0) + Math.max(1, Number(units || 1) || 1);
+    if (nextCalls > Number(quota.limits.aiCallsPerDay || 0)) {
+      const err = badRequest('AI daily quota exceeded', { quota, units, route: req.originalUrl || req.url });
+      err.status = 429;
+      err.code = 'AI_QUOTA_EXCEEDED';
+      throw err;
+    }
+    if (Math.max(1, Number(units || 1) || 1) > Number(quota.limits.aiBatchItemsPerTask || 0)) {
+      const err = badRequest('AI batch size exceeds plan limit', { quota, units, route: req.originalUrl || req.url });
+      err.status = 429;
+      err.code = 'AI_BATCH_LIMIT_EXCEEDED';
+      throw err;
+    }
+    return quota;
   }
 
   app.get('/api/product/entitlements', async (req, res, next) => {
@@ -473,6 +743,23 @@ function registerProductRoutes(app, deps) {
       res.json({ ok: true, quota: quotaSummary(db, userId) });
     } catch (err) {
       next(err);
+    }
+  });
+
+  app.use('/api/product/ai', async (req, _res, next) => {
+    try {
+      const method = String(req.method || 'GET').toUpperCase();
+      if (['GET', 'HEAD'].includes(method)) return next();
+      const path = String(req.originalUrl || req.url || '');
+      if (/\/api\/product\/ai\/config(?:[/?]|$)/.test(path)) return next();
+      if (/\/api\/product\/ai\/(?:evals|feedback|privacy-policy|feature-policy|health)(?:[/?]|$)/.test(path)) return next();
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      assertAiFeaturePolicy(db, userId, path, badRequest);
+      assertAiQuota(db, userId, estimateAiQuotaUnits(req), req);
+      return next();
+    } catch (err) {
+      return next(err);
     }
   });
 
@@ -1415,6 +1702,46 @@ function registerProductRoutes(app, deps) {
         : current;
       const out = await testAiProviderConnection(mergedInput);
       res.json({ ok: true, test: out });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/product/ai/prompts', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      requireFeature(db, userId, 'aiSuggestions', badRequest);
+      res.json({ ok: true, items: aiPromptTemplatesForUser(db, userId) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/product/ai/prompts/:key', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const key = String(req.params.key || '').trim();
+      if (!DEFAULT_AI_PROMPT_TEMPLATES.some((t) => t.key === key)) return next(badRequest('unknown prompt template key'));
+      const body = String(req.body?.body || '').trim();
+      if (!body) return next(badRequest('prompt template body is required'));
+      let item = null;
+      await dbRepo.update((db) => {
+        requireFeature(db, userId, 'aiSuggestions', badRequest);
+        const list = ensureAiPromptTemplates(db);
+        const now = Date.now();
+        item = list.find((t) => String(t.userId || '') === userId && String(t.key || '') === key);
+        if (!item) {
+          item = { id: `prompt_${crypto.randomUUID()}`, userId, key, createdAt: now, version: 0 };
+          list.unshift(item);
+        }
+        item.name = String(req.body?.name || DEFAULT_AI_PROMPT_TEMPLATES.find((t) => t.key === key)?.name || key);
+        item.body = body;
+        item.version = Number(item.version || 0) + 1;
+        item.updatedAt = now;
+        return db;
+      });
+      res.json({ ok: true, item });
     } catch (err) {
       next(err);
     }
@@ -4183,6 +4510,182 @@ function registerProductRoutes(app, deps) {
       res.json({ ok: true, ...out });
     } catch (err) {
       if (String(err?.message || '') === 'bookmark not found') return next(notFound('bookmark not found'));
+      next(err);
+    }
+  });
+
+  app.get('/api/product/ai/evals', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      const runs = ensureAiEvalRuns(db)
+        .filter((run) => String(run.userId || '') === userId)
+        .slice(0, 20);
+      res.json({ ok: true, samples: aiEvalSamplesForUser(db, userId), runs });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/product/ai/evals/run', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      let run = null;
+      await dbRepo.update((db) => {
+        run = runAiEvalBaseline(db, userId, req.body?.candidates || []);
+        ensureAiEvalRuns(db).unshift(run);
+        db.aiEvalRuns = db.aiEvalRuns.slice(0, 200);
+        return db;
+      });
+      res.json({ ok: true, run });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/product/ai/feedback', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      const items = ensureAiFeedbackItems(db)
+        .filter((item) => String(item.userId || '') === userId)
+        .slice(0, 100);
+      res.json({ ok: true, summary: aiFeedbackSummary(items), items });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/product/ai/feedback', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const action = String(req.body?.action || '').trim();
+      if (!['accepted', 'rejected', 'edited', 'rated'].includes(action)) return next(badRequest('feedback action must be accepted, rejected, edited, or rated'));
+      const item = {
+        id: `ai_feedback_${crypto.randomUUID()}`,
+        userId,
+        jobId: String(req.body?.jobId || ''),
+        bookmarkId: String(req.body?.bookmarkId || ''),
+        feature: String(req.body?.feature || 'unknown').slice(0, 80),
+        action,
+        rating: Math.max(0, Math.min(5, Number(req.body?.rating || 0) || 0)),
+        comment: sanitizeAiModelInput(req.body?.comment || '', { maxLength: 1000 }),
+        editedOutput: req.body?.editedOutput && typeof req.body.editedOutput === 'object' ? req.body.editedOutput : null,
+        createdAt: Date.now()
+      };
+      await dbRepo.update((db) => {
+        ensureAiFeedbackItems(db).unshift(item);
+        db.aiFeedbackItems = db.aiFeedbackItems.slice(0, 1000);
+        return db;
+      });
+      res.status(201).json({ ok: true, item });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/product/ai/privacy-policy', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      res.json({
+        ok: true,
+        policy: aiPrivacyPolicyForUser(db, userId),
+        sample: sanitizeAiModelInput('email: owner@example.com token=sk-demo-secret phone +86 138 0000 0000')
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/product/ai/privacy-policy', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      let policy = null;
+      await dbRepo.update((db) => {
+        policy = setAiPrivacyPolicy(db, userId, req.body || {});
+        return db;
+      });
+      res.json({ ok: true, policy });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/product/ai/feature-policy', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      res.json({ ok: true, policy: aiFeaturePolicyForUser(db, userId), entitlement: entitlementForUser(db, userId) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/product/ai/feature-policy', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      let policy = null;
+      await dbRepo.update((db) => {
+        policy = setAiFeaturePolicy(db, userId, req.body || {});
+        return db;
+      });
+      res.json({ ok: true, policy });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/product/ai/health', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      res.json({ ok: true, health: buildAiProviderHealth(db, userId), config: publicAiProviderConfig(getAiProviderConfig(db, userId)) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/product/ai/health/probe', async (req, res, next) => {
+    try {
+      const userId = userIdOf(req);
+      const db = await dbRepo.read();
+      const config = getAiProviderConfig(db, userId);
+      const startedAt = Date.now();
+      let check = null;
+      try {
+        const out = await testAiProviderConnection(config, { timeoutMs: 8000 });
+        check = {
+          id: `ai_health_${crypto.randomUUID()}`,
+          userId,
+          ok: true,
+          providerType: out.providerType,
+          model: out.model,
+          transport: out.transport,
+          latencyMs: Date.now() - startedAt,
+          createdAt: Date.now()
+        };
+      } catch (err) {
+        check = {
+          id: `ai_health_${crypto.randomUUID()}`,
+          userId,
+          ok: false,
+          providerType: config.providerType,
+          model: config.providerType === 'cloudflare_ai' ? config.cloudflareAI?.model : config.openaiCompatible?.model,
+          latencyMs: Date.now() - startedAt,
+          error: { message: String(err.message || err) },
+          createdAt: Date.now()
+        };
+      }
+      await dbRepo.update((dbWrite) => {
+        dbWrite.aiProviderHealthChecks = Array.isArray(dbWrite.aiProviderHealthChecks) ? dbWrite.aiProviderHealthChecks : [];
+        dbWrite.aiProviderHealthChecks.unshift(check);
+        dbWrite.aiProviderHealthChecks = dbWrite.aiProviderHealthChecks.slice(0, 200);
+        return dbWrite;
+      });
+      const dbAfter = await dbRepo.read();
+      res.json({ ok: true, check, health: buildAiProviderHealth(dbAfter, userId) });
+    } catch (err) {
       next(err);
     }
   });

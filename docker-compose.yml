@@ -1,7 +1,7 @@
 services:
-  rainboard:
+  rainbow:
     build: .
-    container_name: rainboard
+    container_name: rainbow
     ports:
       - "3789:3789"
     environment:
@@ -9,7 +9,7 @@ services:
       - RB_PORT=3789
       # - RB_SECRET=change-this-to-a-secure-random-string
     volumes:
-      - rainboard-data:/app/data
+      - rainbow-data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3789/api/health"]
@@ -19,4 +19,4 @@ services:
       start_period: 10s
 
 volumes:
-  rainboard-data:
+  rainbow-data:

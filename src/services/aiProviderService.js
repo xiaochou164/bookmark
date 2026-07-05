@@ -33,6 +33,11 @@ const DEFAULT_AI_CONFIG = {
     fallbackLocal: true,
     dim: 192
   },
+  providerRouting: {
+    fallbackEnabled: true,
+    preferCloudflareFree: true,
+    maxAttempts: 2
+  },
   updatedAt: 0
 };
 
@@ -59,6 +64,23 @@ function normalizeBaseUrl(baseUrl) {
   } catch (_err) {
     return '';
   }
+}
+
+function sanitizeAiModelInput(input = '', { maxLength = 12_000 } = {}) {
+  const text = String(input || '')
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[redacted-email]')
+    .replace(/\b(?:\+?\d[\d\s().-]{7,}\d)\b/g, '[redacted-phone]')
+    .replace(/\b(?:api[_-]?key|token|secret|password|authorization)\s*[:=]\s*["']?[^"'\s,;]+/gi, '$1=[redacted-secret]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/gi, 'Bearer [redacted-secret]')
+    .replace(/\b(sk|rk|cf|ghp|github_pat)_[A-Za-z0-9._-]{12,}/g, '[redacted-secret]');
+  return text.length > maxLength ? `${text.slice(0, maxLength)}\n[truncated]` : text;
+}
+
+function sanitizeAiPrompt(prompt = {}) {
+  return {
+    system: sanitizeAiModelInput(prompt.system, { maxLength: 6_000 }),
+    user: sanitizeAiModelInput(prompt.user, { maxLength: 12_000 })
+  };
 }
 
 function mergeConfig(current = {}, patch = {}) {
@@ -94,6 +116,11 @@ function mergeConfig(current = {}, patch = {}) {
     ...DEFAULT_AI_CONFIG.embeddings,
     ...(prev.embeddings || {}),
     ...((patch && patch.embeddings) || {})
+  };
+  next.providerRouting = {
+    ...DEFAULT_AI_CONFIG.providerRouting,
+    ...(prev.providerRouting || {}),
+    ...((patch && patch.providerRouting) || {})
   };
   return next;
 }
@@ -153,6 +180,13 @@ function normalizeAiProviderConfigInput(input = {}, current = {}) {
     ? merged.embeddings.fallbackLocal
     : DEFAULT_AI_CONFIG.embeddings.fallbackLocal;
   next.embeddings.dim = clampInt(merged.embeddings?.dim, 32, 1024, DEFAULT_AI_CONFIG.embeddings.dim);
+  next.providerRouting.fallbackEnabled = typeof merged.providerRouting?.fallbackEnabled === 'boolean'
+    ? merged.providerRouting.fallbackEnabled
+    : DEFAULT_AI_CONFIG.providerRouting.fallbackEnabled;
+  next.providerRouting.preferCloudflareFree = typeof merged.providerRouting?.preferCloudflareFree === 'boolean'
+    ? merged.providerRouting.preferCloudflareFree
+    : DEFAULT_AI_CONFIG.providerRouting.preferCloudflareFree;
+  next.providerRouting.maxAttempts = clampInt(merged.providerRouting?.maxAttempts, 1, 2, DEFAULT_AI_CONFIG.providerRouting.maxAttempts);
   next.updatedAt = Number(merged.updatedAt || 0) || 0;
 
   return next;
@@ -180,6 +214,7 @@ function publicAiProviderConfig(config = {}) {
     tagging: c.tagging,
     autoClassifyOnCreate: c.autoClassifyOnCreate,
     embeddings: c.embeddings,
+    providerRouting: c.providerRouting,
     updatedAt: c.updatedAt
   };
 }
@@ -973,9 +1008,46 @@ async function callCloudflareAI(config, prompt, { timeoutMs = 30_000 } = {}) {
 }
 
 async function callAiProvider(config, prompt, opts = {}) {
-  const providerType = String(config?.providerType || 'openai_compatible');
-  if (providerType === 'cloudflare_ai') return callCloudflareAI(config, prompt, opts);
-  return callOpenAICompatible(config, prompt, opts);
+  const normalized = normalizeAiProviderConfigInput({}, config);
+  const safePrompt = sanitizeAiPrompt(prompt);
+  const primary = String(normalized.providerType || 'openai_compatible');
+  const hasOpenAI = Boolean(normalized.openaiCompatible?.apiKey && normalized.openaiCompatible?.model);
+  const hasCloudflare = Boolean(normalized.cloudflareAI?.accountId && normalized.cloudflareAI?.apiToken && normalized.cloudflareAI?.model);
+  const order = [];
+  const add = (provider) => {
+    if (provider === 'cloudflare_ai' && !hasCloudflare) return;
+    if (provider === 'openai_compatible' && !hasOpenAI) return;
+    if (!order.includes(provider)) order.push(provider);
+  };
+  if (normalized.providerRouting?.preferCloudflareFree) add('cloudflare_ai');
+  add(primary);
+  if (normalized.providerRouting?.fallbackEnabled) {
+    add(primary === 'cloudflare_ai' ? 'openai_compatible' : 'cloudflare_ai');
+  }
+  if (!order.length) add(primary);
+  const attempts = order.slice(0, Math.max(1, Math.min(2, Number(normalized.providerRouting?.maxAttempts || 2) || 2)));
+  const failures = [];
+  for (const providerType of attempts) {
+    try {
+      const out = providerType === 'cloudflare_ai'
+        ? await callCloudflareAI(normalized, safePrompt, opts)
+        : await callOpenAICompatible(normalized, safePrompt, opts);
+      return {
+        ...out,
+        routedProviderType: providerType,
+        fallbackChain: failures
+      };
+    } catch (err) {
+      failures.push({
+        providerType,
+        message: String(err.message || err)
+      });
+    }
+  }
+  const last = failures[failures.length - 1];
+  const error = new Error(last?.message || 'AI provider unavailable');
+  error.providerFailures = failures;
+  throw error;
 }
 
 function normalizeEmbeddingVector(raw, { dim = 0 } = {}) {
@@ -1931,5 +2003,7 @@ module.exports = {
   generateBookmarksQaAnswer,
   buildAiJobRecord,
   normalizeTagList,
-  normalizeAiProviderConfigInput
+  normalizeAiProviderConfigInput,
+  sanitizeAiModelInput,
+  sanitizeAiPrompt
 };

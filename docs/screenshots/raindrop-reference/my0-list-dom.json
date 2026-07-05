@@ -1,0 +1,101 @@
+{
+  "url": "https://app.raindrop.io/my/0",
+  "title": "所有书签",
+  "viewport": {
+    "w": 1440,
+    "h": 693
+  },
+  "sidebar": {
+    "tag": "ASIDE",
+    "className": "svSidebar",
+    "text": "xiaochou164\n所有书签\n112\n所有书签\n未分类\n19\n未分类\n废纸篓\n85\n废纸篓\nMy Collections\n软件&工具&论坛\n46\n软件&工具&论坛\n机场\n6\n机场\n自建服务\n5\n自建服务\n学习\n5\n学习\n收藏癖\n1\n收藏癖\n影音娱乐\n12\n影音娱乐\n云外国人\n6\n云外国人\nAI使用\n10\nAI使用\n网盘\n1\n网盘\n土木\n1\n土木\n2223",
+    "x": 0,
+    "y": 0,
+    "w": 300,
+    "h": 693,
+    "bg": "rgb(246, 245, 244)",
+    "color": "rgb(26, 26, 26)",
+    "fontSize": "14px",
+    "fontWeight": "400"
+  },
+  "main": {
+    "tag": "MAIN",
+    "className": "small-n8_K svMain ",
+    "text": "询问\n添加\n所有书签\n按日期 ↓\n列表\n导出书签\nECMWF\n未分类\necmwf.int\n2月22日\nECMWF\n用 python 调用和风天气的 api 爬取天气预报数据 - 灰信网（软件开发博客聚合）\n未分类\nfreesion.com\n2月22日\n用 python 调用和风天气的 api 爬取天气预报数据 - 灰信网（软件开发博客聚合）\n人生足迹 · 博",
+    "x": 300,
+    "y": 0,
+    "w": 1140,
+    "h": 693,
+    "bg": "rgb(255, 255, 255)",
+    "color": "rgb(26, 26, 26)",
+    "fontSize": "14px",
+    "fontWeight": "400"
+  },
+  "rows": [
+    {
+      "tag": "A",
+      "className": "permalink-Wc76 superLink-lGgz",
+      "text": "ECMWF",
+      "x": 300,
+      "y": 96,
+      "w": 1140,
+      "h": 80,
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgba(0, 0, 0, 0)",
+      "fontSize": "0px",
+      "fontWeight": "400"
+    },
+    {
+      "tag": "A",
+      "className": "permalink-Wc76 superLink-lGgz",
+      "text": "用 python 调用和风天气的 api 爬取天气预报数据 - 灰信网（软件开发博客聚合）",
+      "x": 300,
+      "y": 176,
+      "w": 1140,
+      "h": 80,
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgba(0, 0, 0, 0)",
+      "fontSize": "0px",
+      "fontWeight": "400"
+    },
+    {
+      "tag": "A",
+      "className": "permalink-Wc76 superLink-lGgz",
+      "text": "人生足迹 · 博客",
+      "x": 300,
+      "y": 256,
+      "w": 1140,
+      "h": 80,
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgba(0, 0, 0, 0)",
+      "fontSize": "0px",
+      "fontWeight": "400"
+    },
+    {
+      "tag": "A",
+      "className": "permalink-Wc76 superLink-lGgz",
+      "text": "Theo Docs",
+      "x": 300,
+      "y": 336,
+      "w": 1140,
+      "h": 80,
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgba(0, 0, 0, 0)",
+      "fontSize": "0px",
+      "fontWeight": "400"
+    },
+    {
+      "tag": "A",
+      "className": "permalink-Wc76 superLink-lGgz",
+      "text": "【合集】常用VPS脚本",
+      "x": 300,
+      "y": 416,
+      "w": 1140,
+      "h": 80,
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgba(0, 0, 0, 0)",
+      "fontSize": "0px",
+      "fontWeight": "400"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DB_NAME="${CF_D1_DB_NAME:-rainboard}"
+DB_NAME="${CF_D1_DB_NAME:-rainbow}"
 SKIP_CHECKS=0
 IMPORT_LOCAL_DATA=0
 

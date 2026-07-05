@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ "main", "master" ]
+  push:
+    branches: [ "main", "master" ]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check
+        run: |
+          node --check src/server.js
+          node --check src/worker.mjs
+          node --check src/services/objectStorage.js
+          node --check src/http/middleware.js
+          node --check src/infra/logger.js
+          node --check src/infra/metrics.js
+          node --check scripts/ops-backup-restore-drill.mjs
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Cloudflare Worker smoke
+        run: npm run cf:smoke
+
+      - name: UI quality gates
+        run: npm run ui:check
+
+      - name: Operations drill
+        run: npm run ops:drill

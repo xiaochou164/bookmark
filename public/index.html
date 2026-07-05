@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Rainboard 云书签</title>
+  <title>Rainbow 云书签</title>
   <meta name="theme-color" content="#1194ff" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="shortcut icon" href="/favicon.svg" />
@@ -14,30 +14,34 @@
 <body>
   <div class="shell">
     <aside class="sidebar" id="mobileSidebar">
-      <div class="sidebar-account" id="sidebarAccountArea">
-        <button type="button" id="sidebarAccountBtn" class="sidebar-account-btn" aria-haspopup="menu"
-          aria-expanded="false">
-          <span id="sidebarAccountAvatar" class="sidebar-account-avatar">未</span>
-          <span class="sidebar-account-text">
-            <strong id="sidebarAccountName">未登录</strong>
-            <small id="sidebarAccountMeta">点击登录</small>
-          </span>
-          <span class="sidebar-account-caret">▾</span>
-        </button>
-        <div id="sidebarAccountMenu" class="sidebar-account-menu hidden" role="menu" aria-label="账号菜单">
-          <button type="button" id="sidebarAccountMenuAuth" class="sidebar-account-menu-item" role="menuitem">账号与
-            Token</button>
-          <button type="button" id="sidebarAccountMenuSettings" class="sidebar-account-menu-item"
-            role="menuitem">设置</button>
-          <button type="button" id="sidebarAccountMenuLogout" class="sidebar-account-menu-item danger"
-            role="menuitem">退出登录</button>
+      <div class="sidebar-topbar">
+        <div class="sidebar-account" id="sidebarAccountArea">
+          <button type="button" id="sidebarAccountBtn" class="sidebar-account-btn" aria-haspopup="menu"
+            aria-expanded="false">
+            <span id="sidebarAccountAvatar" class="sidebar-account-avatar">未</span>
+            <span class="sidebar-account-text">
+              <strong id="sidebarAccountName">未登录</strong>
+              <small id="sidebarAccountMeta">点击登录</small>
+            </span>
+            <span class="sidebar-account-caret">▾</span>
+          </button>
+          <div id="sidebarAccountMenu" class="sidebar-account-menu hidden" role="menu" aria-label="账号菜单">
+            <button type="button" id="sidebarAccountMenuAuth" class="sidebar-account-menu-item" role="menuitem">账号与
+              Token</button>
+            <button type="button" id="sidebarAccountMenuSettings" class="sidebar-account-menu-item"
+              role="menuitem">设置</button>
+            <button type="button" id="sidebarAccountMenuLogout" class="sidebar-account-menu-item danger"
+              role="menuitem">退出登录</button>
+          </div>
         </div>
+        <button type="button" id="sidebarTopNewBtn" class="icon-btn sidebar-top-new-btn" aria-label="新建集合"
+          title="新建集合">+</button>
       </div>
 
       <div class="brand">
         <div class="brand-dot"></div>
         <div>
-          <strong>Rainboard</strong>
+          <strong>Rainbow</strong>
           <small>云书签</small>
         </div>
       </div>
@@ -86,7 +90,7 @@
 
       <div id="sidebarStatusCard" class="sidebar-status-card">
         <div class="sidebar-status-card-head">
-          <strong>Rainboard</strong>
+          <strong>Rainbow</strong>
           <span id="sidebarStatusBadge" class="sidebar-status-badge">就绪</span>
         </div>
         <div id="sidebarStatusMeta" class="muted">正在加载状态…</div>
@@ -95,6 +99,8 @@
           <button type="button" id="sidebarStatusSettingsBtn" class="ghost">设置</button>
         </div>
       </div>
+      <div id="sidebarResizeHandle" class="split-resize-handle sidebar-resize-handle" role="separator"
+        aria-label="调整侧栏宽度" aria-orientation="vertical" tabindex="0"></div>
     </aside>
 
     <button type="button" id="mobileSidebarBackdrop" class="mobile-sidebar-backdrop hidden" aria-label="关闭导航"></button>
@@ -107,6 +113,7 @@
             <span id="searchLeadingIcon" class="search-leading-icon" aria-hidden="true"></span>
             <input id="searchInput" type="search" placeholder="搜索标题、链接、备注、标签..." role="combobox"
               aria-autocomplete="list" aria-expanded="false" aria-controls="searchSuggestList" autocomplete="off" />
+            <span id="searchModeBadge" class="toolbar-mode-badge search-mode-badge" aria-live="polite">关键词</span>
             <button id="advancedSearchToggleBtn" class="ghost search-inline-tool" type="button" aria-label="高级搜索"
               title="高级搜索">
               <span class="search-inline-tool-icon" aria-hidden="true">⌕</span>
@@ -118,7 +125,18 @@
           </div>
         </div>
         <div class="toolbar-right">
-          <button id="askAiBtn" class="ghost toolbar-ask-btn" type="button" aria-label="询问 AI" title="询问">询问</button>
+          <div id="realtimeNotificationsWrap" class="realtime-notifications-wrap">
+            <button id="realtimeNotificationsBtn" class="ghost realtime-notifications-btn" type="button"
+              aria-haspopup="menu" aria-expanded="false" aria-label="实时通知" title="实时通知"><span
+                class="sr-only">实时通知</span>
+              <span id="realtimeNotificationsBadge" class="realtime-notifications-badge hidden">0</span>
+            </button>
+            <div id="realtimeNotificationsMenu" class="realtime-notifications-menu hidden" role="menu"
+              aria-label="实时通知"></div>
+          </div>
+          <button id="askAiBtn" class="ghost toolbar-ask-btn" type="button" aria-label="询问 AI" title="询问 AI"><span
+              class="sr-only">询问 AI</span></button>
+          <span id="askAiModeBadge" class="toolbar-mode-badge ai-mode-badge" aria-live="polite">当前视图</span>
           <button id="settingsBtn" class="ghost">设置</button>
           <button id="authBtn" class="ghost">登录</button>
           <div id="addToolbarMenuWrap" class="header-menu-wrap add-split-wrap">
@@ -221,10 +239,11 @@
         </div>
         <div class="actions">
           <div class="actions-group actions-general actions-header-tools">
-            <button id="refreshBtn" class="ghost header-tool-btn" title="刷新">刷新</button>
+            <button id="refreshBtn" class="ghost header-tool-btn" aria-label="刷新" title="刷新"><span
+                class="sr-only">刷新</span></button>
             <div id="headerSortMenuWrap" class="header-menu-wrap">
               <button id="headerSortBtn" type="button" class="ghost header-tool-btn header-menu-trigger"
-                aria-haspopup="menu" aria-expanded="false">排序</button>
+                aria-haspopup="menu" aria-expanded="false" aria-label="排序" title="排序">排序</button>
               <div id="headerSortMenu" class="header-menu hidden" role="menu" aria-label="排序菜单">
                 <button type="button" class="header-menu-item" data-sort-option="newest"
                   role="menuitem">按日期（新到旧）</button>
@@ -244,7 +263,7 @@
 
             <div id="headerViewMenuWrap" class="header-menu-wrap">
               <button id="headerViewBtn" type="button" class="ghost header-tool-btn header-menu-trigger"
-                aria-haspopup="menu" aria-expanded="false">视图</button>
+                aria-haspopup="menu" aria-expanded="false" aria-label="视图" title="视图">视图</button>
               <div id="headerViewMenu" class="header-menu hidden" role="menu" aria-label="视图菜单">
                 <button type="button" class="header-menu-item" data-layout-option="list" role="menuitem">列表</button>
                 <button type="button" class="header-menu-item" data-layout-option="card" role="menuitem">卡片</button>
@@ -276,7 +295,7 @@
 
             <div id="headerMoreMenuWrap" class="header-menu-wrap">
               <button id="headerMoreBtn" type="button" class="ghost header-tool-btn header-menu-trigger"
-                aria-haspopup="menu" aria-expanded="false">更多</button>
+                aria-haspopup="menu" aria-expanded="false" aria-label="更多" title="更多">更多</button>
               <div id="headerMoreMenu" class="header-menu hidden" role="menu" aria-label="更多菜单">
                 <button type="button" class="header-menu-item" data-header-more-action="export"
                   role="menuitem">导出书签</button>
@@ -286,12 +305,14 @@
                   role="menuitem">同步插件</button>
               </div>
             </div>
+            <button id="exportBtn" class="ghost header-tool-btn ra-export-btn" aria-label="导出书签"
+              title="导出书签">导出书签</button>
             <button id="importBtn" class="ghost hidden">导入书签</button>
-            <button id="exportBtn" class="ghost hidden">导出书签</button>
             <button id="pluginPanelBtn" class="ghost hidden">同步插件</button>
           </div>
           <div id="bulkActionsBar" class="actions-group actions-bulk hidden" aria-live="polite">
             <span id="bulkSelectionCount" class="bulk-selection-pill">已选 0 项</span>
+            <span id="bulkModeHint" class="bulk-mode-hint">批量模式</span>
             <button id="bulkFavoriteBtn" class="ghost">收藏</button>
             <button id="bulkArchiveBtn" class="ghost">归档</button>
             <button id="bulkAiTagBtn" class="ghost">AI 打标签</button>
@@ -302,6 +323,7 @@
           </div>
         </div>
       </div>
+      <div id="toolbarShortcutHints" class="toolbar-shortcut-hints" aria-label="快捷键提示"></div>
 
       <section id="cards" class="cards"></section>
       <div id="listLoadMoreBar" class="list-load-more-bar hidden" aria-live="polite">
@@ -327,6 +349,8 @@
     <button type="button" id="detailPanelBackdrop" class="detail-panel-backdrop hidden" aria-label="关闭详情"></button>
 
     <aside class="detail" id="detailPanel">
+      <div id="detailResizeHandle" class="split-resize-handle detail-resize-handle" role="separator"
+        aria-label="调整详情面板宽度" aria-orientation="vertical" tabindex="0"></div>
       <div class="detail-panel-head">
         <div class="detail-panel-head-main">
           <h3>详情</h3>
@@ -392,7 +416,11 @@
             title="关闭详情"></button>
         </div>
       </div>
-      <div id="emptyDetail" class="muted">选择一个书签卡片以编辑详情。</div>
+      <div id="emptyDetail" class="state-block state-block-compact" data-state="empty">
+        <div class="state-block-eyebrow">详情状态</div>
+        <div class="state-block-title">尚未选择书签</div>
+        <div class="state-block-message muted">选择任一书签后，可在这里查看、编辑、预览和整理。</div>
+      </div>
 
       <form id="detailForm" class="hidden">
         <div class="detail-summary-card">
@@ -477,7 +505,7 @@
           </div>
           <div id="detailFetchSummaryChips" class="detail-summary-chips detail-inline-status"></div>
           <div id="detailMetaInfo" class="muted"></div>
-          <div id="detailMetaTaskInfo" class="muted"></div>
+          <div id="detailMetaTaskInfo" class="muted" role="status" aria-live="polite"></div>
           <div id="detailArticleInfo" class="muted"></div>
           <div id="detailReaderSummaryInfo" class="muted"></div>
           <div id="detailReaderSummaryBox" class="detail-ai-reader-summary hidden"></div>
@@ -539,6 +567,56 @@
         </div>
       </form>
     </aside>
+
+    <button type="button" id="aiSideDrawerBackdrop" class="ai-side-drawer-backdrop hidden" aria-label="关闭 AI 抽屉"></button>
+    <aside id="aiSideDrawer" class="ai-side-drawer hidden" aria-label="AI 侧边抽屉" aria-hidden="true">
+      <div class="ai-side-drawer-head">
+        <div>
+          <strong>询问 AI</strong>
+          <small id="aiDrawerContextMeta">当前视图</small>
+        </div>
+        <button type="button" id="aiDrawerCloseBtn" class="ghost" aria-label="关闭 AI 抽屉">关闭</button>
+      </div>
+      <div class="ai-side-drawer-body">
+        <label class="form-field">问题
+          <textarea id="aiDrawerQuestion" rows="4" placeholder="例如：帮我总结当前集合里的资料重点"></textarea>
+        </label>
+        <div class="dialog-grid-2">
+          <label class="form-field">范围
+            <select id="aiDrawerScope">
+              <option value="auto">当前书签优先</option>
+              <option value="all">全部书签</option>
+              <option value="current_only">仅当前书签</option>
+            </select>
+          </label>
+          <label class="form-field">出处
+            <input id="aiDrawerLimit" type="number" min="1" max="10" value="6" />
+          </label>
+        </div>
+        <div class="ai-drawer-actions">
+          <button type="button" id="aiDrawerAskBtn">提问</button>
+          <button type="button" id="aiDrawerOpenDialogBtn" class="ghost">弹窗</button>
+        </div>
+        <div class="ai-drawer-shortcuts" aria-label="AI 快捷操作">
+          <button type="button" class="ghost" data-ai-drawer-action="autotag">建议标签</button>
+          <button type="button" class="ghost" data-ai-drawer-action="summary">生成摘要</button>
+          <button type="button" class="ghost" data-ai-drawer-action="folder-summary">集合摘要</button>
+        </div>
+        <section class="ai-drawer-panel">
+          <div class="ai-drawer-panel-title">标签 / 摘要建议</div>
+          <div id="aiDrawerSuggestions" class="ai-drawer-suggestions muted">选择书签后显示建议。</div>
+        </section>
+        <section class="ai-drawer-panel">
+          <div class="ai-drawer-panel-title">回答</div>
+          <div id="aiDrawerAnswer" class="ai-qa-answer muted">暂无回答。</div>
+          <div id="aiDrawerSources" class="ai-qa-sources"></div>
+        </section>
+        <section class="ai-drawer-panel">
+          <div class="ai-drawer-panel-title">历史提问</div>
+          <div id="aiDrawerHistory" class="ai-drawer-history"></div>
+        </section>
+      </div>
+    </aside>
   </div>
 
   <dialog id="bookmarkDialog">
@@ -570,8 +648,8 @@
         <h3 id="collectionDialogTitle" class="dialog-title">新建集合</h3>
         <p id="collectionDialogSubtitle" class="dialog-subtitle">创建顶级集合或挂到父级集合下。</p>
       </div>
-      <div id="collectionFormError" class="form-error hidden" role="alert"></div>
       <div class="dialog-body">
+        <div id="collectionFormError" class="form-error hidden" role="alert"></div>
         <label class="form-field">名称<input id="newCollectionName" required placeholder="例如：设计灵感" /></label>
         <div class="dialog-grid-2">
           <label class="form-field">父级<select id="newCollectionParent"></select></label>
@@ -613,7 +691,7 @@
           </div>
         </div>
       </div>
-      <div id="previewError" class="muted hidden"></div>
+      <div id="previewError" class="state-block state-block-compact hidden" data-state="error"></div>
       <div class="preview-surface">
         <div id="previewLoading" class="preview-loading hidden" aria-live="polite">
           <div class="preview-loading-spinner" aria-hidden="true"></div>
@@ -622,7 +700,11 @@
         <iframe id="previewFrame" class="preview-pane hidden" title="预览框架"></iframe>
         <img id="previewImage" class="preview-pane hidden" alt="预览图片" />
         <video id="previewVideo" class="preview-pane hidden" controls></video>
-        <div id="previewFallback" class="preview-pane hidden muted">无法预览，请使用“打开原文”。</div>
+        <div id="previewFallback" class="preview-pane state-block state-block-compact hidden" data-state="fallback">
+          <div class="state-block-eyebrow">预览状态</div>
+          <div class="state-block-title">无法嵌入预览</div>
+          <div class="state-block-message muted">请使用“打开原文”继续查看。</div>
+        </div>
       </div>
       <pre id="previewPayload" class="preview-json hidden"></pre>
     </div>
@@ -704,8 +786,11 @@
 
   <dialog id="tagManagerDialog">
     <form method="dialog" id="tagManagerForm" class="dialog-form">
-      <h3>标签管理</h3>
-      <div class="tag-admin-grid">
+      <div class="dialog-header">
+        <h3 class="dialog-title">标签管理</h3>
+        <p class="dialog-subtitle">重命名、合并标签，或使用 AI 生成标准化建议。</p>
+      </div>
+      <div class="dialog-body tag-admin-grid">
         <div>
           <div class="muted tag-admin-current-title">当前标签</div>
           <div id="tagManagerList" class="tag-admin-list"></div>
@@ -728,10 +813,10 @@
           <button id="mergeTagsBtn" type="button" class="ghost">合并标签</button>
           <button id="aiTagStandardizeBtn" type="button" class="ghost">AI 标签标准化建议</button>
           <button id="aiTagLocalizeBtn" type="button" class="ghost">AI 标签本地化建议</button>
-          <pre id="tagManagerOutput">就绪</pre>
+          <pre id="tagManagerOutput" role="status" aria-live="polite">就绪</pre>
         </div>
       </div>
-      <div class="dialog-actions">
+      <div class="dialog-actions dialog-footer">
         <button type="submit" value="cancel" formnovalidate class="ghost">关闭</button>
       </div>
     </form>
@@ -811,8 +896,8 @@
           <strong>后台任务列表</strong>
           <button type="button" id="ioRetryTaskBtn" class="ghost">重试最近失败</button>
         </div>
-        <div id="ioTaskList" class="io-task-list io-task-list-dialog"></div>
-        <pre id="ioTaskOutput" class="io-task-output">就绪</pre>
+        <div id="ioTaskList" class="io-task-list io-task-list-dialog" role="status" aria-live="polite"></div>
+        <pre id="ioTaskOutput" class="io-task-output" role="status" aria-live="polite">就绪</pre>
       </div>
       <div class="dialog-actions dialog-footer">
         <button type="button" id="exportCloseBtn" class="ghost">关闭面板</button>
@@ -821,57 +906,60 @@
   </dialog>
 
   <dialog id="authDialog">
-    <div class="dialog-form auth-grid">
-      <div class="auth-panel">
-        <h3 id="authDialogTitle">账号</h3>
-        <div id="authStatusText" class="muted">未登录</div>
+    <div class="dialog-form wide auth-dialog-shell">
+      <div class="dialog-header">
+        <h3 id="authDialogTitle" class="dialog-title">账号</h3>
+        <p id="authStatusText" class="dialog-subtitle" role="status" aria-live="polite">未登录</p>
+      </div>
+      <div class="dialog-body auth-grid">
+        <div class="auth-panel">
+          <div id="authGuestPanel" class="auth-section">
+            <form onsubmit="event.preventDefault();">
+              <label>邮箱<input id="authEmail" type="email" autocomplete="username" /></label>
+              <label>密码<input id="authPassword" type="password" autocomplete="current-password" /></label>
+              <div class="dialog-actions dialog-actions-start">
+                <button type="button" id="authLoginBtn">登录</button>
+              </div>
+            </form>
+            <hr />
+            <form onsubmit="event.preventDefault();">
+              <label>昵称<input id="authRegisterName" autocomplete="name" /></label>
+              <label>邮箱<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
+              <label>密码<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
+              <div class="dialog-actions dialog-actions-start">
+                <button type="button" id="authRegisterBtn" class="ghost">注册</button>
+              </div>
+            </form>
+          </div>
 
-        <div id="authGuestPanel" class="auth-section">
-          <form onsubmit="event.preventDefault();">
-            <label>邮箱<input id="authEmail" type="email" autocomplete="username" /></label>
-            <label>密码<input id="authPassword" type="password" autocomplete="current-password" /></label>
-            <div class="dialog-actions dialog-actions-start">
-              <button type="button" id="authLoginBtn">登录</button>
+          <div id="authUserPanel" class="auth-section hidden">
+            <div class="auth-user-card">
+              <div><strong id="authUserName">用户</strong></div>
+              <div id="authUserEmail" class="muted"></div>
+              <div id="authUserMeta" class="muted"></div>
             </div>
-          </form>
-          <hr />
-          <form onsubmit="event.preventDefault();">
-            <label>昵称<input id="authRegisterName" autocomplete="name" /></label>
-            <label>邮箱<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
-            <label>密码<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
             <div class="dialog-actions dialog-actions-start">
-              <button type="button" id="authRegisterBtn" class="ghost">注册</button>
+              <button type="button" id="authLogoutBtn" class="ghost danger">退出登录</button>
             </div>
-          </form>
+          </div>
         </div>
 
-        <div id="authUserPanel" class="auth-section hidden">
-          <div class="auth-user-card">
-            <div><strong id="authUserName">用户</strong></div>
-            <div id="authUserEmail" class="muted"></div>
-            <div id="authUserMeta" class="muted"></div>
+        <div class="auth-panel">
+          <h3>API Token</h3>
+          <div class="auth-token-create">
+            <label>名称<input id="authTokenName" placeholder="我的 API Token" /></label>
+            <div class="dialog-actions dialog-actions-start">
+              <button type="button" id="authCreateTokenBtn" class="ghost">创建 Token</button>
+              <button type="button" id="authRefreshTokensBtn" class="ghost">刷新 Token</button>
+            </div>
           </div>
-          <div class="dialog-actions dialog-actions-start">
-            <button type="button" id="authLogoutBtn" class="ghost danger">退出登录</button>
-          </div>
+          <div id="authTokensList" class="io-task-list"></div>
+          <div class="muted">新 Token 值（仅展示一次）</div>
+          <pre id="authTokenOutput" role="status" aria-live="polite">尚未创建 Token</pre>
         </div>
       </div>
 
-      <div class="auth-panel">
-        <h3>API Token</h3>
-        <div class="auth-token-create">
-          <label>名称<input id="authTokenName" placeholder="我的 API Token" /></label>
-          <div class="dialog-actions dialog-actions-start">
-            <button type="button" id="authCreateTokenBtn" class="ghost">创建 Token</button>
-            <button type="button" id="authRefreshTokensBtn" class="ghost">刷新 Token</button>
-          </div>
-        </div>
-        <div id="authTokensList" class="io-task-list"></div>
-        <div class="muted">新 Token 值（仅展示一次）</div>
-        <pre id="authTokenOutput">尚未创建 Token</pre>
-      </div>
-
-      <div class="dialog-actions auth-dialog-actions">
+      <div class="dialog-actions dialog-footer auth-dialog-actions">
         <button type="button" id="authCloseBtn" class="ghost">关闭</button>
       </div>
     </div>
@@ -891,11 +979,13 @@
         <h3 id="actionDialogTitle" class="dialog-title">确认操作</h3>
         <p id="actionDialogMessage" class="dialog-subtitle">请确认继续。</p>
       </div>
-      <div id="actionDialogError" class="form-error hidden" role="alert"></div>
-      <label id="actionDialogInputWrap" class="form-field hidden">
-        <span id="actionDialogInputLabel">输入</span>
-        <input id="actionDialogInput" />
-      </label>
+      <div class="dialog-body action-dialog-body">
+        <div id="actionDialogError" class="form-error hidden" role="alert"></div>
+        <label id="actionDialogInputWrap" class="form-field hidden">
+          <span id="actionDialogInputLabel">输入</span>
+          <input id="actionDialogInput" />
+        </label>
+      </div>
       <div class="dialog-actions dialog-footer">
         <button type="button" id="actionDialogCancelBtn" class="ghost">取消</button>
         <button type="button" id="actionDialogConfirmBtn">确定</button>

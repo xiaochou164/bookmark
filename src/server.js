@@ -28,6 +28,8 @@ const { AuthService } = require('./services/authService');
 const { createTenantBootstrapMiddleware } = require('./services/tenantScope');
 const { createAuthorizationMiddleware } = require('./services/permissionService');
 const { createJobQueueBroker } = require('./infra/jobQueue');
+const { createLogger } = require('./infra/logger');
+const { createMetricsRegistry } = require('./infra/metrics');
 const { AiRuleEngine } = require('./services/aiRuleEngine');
 
 function normalizeTags(raw) {
@@ -127,6 +129,7 @@ function ensureDbShape(db) {
   db.semanticIndex = Array.isArray(db.semanticIndex) ? db.semanticIndex : [];
   db.aiRuleConfigs = db.aiRuleConfigs && typeof db.aiRuleConfigs === 'object' ? db.aiRuleConfigs : {};
   db.aiRuleRuns = Array.isArray(db.aiRuleRuns) ? db.aiRuleRuns : [];
+  db.aiPromptTemplates = Array.isArray(db.aiPromptTemplates) ? db.aiPromptTemplates : [];
 
   for (const share of db.collectionShares) {
     share.id = String(share.id || `shr_${crypto.randomUUID()}`);
@@ -472,8 +475,10 @@ function seedDemoDataIfEmpty(db) {
 
 async function main() {
   const config = loadConfig();
+  const logger = createLogger({ level: config.logLevel, service: config.appName });
+  const metrics = createMetricsRegistry();
   const app = express();
-  registerBaseHttp(app);
+  registerBaseHttp(app, { config, logger, metrics });
 
   const store = config.dbBackend === 'sqlite'
     ? new SQLiteStore(config.sqliteFile, { importJsonFile: config.dataFile })
@@ -484,7 +489,17 @@ async function main() {
   const objectStorage = createObjectStorage({
     backend: config.objectStorageBackend,
     localDir: config.objectStorageDir,
-    publicBasePath: '/api/assets'
+    publicBasePath: '/api/assets',
+    publicBaseUrl: config.objectStoragePublicBaseUrl,
+    s3: {
+      endpoint: config.s3Endpoint,
+      bucket: config.s3Bucket,
+      region: config.s3Region,
+      accessKeyId: config.s3AccessKeyId,
+      secretAccessKey: config.s3SecretAccessKey,
+      sessionToken: config.s3SessionToken,
+      forcePathStyle: config.s3ForcePathStyle
+    }
   });
   await objectStorage.init();
   const jobQueue = await createJobQueueBroker(config);
@@ -531,7 +546,9 @@ async function main() {
     }
   });
 
-  app.use('/api/assets', express.static(config.objectStorageDir));
+  if (objectStorage.backend === 'local') {
+    app.use('/api/assets', express.static(config.objectStorageDir));
+  }
 
   registerStaticAndDocs(app, {
     publicDir: path.join(__dirname, '..', 'public'),
@@ -556,6 +573,10 @@ async function main() {
 
   registerSystemRoutes(app, {
     dbRepo,
+    config,
+    jobQueue,
+    objectStorage,
+    metrics,
     toFolderTree,
     bookmarkStats,
     tagsSummary
@@ -625,13 +646,13 @@ async function main() {
   registerErrorStack(app);
 
   app.listen(config.port, config.host, () => {
-    console.log('[startup]', startupConfigView(config));
-    console.log('[job-queue]', {
+    logger.info('startup', startupConfigView(config));
+    logger.info('job_queue_ready', {
       requested: config.queueBackend,
       active: jobQueue?.backend || 'memory',
       meta: jobQueue?.meta || {}
     });
-    console.log(`Cloud bookmarks listening on http://localhost:${config.port}`);
+    logger.info('server_listening', { url: `http://localhost:${config.port}` });
   });
 }
 

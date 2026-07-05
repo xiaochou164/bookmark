@@ -1,0 +1,374 @@
+:root {
+  --color-canvas: #f3f5f8;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f7f8fa;
+  --color-text: #20242c;
+  --color-text-muted: #687080;
+  --color-border: #e1e5eb;
+  --color-primary: #1769e0;
+  --color-danger: #c9364f;
+  --color-success: #177245;
+  --control-h-sm: 32px;
+  --control-h-md: 36px;
+  --control-h-lg: 40px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --radius-control: 8px;
+  --radius-panel: 12px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select {
+  max-width: 100%;
+  min-width: 0;
+  font: inherit;
+}
+
+button {
+  min-height: var(--control-h-md);
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+button[disabled] {
+  cursor: wait;
+  opacity: .62;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.btn-lite,
+.btn-ghost {
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.btn-primary {
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.btn-accent {
+  color: #fff;
+  background: #4f46e5;
+}
+
+.btn-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 5px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.btn-label {
+  min-width: 0;
+  flex: 1;
+}
+
+.btn-sub {
+  display: block;
+  margin-top: 1px;
+  opacity: .72;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.state-box {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.state-box[data-state="success"] {
+  border-color: #b7e5c8;
+  background: #f1fbf5;
+  color: var(--color-success);
+}
+
+.state-box[data-state="error"] {
+  border-color: #f6c9d1;
+  background: #fff5f6;
+  color: var(--color-danger);
+}
+
+.state-box[data-state="loading"],
+.state-box[data-state="info"] {
+  border-color: #c7dafb;
+  background: #f2f7ff;
+  color: #2459a6;
+}
+
+.muted,
+.small {
+  color: var(--color-text-muted);
+}
+
+.small {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.popup-body {
+  width: 380px;
+  max-height: 580px;
+  overflow: hidden;
+}
+
+.popup-shell {
+  display: grid;
+  max-height: 580px;
+  overflow: hidden;
+}
+
+.popup-header {
+  padding: var(--space-3) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: #fff;
+  background: var(--color-primary);
+}
+
+.popup-logo {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .22);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.popup-header-text strong,
+.popup-header-text small {
+  display: block;
+}
+
+.popup-header-text strong {
+  font-size: 14px;
+}
+
+.popup-header-text small {
+  opacity: .78;
+  font-size: 11px;
+}
+
+.section {
+  padding: var(--space-3) var(--space-4);
+}
+
+.section-title {
+  margin-bottom: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.popup-actions {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.popup-actions .btn {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 44px;
+  text-align: left;
+}
+
+.status-box {
+  display: none;
+  max-height: 176px;
+  overflow: auto;
+}
+
+.status-box.visible {
+  display: grid;
+}
+
+.popup-status-details {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.popup-status-details summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.divider {
+  height: 1px;
+  background: var(--color-border);
+}
+
+.footer {
+  padding: var(--space-2) var(--space-4) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.footer a {
+  color: var(--color-primary);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.options-body {
+  min-width: 320px;
+  padding: var(--space-4);
+}
+
+.options-shell {
+  width: min(900px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.options-section {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface);
+}
+
+.options-section h1,
+.options-section h2 {
+  margin: 0;
+}
+
+.options-section h1 {
+  font-size: 22px;
+}
+
+.options-section h2 {
+  font-size: 16px;
+}
+
+.group {
+  display: grid;
+  gap: 6px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="password"],
+select {
+  width: 100%;
+  min-height: var(--control-h-lg);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.row,
+.token-row,
+.actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: end;
+  flex-wrap: wrap;
+}
+
+.row > div,
+.token-row .group {
+  flex: 1 1 220px;
+}
+
+.actions {
+  align-items: center;
+}
+
+.status-line {
+  min-height: var(--control-h-md);
+}
+
+@media (max-width: 640px) {
+  .options-body {
+    padding: var(--space-2);
+  }
+
+  .row,
+  .token-row,
+  .actions {
+    display: grid;
+  }
+
+  .row > div,
+  .token-row .group,
+  .actions > button {
+    width: 100%;
+  }
+}

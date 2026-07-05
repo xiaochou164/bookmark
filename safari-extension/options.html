@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rainbow Sync 设置</title>
+  <link rel="stylesheet" href="shared.css" />
+</head>
+
+<body class="options-body">
+  <main class="options-shell">
+  <section class="options-section">
+    <h1>Rainbow Sync 设置</h1>
+    <p class="small">配置 Safari 扩展与 Rainbow 服务之间的连接、自动同步和手动同步操作。</p>
+  </section>
+
+  <section class="options-section">
+  <h2>云端连接</h2>
+  <div class="group">
+    <label for="cloudApiBaseUrl">Rainbow 地址</label>
+    <input id="cloudApiBaseUrl" type="text" placeholder="https://bookmark.sundays.ink" />
+  </div>
+  <div class="small">插件通过这个 Rainbow 服务完成 Safari ↔ 云书签 双向同步。默认已指向当前线上 Cloudflare 部署。</div>
+
+  <div class="token-row">
+    <div class="group">
+      <label for="cloudApiToken">Rainbow API Token</label>
+      <input id="cloudApiToken" type="password" placeholder="手动输入或点击自动获取" />
+    </div>
+    <button id="toggleTokenBtn" class="btn btn-lite" type="button">显示 Token</button>
+    <button id="clearTokenBtn" class="btn btn-lite" type="button">清除 Token</button>
+    <button id="autoFetchTokenBtn" class="btn btn-lite" type="button">一键自动识别</button>
+    <button id="testCloudBtn" class="btn btn-lite" type="button">测试连接</button>
+  </div>
+  <div id="msg" class="state-box status-line" data-state="info" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="options-section">
+  <h2>云书签双向同步（Safari ↔ Rainbow）</h2>
+  <div class="small">Safari 有的会写入 Rainbow；Rainbow 有的会推送到 Safari。</div>
+  <div class="row">
+    <div class="group">
+      <label for="rbAutoSyncEnabled">启用自动同步（Safari ↔ Rainbow）</label>
+      <input id="rbAutoSyncEnabled" type="checkbox" />
+    </div>
+    <div class="group">
+      <label for="rbAutoSyncMinutes">同步间隔（分钟）</label>
+      <input id="rbAutoSyncMinutes" type="number" min="5" value="30" />
+    </div>
+  </div>
+  <div class="actions">
+    <button id="rbSyncNowBtn" class="btn btn-lite" type="button">立即同步 Safari ↔ 云书签</button>
+    <button id="rbPreviewNowBtn" class="btn btn-lite" type="button">预览变更（不写入）</button>
+  </div>
+  <div id="rbSyncMsg" class="state-box status-line" data-state="info" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="options-section">
+  <div class="actions">
+    <button id="saveBtn" class="btn">保存设置</button>
+  </div>
+  </section>
+  </main>
+
+  <script src="options.js"></script>
+</body>
+
+</html>

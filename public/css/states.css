@@ -1,0 +1,68 @@
+/*
+ * Shared loading, empty, fallback, and error state blocks.
+ */
+
+.state-block {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
+}
+
+.state-block[data-state="error"] {
+  border-color: #fecdd3;
+  background: #fff7f8;
+}
+
+.state-block[data-state="loading"] {
+  border-style: solid;
+}
+
+.state-block-compact {
+  padding: var(--space-3);
+}
+
+.state-block-eyebrow {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.state-block-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.state-block-message {
+  overflow-wrap: anywhere;
+}
+
+.state-block-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+#emptyDetail.state-block {
+  margin-bottom: var(--space-3);
+}
+
+#previewError.state-block {
+  margin: var(--space-2) 0;
+}
+
+.preview-surface .state-block.preview-pane {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.preview-surface .state-block.preview-pane.hidden {
+  display: none;
+}

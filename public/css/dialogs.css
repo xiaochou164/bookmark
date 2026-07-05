@@ -1,0 +1,14 @@
+.dialog-form{grid-template-rows:auto minmax(0,1fr) auto;width:min(720px,calc(100vw - 24px));max-height:min(760px,calc(100dvh - 24px))}
+
+.auth-dialog-shell{width:min(1040px,calc(100vw - 24px))}
+
+.auth-dialog-shell .auth-grid{width:auto}
+
+.dialog-header,.dialog-body,.dialog-footer{min-width:0}
+
+.action-dialog-shell .action-dialog-body:not(:has(>:not(.hidden))){display:none}
+.action-dialog-shell .dialog-footer{position:static;margin:0;padding:10px 0 0}
+
+.dialog-body{overscroll-behavior:contain}
+
+.dialog-footer{position:sticky;bottom:0;z-index:1;margin-inline:-16px;margin-bottom:-16px;padding:10px 16px 16px;background:color-mix(in srgb,var(--color-surface) 96%,transparent)}

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>同步插件 - Rainboard 云书签</title>
+    <title>同步插件 - Rainbow 云书签</title>
     <meta name="theme-color" content="#1194ff" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="shortcut icon" href="/favicon.svg" />
@@ -18,7 +18,7 @@
                 <div class="brand">
                     <div class="brand-dot"></div>
                     <div>
-                        <strong>Rainboard</strong>
+                        <strong>Rainbow</strong>
                         <small>同步插件</small>
                     </div>
                 </div>
@@ -36,6 +36,7 @@
             <div class="settings-nav-block">
                 <div class="settings-nav-title">操作</div>
                 <button type="button" class="ghost" id="pluginRefreshAllBtn">刷新全部</button>
+                <div id="pluginLastUpdated" class="muted settings-nav-meta">尚未刷新</div>
             </div>
 
             <a class="settings-back-link" href="/">返回主界面</a>
@@ -45,14 +46,11 @@
             <div class="settings-page-header">
                 <div class="settings-page-header-main">
                     <h1>云书签同步</h1>
-                    <p class="muted">查看 Chrome ↔ Rainboard 云书签同步说明、设备状态与健康信息。</p>
-                </div>
-                <div class="settings-page-header-actions">
-                    <a class="ghost button-link" href="/">返回主界面</a>
+                    <p class="muted">查看 Chrome ↔ Rainbow 云书签同步说明、设备状态与健康信息。</p>
                 </div>
             </div>
 
-            <div id="pluginPageStatus" class="settings-status-banner muted">正在加载插件配置...</div>
+            <div id="pluginPageStatus" class="settings-status-banner muted" role="status" aria-live="polite">正在加载插件配置...</div>
 
             <div class="settings-sections">
 
@@ -60,8 +58,8 @@
                 <section id="pluginSectionRun" class="settings-section" data-plugin-section="run">
                     <div class="settings-section-head">
                         <div>
-                            <h2>Chrome ↔ Rainboard</h2>
-                            <p class="muted">当前服务端页面仅展示 Chrome ↔ Rainboard 云书签同步说明与云端书签数据。</p>
+                            <h2>Chrome ↔ Rainbow</h2>
+                            <p class="muted">当前服务端页面仅展示 Chrome ↔ Rainbow 云书签同步说明与云端书签数据。</p>
                         </div>
                     </div>
                     <div class="settings-section-grid">
@@ -69,21 +67,21 @@
                             <h3>Chrome 书签 ↔ 云书签 DB</h3>
                             <p class="muted">将当前页面服务器上的书签与 Chrome 书签进行双向同步。需通过 Chrome 插件触发，或使用下方按钮获取同步状态。</p>
                             <div class="settings-form">
-                                <label>云书签 Rainboard 书签总览</label>
+                                <label>云书签 Rainbow 书签总览</label>
                                 <div class="settings-actions">
                                     <button type="button" id="loadDbBookmarksBtn">刷新云端书签列表</button>
                                 </div>
                             </div>
                             <div id="dbBookmarksSummary" class="plugin-db-summary"></div>
-                            <pre id="dbBookmarksOutput" class="plugin-db-output"></pre>
+                            <div id="dbBookmarksOutput" class="plugin-data-list" role="status" aria-live="polite"></div>
                             <div class="plugin-sync-note">
                                 <p class="muted plugin-sync-note-text">💡 提示：点击 Chrome 插件弹窗中的「云书签双向同步」按钮，即可将 Chrome
-                                    书签 ↔ Rainboard 云书签进行同步。</p>
+                                    书签 ↔ Rainbow 云书签进行同步。</p>
                                 <div class="plugin-sync-logic">
                                     同步逻辑：
                                     <ul class="plugin-sync-logic-list">
-                                        <li>Chrome 有 → Rainboard DB 没有：<strong>将 Chrome 书签添加到 Rainboard</strong></li>
-                                        <li>Rainboard DB 有 → Chrome 没有：<strong>将 Rainboard 书签添加到 Chrome</strong></li>
+                                        <li>Chrome 有 → Rainbow DB 没有：<strong>将 Chrome 书签添加到 Rainbow</strong></li>
+                                        <li>Rainbow DB 有 → Chrome 没有：<strong>将 Rainbow 书签添加到 Chrome</strong></li>
                                         <li>两侧都有：<strong>跳过（幂等）</strong></li>
                                     </ul>
                                 </div>
@@ -105,7 +103,11 @@
                             <div class="settings-actions">
                                 <button type="button" class="ghost" id="pluginDevicesBtn">刷新设备</button>
                             </div>
-                            <pre id="pluginDevices"></pre>
+                            <div id="pluginDevices" class="plugin-data-list" role="status" aria-live="polite"></div>
+                            <details class="plugin-raw-details">
+                                <summary>查看原始设备数据</summary>
+                                <pre id="pluginDevicesRaw"></pre>
+                            </details>
                         </section>
                     </div>
                 </section>
@@ -123,7 +125,11 @@
                             <div class="settings-actions">
                                 <button type="button" class="ghost" id="pluginHealthBtn">刷新健康</button>
                             </div>
-                            <pre id="pluginHealth"></pre>
+                            <div id="pluginHealth" class="plugin-health-grid" role="status" aria-live="polite"></div>
+                            <details class="plugin-raw-details">
+                                <summary>查看原始健康数据</summary>
+                                <pre id="pluginHealthRaw"></pre>
+                            </details>
                         </section>
                     </div>
                 </section>

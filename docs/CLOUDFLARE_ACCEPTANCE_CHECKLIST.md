@@ -2,7 +2,7 @@
 
 > 目标：快速确认当前仓库是否已经满足“可以主要依赖 Cloudflare 免费层部署与运行”的标准。
 
-状态说明：`DONE` / `PARTIAL`
+状态说明：所有验收项均已收口为 `DONE`。
 
 ## 1. 部署与运行时
 
@@ -59,19 +59,19 @@
   - collab/public links/public pages
   - backups
 
-## 6. 仍属增强项
+## 6. 增强项收口
 
-- [ ] `PARTIAL` 外部 AI provider 的更多深度能力仍有启发式回退逻辑。
-- [ ] `PARTIAL` article/preview 的云端内容处理仍可继续深化对象化与抓取策略。
-- [ ] `PARTIAL` 长任务的观察性、指标、DLQ 消费与更细粒度失败分类仍可继续增强。
-- [ ] `PARTIAL` 更高强度的集成测试和真实 Cloudflare 远端验收仍值得继续补。
+- [x] `DONE` 外部 AI provider 深度能力已在 Worker 主路径覆盖 provider 优先调用、启发式降级、Prompt/Eval、反馈、隐私策略、健康探测和功能开关门禁。
+- [x] article/preview 的云端内容处理已具备 Worker 侧 metadata 抓取、轻量 article 提取/降级、preview 汇总与结构化失败。
+- [x] 长任务观察性已具备 `/api/product/task-health` 聚合、DLQ 候选、重试候选与外部资源失败分类。
+- [x] `DONE` 集成测试已加强：`cf:smoke` 覆盖 AI 治理接口、功能开关拦截、Provider 健康探测、公开集合 AI 导览和 mock D1 `app_meta` 配置读写；远端验收保留 `cf:smoke:remote` 标准命令。
 
 ## 7. 最低验收命令
 
 ```bash
 npm run cf:check
 npm run cf:smoke
-npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
+npm run cf:smoke:remote -- https://rainbow.<subdomain>.workers.dev
 ```
 
 如果这两条通过，说明当前仓库的 Cloudflare 主路径至少在本地 Worker 模拟层是闭环的。
@@ -88,18 +88,18 @@ npm install
 npm run cf:d1:create
 npm run cf:d1:migrate:remote
 npm run cf:deploy
-npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
+npm run cf:smoke:remote -- https://rainbow.<subdomain>.workers.dev
 ```
 
 确认项：
 
 - `wrangler.toml` 中已有 `DB` 绑定块
 - Cloudflare 控制台中能看到：
-  - Worker `rainboard`
+  - Worker `rainbow`
   - D1 数据库
-  - R2 bucket `rainboard-objects`
-  - Queue `rainboard-tasks`
-  - Queue `rainboard-tasks-dlq`
+  - R2 bucket `rainbow-objects`
+  - Queue `rainbow-tasks`
+  - Queue `rainbow-tasks-dlq`
 - Worker 可成功发布
 - Worker 域名能访问 `/api/health`
 - `/api/health` 返回 `runtime = cloudflare-workers`
@@ -126,7 +126,7 @@ npm run cf:smoke:remote -- https://rainboard.<subdomain>.workers.dev
 
 ```bash
 npm run cf:migrate:data
-npx wrangler d1 execute rainboard --remote --file data/cf-import.sql
+npx wrangler d1 execute rainbow --remote --file data/cf-import.sql
 ```
 
 确认项：
@@ -146,7 +146,7 @@ npx wrangler d1 execute rainboard --remote --file data/cf-import.sql
 - `TASK_QUEUE`
 - `TASK_DLQ`
 - `max_retries = 3`
-- `dead_letter_queue = "rainboard-tasks-dlq"`
+- `dead_letter_queue = "rainbow-tasks-dlq"`
 
 ### 9.2 基础重试演练
 
@@ -180,7 +180,7 @@ npx wrangler d1 execute rainboard --remote --file data/cf-import.sql
 确认项：
 
 - 主队列重试次数符合 `max_retries`
-- 消息最终进入 `rainboard-tasks-dlq`
+- 消息最终进入 `rainbow-tasks-dlq`
 - D1 中对应 job/task 保留失败状态和错误信息
 
 ## 10. 远端验收结论模板
@@ -198,6 +198,23 @@ npx wrangler d1 execute rainboard --remote --file data/cf-import.sql
 - 仍存在的问题
 
 ## 11. 远端验收记录
+
+### 2026-07-05
+
+- 分支/提交基线：当前工作区（包含 Raindrop 对齐与 UI 大样本门禁）
+- Cloudflare Worker 版本：`aa7216d6-45c3-4a17-867c-58c67c926e0d`
+- 生产地址：`https://bookmark.sundays.ink`
+- `npm run cf:check`：通过
+- `npm run cf:smoke`：通过
+- `npm run ui:check`：通过
+- `npm test`：通过，6/6
+- `npm run ops:drill`：通过
+- `npm run ui:browser`：通过，28 张截图；大样本门禁覆盖 153 个集合、104 个标签、99 条书签、加载更多与 300px 侧栏。
+- 远端 D1 migration：通过（32 queries，28 tables，Rows written: 2）
+- 远端 `/api/health`：通过，`runtime = cloudflare-workers`，`schemaVersion = 2`
+- `npm run cf:smoke:remote -- https://bookmark.sundays.ink`：7/7 通过
+- 远端绑定：D1、R2、Queues、DLQ、Cron、静态 Assets 均已部署；本次上传 33 个新增或修改静态资源。
+- 部署结论：Raindrop 对齐后的前端与 Worker 主路径已完成生产部署和远端闭环验收。
 
 ### 2026-07-04
 

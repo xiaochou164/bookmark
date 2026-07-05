@@ -1,13 +1,13 @@
-# Cloudflare Workers 迁移 TODO
+# Cloudflare Workers 迁移收口清单
 
 > 目标：先提供可部署到 Cloudflare Workers 的“最小可用版本（MVP）”，再逐步迁移现有 Express + 本地文件能力。
 
-状态说明：`TODO` / `DOING` / `DONE` / `BLOCKED`
+状态说明：所有迁移条目均已完成并标记为 `[x]`。
 
 ## Phase 1：运行时与部署骨架
 
 - [x] `CFW-001` 新增 `wrangler.toml`，配置 Worker 入口、静态资源目录与兼容日期。
-- [x] `CFW-002` 新增 `src/worker.js`，实现 Fetch 入口与统一 JSON 响应工具。
+- [x] `CFW-002` 新增 `src/worker.mjs`，实现 Fetch 入口与统一 JSON 响应工具。
 - [x] `CFW-003` 将 `public/` 作为静态资源输出目录（通过 Workers assets 直出）。
 - [x] `CFW-004` 提供 `/api/health` 与 `/api/state` 的 Worker 版本健康检查接口。
 
@@ -33,10 +33,10 @@
 
 - [x] `CFW-301` 逐步迁移 `folders/bookmarks/tags` 基础 CRUD API。
 - [x] `CFW-302` 迁移 `auth` 与权限中间件逻辑。
-- [ ] `CFW-303` 迁移 metadata/article/preview 等内容能力（当前保留接口，复杂抓取仍需继续云端化）。
+- [x] `CFW-303` 迁移 metadata/article/preview 等内容能力（Worker 内置 metadata 抓取、轻量 article 提取/降级、preview 汇总与结构化失败）。
 - [x] `CFW-304` 迁移插件与同步任务能力（拆分为异步消费者）。
 - [x] `CFW-305` 将 AI / 扫描 / 恢复类长任务迁移到 Queue + Consumer + Cron 补偿模型。
-- [ ] `CFW-306` 为关键长任务补齐更完整的集成测试与失败治理（DLQ / 观察性 / 外部资源失败细分）。
+- [x] `CFW-306` 为关键长任务补齐更完整的集成测试与失败治理（DLQ 候选、任务健康聚合、外部资源失败细分与 smoke 覆盖）。
 
 ## 本次实施范围
 

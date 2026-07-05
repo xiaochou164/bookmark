@@ -1,4 +1,4 @@
-name = "rainboard"
+name = "rainbow"
 main = "src/worker.mjs"
 compatibility_date = "2026-02-26"
 workers_dev = true
@@ -14,23 +14,23 @@ run_worker_first = true
 
 [[r2_buckets]]
 binding = "OBJECTS"
-bucket_name = "rainboard-objects"
-preview_bucket_name = "rainboard-objects-preview"
+bucket_name = "rainbow-objects"
+preview_bucket_name = "rainbow-objects-preview"
 
 [[queues.producers]]
 binding = "TASK_QUEUE"
-queue = "rainboard-tasks"
+queue = "rainbow-tasks"
 
 [[queues.producers]]
 binding = "TASK_DLQ"
-queue = "rainboard-tasks-dlq"
+queue = "rainbow-tasks-dlq"
 
 [[queues.consumers]]
-queue = "rainboard-tasks"
+queue = "rainbow-tasks"
 max_batch_size = 10
 max_batch_timeout = 5
 max_retries = 3
-dead_letter_queue = "rainboard-tasks-dlq"
+dead_letter_queue = "rainbow-tasks-dlq"
 
 [triggers]
 crons = ["*/15 * * * *"]
@@ -39,10 +39,10 @@ crons = ["*/15 * * * *"]
 # 下方保留的是注释模板；脚本会在文件末尾追加或更新可用配置块
 # [[d1_databases]]
 # binding = "DB"
-# database_name = "rainboard"
+# database_name = "rainbow"
 # database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "rainboard"
+database_name = "rainbow"
 database_id = "ace7a94b-abff-4ee7-9894-630b3c0d6df8"

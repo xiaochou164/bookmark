@@ -26,7 +26,9 @@ export const {
   generateBookmarksQaAnswer,
   buildAiJobRecord,
   normalizeTagList,
-  normalizeAiProviderConfigInput
+  normalizeAiProviderConfigInput,
+  sanitizeAiModelInput,
+  sanitizeAiPrompt
 } = aiProviderService;
 
 export default aiProviderService;

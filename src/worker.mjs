@@ -19,7 +19,8 @@ import {
   generateRelatedBookmarksRecommendations,
   generateReadingPriorityRecommendations,
   generateBookmarksQaAnswer,
-  generateBookmarkFolderRecommendation
+  generateBookmarkFolderRecommendation,
+  sanitizeAiModelInput
 } from './services/aiProviderService.mjs';
 
 const JSON_HEADERS = {
@@ -263,6 +264,160 @@ function makeAiJobRecord({
     request: request && typeof request === 'object' ? request : {},
     result,
     error: error ? { message: String(error.message || error) } : null
+  };
+}
+
+const DEFAULT_AI_EVAL_SAMPLES = Object.freeze([
+  {
+    id: 'eval_autotag_ai_article',
+    task: 'bookmark.autotag',
+    input: { title: 'OpenAI API structured outputs guide', url: 'https://platform.openai.com/docs/guides/structured-outputs' },
+    expected: { tags: ['AI', 'OpenAI', 'API'], keywords: ['structured', 'json'] }
+  },
+  {
+    id: 'eval_summary_product',
+    task: 'bookmark.summary',
+    input: { title: 'Rainbow product roadmap', note: 'product planning and release priorities' },
+    expected: { tags: ['产品', '路线图'], keywords: ['规划', '优先级', '发布'] }
+  },
+  {
+    id: 'eval_classify_design',
+    task: 'bookmark.classify',
+    input: { title: 'Design system accessibility checklist', note: 'contrast, focus, keyboard navigation' },
+    expected: { tags: ['设计系统', '可访问性'], keywords: ['contrast', 'keyboard', 'focus'] }
+  }
+]);
+
+const DEFAULT_AI_PRIVACY_POLICY = Object.freeze({
+  anonymize: true,
+  stripFields: ['apiKey', 'apiToken', 'password', 'rawHtml', 'cookies'],
+  maxPromptChars: 12_000,
+  redactPatterns: ['email', 'phone', 'token']
+});
+
+const DEFAULT_AI_FEATURE_POLICY = Object.freeze({
+  enabled: true,
+  role: 'owner',
+  capabilities: {
+    autoTag: true,
+    summarize: true,
+    qa: true,
+    search: true,
+    rules: true,
+    bulkTasks: true
+  }
+});
+
+function aiEvalScore(expected = {}, actual = {}) {
+  const expectedTokens = wordsFromText([
+    ...(Array.isArray(expected.tags) ? expected.tags : []),
+    ...(Array.isArray(expected.keywords) ? expected.keywords : [])
+  ].join(' '));
+  const actualTokens = new Set(wordsFromText(JSON.stringify(actual || {})));
+  if (!expectedTokens.length) return 1;
+  const matched = expectedTokens.filter((token) => actualTokens.has(token)).length;
+  return Number((matched / expectedTokens.length).toFixed(4));
+}
+
+function buildAiEvalRun(userId, candidates = []) {
+  const candidateBySampleId = new Map((Array.isArray(candidates) ? candidates : []).map((item) => [String(item.sampleId || item.id || ''), item]));
+  const rows = DEFAULT_AI_EVAL_SAMPLES.map((sample) => {
+    const candidate = candidateBySampleId.get(sample.id) || {};
+    const actual = candidate.output || candidate.result || inferSuggestedTags(sample.input || {});
+    const score = aiEvalScore(sample.expected, actual);
+    return { sampleId: sample.id, task: sample.task, score, passed: score >= 0.5, expected: sample.expected, actual };
+  });
+  const avgScore = rows.length ? rows.reduce((sum, row) => sum + Number(row.score || 0), 0) / rows.length : 0;
+  return {
+    id: `ai_eval_${crypto.randomUUID()}`,
+    userId: String(userId || ''),
+    createdAt: Date.now(),
+    sampleCount: rows.length,
+    passed: rows.filter((row) => row.passed).length,
+    failed: rows.filter((row) => !row.passed).length,
+    avgScore: Number(avgScore.toFixed(4)),
+    rows
+  };
+}
+
+function normalizeAiFeaturePolicy(raw = {}) {
+  return {
+    ...DEFAULT_AI_FEATURE_POLICY,
+    ...(raw && typeof raw === 'object' ? raw : {}),
+    capabilities: {
+      ...DEFAULT_AI_FEATURE_POLICY.capabilities,
+      ...(raw?.capabilities && typeof raw.capabilities === 'object' ? raw.capabilities : {})
+    }
+  };
+}
+
+function aiFeedbackSummary(items = []) {
+  const counts = {};
+  for (const item of items) {
+    const action = String(item.action || 'unknown');
+    counts[action] = (counts[action] || 0) + 1;
+  }
+  const ratings = items.map((item) => Number(item.rating || 0)).filter((n) => Number.isFinite(n) && n > 0);
+  return {
+    total: items.length,
+    counts,
+    avgRating: ratings.length ? Number((ratings.reduce((sum, n) => sum + n, 0) / ratings.length).toFixed(2)) : 0
+  };
+}
+
+function buildAiProviderHealth(jobs = [], checks = []) {
+  const failures = jobs.filter((job) => String(job.status || '') === 'failed');
+  const durations = jobs
+    .map((job) => Number(job.finishedAt || 0) - Number(job.createdAt || job.startedAt || 0))
+    .filter((n) => Number.isFinite(n) && n >= 0);
+  const lastCheck = checks[0] || null;
+  return {
+    availability: jobs.length ? Number(((jobs.length - failures.length) / jobs.length).toFixed(4)) : (lastCheck?.ok ? 1 : 0),
+    avgLatencyMs: durations.length ? Math.round(durations.reduce((sum, n) => sum + n, 0) / durations.length) : Number(lastCheck?.latencyMs || 0) || 0,
+    recentFailures: failures.slice(0, 5).map((job) => ({ id: job.id, type: job.type, message: job.error?.message || '', createdAt: job.createdAt })),
+    lastCheck,
+    checks: checks.slice(0, 20),
+    jobsSampled: jobs.length
+  };
+}
+
+function aiCapabilityForPath(path = '') {
+  const p = String(path || '');
+  if (/\/(?:batch|backfill)\//.test(p)) return 'bulkTasks';
+  if (/\/rules\//.test(p)) return 'rules';
+  if (/\/qa(?:[/?]|$)/.test(p)) return 'qa';
+  if (/\/(?:search-to-filters|dedupe|related|reading-priority)/.test(p)) return 'search';
+  if (/\/(?:summary|reader-summary|folder-summary|digest|highlight)/.test(p)) return 'summarize';
+  if (/\/(?:suggest|autotag|title-clean|folder-recommend|tags\/)/.test(p)) return 'autoTag';
+  return '';
+}
+
+function isAiGovernancePath(path = '') {
+  return /\/api\/product\/ai\/(?:config|evals|feedback|privacy-policy|feature-policy|health)(?:[/?]|$)/.test(String(path || ''));
+}
+
+function buildPublicAiGuide(link = {}, folder = {}, bookmarks = []) {
+  const counts = new Map();
+  for (const item of bookmarks) {
+    for (const tag of Array.isArray(item.tags) ? item.tags : []) {
+      const key = String(tag || '').trim();
+      if (!key) continue;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  const tags = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 10)
+    .map(([tag, count]) => ({ tag, count }));
+  const sample = bookmarks.slice(0, 5).map((item) => item.title).filter(Boolean);
+  return {
+    summary: link.description || (sample.length ? `这个集合收录了 ${sample.join('、')} 等内容。` : '这个集合还在整理中。'),
+    tags,
+    faq: [
+      { q: '这个集合适合先看什么？', a: sample[0] ? `可以先从「${sample[0]}」开始。` : '暂无推荐入口。' },
+      { q: '主要主题是什么？', a: tags.length ? tags.slice(0, 5).map((x) => `#${x.tag}`).join('、') : '暂无明显主题标签。' }
+    ],
+    recommendations: bookmarks.slice(0, 3).map((item) => ({ id: item.id, title: item.title, url: item.url }))
   };
 }
 
@@ -2002,13 +2157,40 @@ function createRepo(env) {
         bookmarkId,
         limit
       );
+      return rows.map((row) => {
+        const result = safeJsonParse(row.resultJson, null);
+        return {
+          id: String(row.id || ''),
+          bookmarkId,
+          status: String(row.status || ''),
+          payload: safeJsonParse(row.payloadJson, {}),
+          result,
+          error: row.errorText ? { message: String(row.errorText), failure: result?.failure || null } : null,
+          createdAt: Number(row.createdAt || 0),
+          updatedAt: Number(row.updatedAt || 0)
+        };
+      });
+    },
+
+    async listMetadataTasksForUser(userId, limit = 50) {
+      const rows = await allResults(
+        db.prepare(`
+          SELECT id, bookmark_id as bookmarkId, status, payload_json as payloadJson, result_json as resultJson, error_text as errorText, created_at as createdAt, updated_at as updatedAt
+          FROM metadata_tasks
+          WHERE user_id = ?1
+          ORDER BY created_at DESC
+          LIMIT ?2
+        `),
+        userId,
+        Math.max(1, Math.min(200, Number(limit || 50) || 50))
+      );
       return rows.map((row) => ({
         id: String(row.id || ''),
-        bookmarkId,
+        bookmarkId: String(row.bookmarkId || ''),
         status: String(row.status || ''),
         payload: safeJsonParse(row.payloadJson, {}),
         result: safeJsonParse(row.resultJson, null),
-        error: row.errorText ? { message: String(row.errorText) } : null,
+        error: row.errorText ? { message: String(row.errorText), failure: safeJsonParse(row.resultJson, null)?.failure || null } : null,
         createdAt: Number(row.createdAt || 0),
         updatedAt: Number(row.updatedAt || 0)
       }));
@@ -2025,13 +2207,14 @@ function createRepo(env) {
         taskId
       );
       if (!row) return null;
+      const result = safeJsonParse(row.resultJson, null);
       return {
         id: String(row.id || ''),
         bookmarkId: String(row.bookmarkId || ''),
         status: String(row.status || ''),
         payload: safeJsonParse(row.payloadJson, {}),
-        result: safeJsonParse(row.resultJson, null),
-        error: row.errorText ? { message: String(row.errorText) } : null,
+        result,
+        error: row.errorText ? { message: String(row.errorText), failure: result?.failure || null } : null,
         createdAt: Number(row.createdAt || 0),
         updatedAt: Number(row.updatedAt || 0)
       };
@@ -2454,6 +2637,26 @@ function createRepo(env) {
       return payload || {};
     },
 
+    async getUserMeta(userId, key, fallback = null) {
+      const row = await firstResult(db.prepare(`SELECT value_text as valueText FROM app_meta WHERE meta_key = ?1`), `${key}:${userId}`);
+      return row ? safeJsonParse(row.valueText, fallback) : fallback;
+    },
+
+    async setUserMeta(userId, key, value) {
+      const now = Date.now();
+      await runStatement(
+        db.prepare(`
+          INSERT INTO app_meta(meta_key, value_text, updated_at)
+          VALUES (?1, ?2, ?3)
+          ON CONFLICT(meta_key) DO UPDATE SET value_text = excluded.value_text, updated_at = excluded.updated_at
+        `),
+        `${key}:${userId}`,
+        JSON.stringify(value),
+        now
+      );
+      return value;
+    },
+
     async createAiBatchTask(userId, payload) {
       const now = Date.now();
       const task = {
@@ -2857,9 +3060,55 @@ function toAbsoluteUrl(baseUrl, maybeUrl) {
   }
 }
 
+function workerError(message, { code = 'WORKER_ERROR', category = 'internal', retryable = false, httpStatus = 0 } = {}) {
+  const err = new Error(String(message || code));
+  err.code = code;
+  err.category = category;
+  err.retryable = Boolean(retryable);
+  err.httpStatus = Number(httpStatus || 0) || 0;
+  return err;
+}
+
+function classifyExternalError(error, { prefix = 'EXTERNAL_FETCH' } = {}) {
+  const message = String(error?.message || error || 'external fetch failed');
+  const httpStatus = Number(error?.httpStatus || 0) || 0;
+  const code = String(error?.code || '').trim();
+  if (code) {
+    return {
+      code,
+      category: String(error?.category || 'external_fetch'),
+      retryable: Boolean(error?.retryable),
+      httpStatus,
+      message
+    };
+  }
+  if (error?.name === 'AbortError' || /abort|timeout/i.test(message)) {
+    return { code: `${prefix}_TIMEOUT`, category: 'timeout', retryable: true, httpStatus: 0, message };
+  }
+  if (httpStatus >= 500) return { code: `${prefix}_HTTP_${httpStatus}`, category: 'http_5xx', retryable: true, httpStatus, message };
+  if (httpStatus >= 400) return { code: `${prefix}_HTTP_${httpStatus}`, category: 'http_4xx', retryable: false, httpStatus, message };
+  if (/dns|enotfound|getaddrinfo/i.test(message)) {
+    return { code: `${prefix}_DNS`, category: 'dns', retryable: true, httpStatus: 0, message };
+  }
+  return { code: `${prefix}_NETWORK`, category: 'network', retryable: true, httpStatus: 0, message };
+}
+
+function failurePayload(error, { prefix = 'EXTERNAL_FETCH' } = {}) {
+  return classifyExternalError(error, { prefix });
+}
+
 async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
   const url = String(targetUrl || '').trim();
-  if (!url) throw new Error('url is required');
+  if (!url) throw workerError('url is required', { code: 'METADATA_URL_REQUIRED', category: 'validation' });
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw workerError('metadata url is invalid', { code: 'METADATA_URL_INVALID', category: 'validation' });
+  }
+  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+    throw workerError('metadata url protocol is unsupported', { code: 'METADATA_URL_PROTOCOL', category: 'validation' });
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
   let res;
@@ -2869,14 +3118,24 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'RainboardBot/worker (+metadata-fetcher)',
+        'User-Agent': 'RainbowBot/worker (+metadata-fetcher)',
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       }
     });
+  } catch (error) {
+    const failure = classifyExternalError(error, { prefix: 'METADATA_FETCH' });
+    throw workerError(failure.message, failure);
   } finally {
     clearTimeout(timer);
   }
-  if (!res.ok) throw new Error(`metadata fetch failed: HTTP ${res.status}`);
+  if (!res.ok) {
+    throw workerError(`metadata fetch failed: HTTP ${res.status}`, {
+      code: `METADATA_FETCH_HTTP_${res.status}`,
+      category: Number(res.status) >= 500 ? 'http_5xx' : 'http_4xx',
+      retryable: Number(res.status) >= 500,
+      httpStatus: Number(res.status || 0)
+    });
+  }
   const html = await res.text();
   const finalUrl = res.url || url;
   const ogTitle = extractMetaContent(html, { property: 'og:title' });
@@ -2894,6 +3153,7 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
     status: 'success',
     sourceUrl: url,
     finalUrl,
+    provider: { providerType: 'cloudflare-worker', model: 'metadata-html-v1' },
     httpStatus: Number(res.status || 0),
     contentType: String(res.headers.get('content-type') || ''),
     title: ogTitle || extractTitle(html),
@@ -2905,6 +3165,66 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
     frameRestricted: (res.headers.get('x-frame-options') || '').toUpperCase() === 'DENY'
       || (res.headers.get('x-frame-options') || '').toUpperCase() === 'SAMEORIGIN'
       || (res.headers.get('content-security-policy') || '').toLowerCase().includes('frame-ancestors')
+  };
+}
+
+function extractArticleTextFromHtml(html) {
+  const source = String(html || '')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ');
+  const articleMatch = source.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+  const mainMatch = source.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
+  const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
+  const picked = articleMatch?.[1] || mainMatch?.[1] || bodyMatch?.[1] || source;
+  return decodeEntities(stripTags(picked)).replace(/\s+/g, ' ').trim();
+}
+
+async function fetchBookmarkArticle(targetUrl, { timeoutMs = 10_000 } = {}) {
+  const metadata = await fetchBookmarkMetadata(targetUrl, { timeoutMs });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
+  let res;
+  try {
+    res = await fetch(metadata.finalUrl || targetUrl, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'RainbowBot/worker (+article-extractor)',
+        Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'
+      }
+    });
+  } catch (error) {
+    const failure = classifyExternalError(error, { prefix: 'ARTICLE_FETCH' });
+    throw workerError(failure.message, failure);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) {
+    throw workerError(`article fetch failed: HTTP ${res.status}`, {
+      code: `ARTICLE_FETCH_HTTP_${res.status}`,
+      category: Number(res.status) >= 500 ? 'http_5xx' : 'http_4xx',
+      retryable: Number(res.status) >= 500,
+      httpStatus: Number(res.status || 0)
+    });
+  }
+  const html = await res.text();
+  const textContent = extractArticleTextFromHtml(html);
+  return {
+    status: 'success',
+    title: metadata.title || extractTitle(html),
+    extractedAt: Date.now(),
+    siteName: metadata.siteName || '',
+    excerpt: (metadata.description || textContent).slice(0, 320),
+    contentType: String(res.headers.get('content-type') || metadata.contentType || 'text/html'),
+    textContent: textContent.slice(0, 30000),
+    textLength: textContent.length,
+    readerHtmlUrl: metadata.finalUrl || targetUrl,
+    articleJsonUrl: '',
+    sourceHtmlUrl: metadata.finalUrl || targetUrl,
+    provider: { providerType: 'cloudflare-worker', model: 'article-html-v1' },
+    metadata
   };
 }
 
@@ -3135,10 +3455,10 @@ function normalizeChromeSyncMirrorIndex(input = {}) {
   const out = {};
   if (!input || typeof input !== 'object') return out;
   for (const [key, raw] of Object.entries(input)) {
-    const rainboardId = String(raw?.rainboardId || key || '').trim();
-    if (!rainboardId) continue;
-    out[rainboardId] = {
-      rainboardId,
+    const rainbowId = String(raw?.rainbowId || key || '').trim();
+    if (!rainbowId) continue;
+    out[rainbowId] = {
+      rainbowId,
       chromeId: String(raw?.chromeId || ''),
       url: String(raw?.url || ''),
       normalizedUrl: String(raw?.normalizedUrl || normalizeChromeSyncUrl(raw?.url) || ''),
@@ -3604,11 +3924,105 @@ async function processMetadataTask(env, message) {
       result: metadata
     });
   } catch (error) {
+    const failure = failurePayload(error, { prefix: 'METADATA_FETCH' });
     await repo.updateMetadataTask(task.id, {
       status: 'failed',
-      error: String(error?.message || error)
+      error: failure.message,
+      result: { failure }
     });
   }
+}
+
+function summarizeTaskHealth(tasks = []) {
+  const counts = {};
+  for (const task of tasks) {
+    const status = String(task?.status || 'unknown');
+    counts[status] = (counts[status] || 0) + 1;
+  }
+  const failures = tasks
+    .filter((task) => ['failed', 'partial'].includes(String(task?.status || '')))
+    .map((task) => {
+      const failure = task?.error?.failure || task?.result?.failure || task?.failure || null;
+      return {
+        id: String(task?.id || ''),
+        status: String(task?.status || ''),
+        type: String(task?.type || task?.kind || ''),
+        bookmarkId: String(task?.bookmarkId || ''),
+        updatedAt: Number(task?.updatedAt || task?.finishedAt || task?.createdAt || 0) || 0,
+        error: String(task?.error?.message || task?.error || failure?.message || ''),
+        failure,
+        retryable: failure ? Boolean(failure.retryable) : true
+      };
+    })
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  return {
+    counts,
+    failures: failures.slice(0, 10),
+    dlqCandidates: failures.filter((item) => item.retryable === false).slice(0, 10),
+    retryableFailures: failures.filter((item) => item.retryable !== false).length
+  };
+}
+
+function summarizeRealtimeTasks(tasks = []) {
+  const list = Array.isArray(tasks) ? tasks : [];
+  const counts = {};
+  let latestUpdatedAt = 0;
+  let active = 0;
+  for (const task of list) {
+    const status = String(task?.status || 'unknown');
+    counts[status] = (counts[status] || 0) + 1;
+    if (['queued', 'running', 'processing'].includes(status)) active += 1;
+    latestUpdatedAt = Math.max(
+      latestUpdatedAt,
+      Number(task?.updatedAt || task?.finishedAt || task?.completedAt || task?.startedAt || task?.createdAt || 0) || 0
+    );
+  }
+  return { total: list.length, counts, active, latestUpdatedAt };
+}
+
+async function buildRealtimeSnapshot(repo, userId) {
+  const limit = 100;
+  const [metadataTasks, ioTasks, pluginTasks, aiJobs, aiBackfillTasks, bookmarks] = await Promise.all([
+    repo.listMetadataTasksForUser(userId, limit),
+    repo.listIoTasks(userId, limit),
+    repo.listPluginTasks(userId, DEFAULT_PLUGIN_ID, limit),
+    repo.listAiJobs(userId, limit),
+    repo.listAiBackfillTasks(userId, limit),
+    repo.listBookmarks(userId)
+  ]);
+  const now = Date.now();
+  const dueReminders = (bookmarks || []).filter((bookmark) => {
+    if (bookmark.deletedAt) return false;
+    const reminderAt = Number(bookmark.reminderAt || 0);
+    if (!reminderAt || reminderAt > now) return false;
+    const status = String(bookmark.reminderState?.status || '');
+    return !['dismissed', 'done', 'none'].includes(status);
+  });
+  const snapshot = {
+    generatedAt: now,
+    tasks: {
+      metadata: summarizeRealtimeTasks(metadataTasks),
+      io: summarizeRealtimeTasks(ioTasks),
+      plugin: summarizeRealtimeTasks(pluginTasks),
+      ai: summarizeRealtimeTasks([...(aiJobs || []), ...(aiBackfillTasks || [])])
+    },
+    reminders: {
+      due: dueReminders.length,
+      latestUpdatedAt: dueReminders.reduce((max, item) => Math.max(max, Number(item.updatedAt || item.reminderAt || 0) || 0), 0)
+    }
+  };
+  snapshot.signature = JSON.stringify({ tasks: snapshot.tasks, reminders: snapshot.reminders });
+  return snapshot;
+}
+
+function eventStreamResponse(event, payload, { requestId } = {}) {
+  const headers = new Headers({
+    'content-type': 'text/event-stream; charset=utf-8',
+    'cache-control': 'no-cache, no-transform',
+    'x-accel-buffering': 'no'
+  });
+  if (requestId) withRequestId(headers, requestId);
+  return new Response(`retry: 3000\n\nevent: ${event}\ndata: ${JSON.stringify(payload)}\n\n`, { headers });
 }
 
 async function processAiBatchTask(env, message) {
@@ -4333,7 +4747,8 @@ async function handleApi(request, env, url, requestId) {
       folder: folder
         ? { id: folder.id, name: folder.name, color: folder.color || '#8f96a3' }
         : { id: link.folderId, name: '共享集合', color: '#8f96a3' },
-      bookmarks
+      bookmarks,
+      aiGuide: buildPublicAiGuide(link, folder, bookmarks)
     };
     if (isJson) return jsonResponse(payload, { requestId });
     const html = `<!doctype html>
@@ -4350,33 +4765,91 @@ async function handleApi(request, env, url, requestId) {
 <body class="auth-page">
   <main class="public-share-shell">
     <section class="public-share-hero">
-      <div class="brand"><div class="brand-dot"></div><div><strong>Rainboard</strong><small>公开收藏页</small></div></div>
+      <div class="brand"><div class="brand-dot"></div><div><strong>Rainbow</strong><small>公开收藏页</small></div></div>
       <h1>${esc(payload.link.title || '共享集合')}</h1>
       <p class="muted">${esc(payload.link.description || '')}</p>
       <div class="public-share-meta">
         <span class="meta-chip type">${esc(payload.folder.name || '集合')}</span>
         <span class="meta-chip">${bookmarks.length} 条</span>
       </div>
+      <div class="public-ai-guide">
+        <div class="public-ai-guide-summary">${esc(payload.aiGuide.summary || '')}</div>
+        ${payload.aiGuide.tags.length ? `<div class="public-ai-guide-tags">${payload.aiGuide.tags.slice(0, 8).map((tag) => `<span class="meta-chip">#${esc(tag.tag)}</span>`).join('')}</div>` : ''}
+        ${payload.aiGuide.faq.length ? `<div class="public-ai-guide-faq">${payload.aiGuide.faq.slice(0, 2).map((row) => `<details><summary>${esc(row.q)}</summary><p>${esc(row.a)}</p></details>`).join('')}</div>` : ''}
+      </div>
     </section>
     <section class="public-share-content">
-      <div class="cards public-share-grid">
+      <div class="public-share-toolbar">
+        <input id="pubSearch" type="search" placeholder="搜索公开书签" aria-label="搜索公开书签" />
+        <select id="pubSort" aria-label="公开书签排序">
+          <option value="newest">最新收藏</option>
+          <option value="title">标题 A-Z</option>
+          <option value="host">域名 A-Z</option>
+        </select>
+      </div>
+      <div id="pubList" class="cards public-share-grid">
         ${bookmarks.length ? bookmarks.map((item) => {
           const cover = String(item.cover || item.metadata?.image || '').trim();
           const tags = Array.isArray(item.tags) ? item.tags.slice(0, 4) : [];
-          return `<article class="card public-share-card">
-            ${cover ? `<div class="card-cover"><img src="${esc(sanitizePublicUrl(cover))}" alt="cover" loading="lazy" /></div>` : ''}
-            <div class="card-top"><div class="host">${esc((() => { try { return new URL(item.url).hostname; } catch { return '网页'; } })())}</div></div>
+          const host = (() => { try { return new URL(item.url).hostname; } catch { return '网页'; } })();
+          const title = item.title || '(未命名)';
+          return `<article class="card public-share-card" data-title="${esc(title).toLowerCase()}" data-host="${esc(host).toLowerCase()}" data-tags="${esc(tags.join(' ')).toLowerCase()}" data-created="${esc(item.createdAt || 0)}">
+            ${cover ? `<div class="card-cover"><img src="${esc(sanitizePublicUrl(cover))}" alt="${esc(title)}" loading="lazy" /></div>` : `<div class="card-cover public-cover-fallback" aria-hidden="true">${esc((host || 'RB').slice(0, 2).toUpperCase())}</div>`}
+            <div class="card-top"><a class="host" href="${esc(sanitizePublicUrl(item.url))}" target="_blank" rel="noopener">${esc(host)}</a></div>
             <div class="card-body">
-              <div class="card-title">${esc(item.title || '(未命名)')}</div>
+              <h2 class="card-title"><a class="card-title-link" href="${esc(sanitizePublicUrl(item.url))}" target="_blank" rel="noopener">${esc(title)}</a></h2>
               ${item.note ? `<div class="card-note">${esc(item.note)}</div>` : ''}
               ${tags.length ? `<div class="card-tags">${tags.map((tag) => `<span class="card-tag">#${esc(tag)}</span>`).join('')}</div>` : ''}
               <div class="card-actions"><a class="ghost button-link" href="${esc(sanitizePublicUrl(item.url))}" target="_blank" rel="noopener">打开</a></div>
             </div>
           </article>`;
-        }).join('') : '<div class="empty-state"><div class="empty-state-title">这个公开集合暂无书签</div><div class="muted">稍后再回来看看。</div></div>'}
+        }).join('') : '<div class="state-block"><div class="state-block-title">这个公开集合暂无书签</div><div class="state-block-message muted">稍后再回来看看。</div></div>'}
       </div>
+      <div id="pubEmptyFiltered" class="state-block state-block-compact hidden" data-state="empty">
+        <div class="state-block-title">没有匹配的书签</div>
+        <div class="state-block-message muted">换个关键词或排序方式再试试。</div>
+      </div>
+      <button type="button" id="pubBackTop" class="ghost public-share-backtop">返回顶部</button>
     </section>
   </main>
+  <script type="application/json" id="pubLegacyInlineDisabled">
+    (function(){
+      var list = document.getElementById('pubList');
+      var empty = document.getElementById('pubEmptyFiltered');
+      var search = document.getElementById('pubSearch');
+      var sort = document.getElementById('pubSort');
+      if (!list || !search || !sort) return;
+      list.querySelectorAll('img').forEach(function(img){
+        img.addEventListener('error', function(){
+          var cover = img.closest('.card-cover');
+          if (cover) {
+            cover.classList.add('image-error');
+            cover.textContent = '封面不可用';
+          }
+        }, { once: true });
+      });
+      function apply(){
+        var q = String(search.value || '').trim().toLowerCase();
+        var mode = sort.value || 'newest';
+        var cards = Array.prototype.slice.call(list.querySelectorAll('.public-share-card'));
+        cards.forEach(function(card){
+          var haystack = [card.dataset.title, card.dataset.host, card.dataset.tags].join(' ');
+          card.classList.toggle('hidden', q && haystack.indexOf(q) === -1);
+        });
+        var visible = cards.filter(function(card){ return !card.classList.contains('hidden'); });
+        visible.sort(function(a, b){
+          if (mode === 'title') return a.dataset.title.localeCompare(b.dataset.title);
+          if (mode === 'host') return a.dataset.host.localeCompare(b.dataset.host);
+          return Number(b.dataset.created || 0) - Number(a.dataset.created || 0);
+        }).forEach(function(card){ list.appendChild(card); });
+        if (empty) empty.classList.toggle('hidden', q && visible.length === 0);
+      }
+      search.addEventListener('input', apply);
+      sort.addEventListener('change', apply);
+      document.getElementById('pubBackTop')?.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    })();
+  </script>
+  <script type="module" src="/public-share.mjs"></script>
 </body>
 </html>`;
     return new Response(html, {
@@ -4535,6 +5008,17 @@ async function handleApi(request, env, url, requestId) {
   }
 
   if (url.pathname.startsWith('/api/')) requireAuth();
+  if (url.pathname.startsWith('/api/product/ai/') && !['GET', 'HEAD'].includes(method) && !isAiGovernancePath(url.pathname)) {
+    const policy = normalizeAiFeaturePolicy(await repo.getUserMeta(auth.user.id, 'ai_feature_policy', DEFAULT_AI_FEATURE_POLICY));
+    const capability = aiCapabilityForPath(url.pathname);
+    if (capability && (!policy.enabled || !policy.capabilities?.[capability])) {
+      throw Object.assign(new Error(`AI capability disabled: ${capability}`), {
+        status: 403,
+        code: 'AI_FEATURE_DISABLED',
+        details: { capability }
+      });
+    }
+  }
 
   if (url.pathname === '/api/state') {
     return jsonResponse(await buildStateForUser(env, auth.user.id), { requestId });
@@ -4677,8 +5161,8 @@ async function handleApi(request, env, url, requestId) {
       return folder;
     };
 
-    for (const [rainboardId, snapshot] of Object.entries(mirrorIndex)) {
-      const bookmark = byId.get(String(rainboardId));
+    for (const [rainbowId, snapshot] of Object.entries(mirrorIndex)) {
+      const bookmark = byId.get(String(rainbowId));
       if (!bookmark || bookmark.deletedAt) continue;
 
       const currentById = snapshot.chromeId ? chromeById.get(String(snapshot.chromeId)) : null;
@@ -4820,7 +5304,7 @@ async function handleApi(request, env, url, requestId) {
       if (!chromeBookmark) continue;
       const folder = folderById.get(String(bookmark.folderId || ROOT_FOLDER_ID));
       nextMirrorIndex[bookmark.id] = {
-        rainboardId: bookmark.id,
+        rainbowId: bookmark.id,
         chromeId: chromeBookmark.chromeId || '',
         url: bookmark.url,
         normalizedUrl: normed,
@@ -4935,11 +5419,16 @@ async function handleApi(request, env, url, requestId) {
       const updated = await repo.setBookmarkMetadata(auth.user.id, id, {
         status: 'failed',
         fetchedAt: Date.now(),
-        error: String(error?.message || error)
+        error: String(error?.message || error),
+        failure: failurePayload(error, { prefix: 'METADATA_FETCH' })
       });
       return jsonResponse({
         ok: false,
-        error: { code: 'METADATA_FETCH_FAILED', message: String(error?.message || error) },
+        error: {
+          code: 'METADATA_FETCH_FAILED',
+          message: String(error?.message || error),
+          failure: failurePayload(error, { prefix: 'METADATA_FETCH' })
+        },
         item: updated
       }, { status: 502, requestId });
     }
@@ -4985,18 +5474,44 @@ async function handleApi(request, env, url, requestId) {
     const bookmark = await repo.getBookmark(auth.user.id, id);
     if (!bookmark || bookmark.deletedAt) throw Object.assign(new Error('bookmark not found'), { status: 404, code: 'NOT_FOUND' });
     const metadata = bookmark.metadata || {};
-    const article = {
-      status: 'success',
-      title: bookmark.title,
-      extractedAt: Date.now(),
-      siteName: metadata.siteName || '',
-      excerpt: metadata.description || '',
-      contentType: metadata.contentType || 'text/html',
-      textContent: [bookmark.title, bookmark.note, metadata.description].filter(Boolean).join('\n\n'),
-      readerHtmlUrl: bookmark.url,
-      articleJsonUrl: '',
-      sourceHtmlUrl: bookmark.url
-    };
+    let article;
+    try {
+      article = await fetchBookmarkArticle(bookmark.url, { timeoutMs: Math.max(1000, Number(body.timeoutMs || 10000)) });
+    } catch (error) {
+      const failure = failurePayload(error, { prefix: 'ARTICLE_FETCH' });
+      if (body.strict === true) {
+        const failedArticle = {
+          status: 'failed',
+          extractedAt: Date.now(),
+          sourceHtmlUrl: bookmark.url,
+          failure,
+          error: failure.message
+        };
+        const updated = await repo.setBookmarkArticle(auth.user.id, id, failedArticle);
+        return jsonResponse({
+          ok: false,
+          error: { code: 'ARTICLE_EXTRACT_FAILED', message: failure.message, failure },
+          item: updated,
+          article: failedArticle
+        }, { status: 502, requestId });
+      }
+      article = {
+        status: 'success',
+        extractionMode: 'metadata_fallback',
+        title: bookmark.title,
+        extractedAt: Date.now(),
+        siteName: metadata.siteName || '',
+        excerpt: metadata.description || '',
+        contentType: metadata.contentType || 'text/html',
+        textContent: [bookmark.title, bookmark.note, metadata.description].filter(Boolean).join('\n\n'),
+        readerHtmlUrl: bookmark.url,
+        articleJsonUrl: '',
+        sourceHtmlUrl: bookmark.url,
+        provider: { providerType: 'cloudflare-worker', model: 'article-fallback-v1' },
+        fallbackReason: failure.code,
+        failure
+      };
+    }
     const updated = await repo.setBookmarkArticle(auth.user.id, id, article);
     return jsonResponse({ ok: true, item: updated, article }, { requestId });
   }
@@ -5480,6 +5995,36 @@ async function handleApi(request, env, url, requestId) {
     return jsonResponse({ ok: true, quota: await repo.getQuota(auth.user.id) }, { requestId });
   }
 
+  if (url.pathname === '/api/product/task-health' && method === 'GET') {
+    const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 100) || 100));
+    const metadataTasks = await repo.listMetadataTasksForUser(auth.user.id, limit);
+    const ioTasks = await repo.listIoTasks(auth.user.id, limit);
+    const pluginTasks = await repo.listPluginTasks(auth.user.id, DEFAULT_PLUGIN_ID, limit);
+    const sections = {
+      metadata: summarizeTaskHealth(metadataTasks.map((task) => ({ ...task, kind: 'metadata' }))),
+      io: summarizeTaskHealth(ioTasks.map((task) => ({ ...task, kind: 'io' }))),
+      plugin: summarizeTaskHealth(pluginTasks.map((task) => ({ ...task, kind: 'plugin' })))
+    };
+    const failed = Object.values(sections).reduce((sum, section) => sum + (section.counts.failed || 0), 0);
+    const partial = Object.values(sections).reduce((sum, section) => sum + (section.counts.partial || 0), 0);
+    const dlqCandidates = Object.values(sections).flatMap((section) => section.dlqCandidates || []);
+    return jsonResponse({
+      ok: true,
+      generatedAt: Date.now(),
+      status: failed || partial ? 'degraded' : 'healthy',
+      sections,
+      dlqCandidates
+    }, { requestId });
+  }
+
+  if (url.pathname === '/api/events' && method === 'GET') {
+    return eventStreamResponse('rainbow:update', await buildRealtimeSnapshot(repo, auth.user.id), { requestId });
+  }
+
+  if (url.pathname === '/api/events-snapshot' && method === 'GET') {
+    return jsonResponse(await buildRealtimeSnapshot(repo, auth.user.id), { requestId });
+  }
+
   if (url.pathname === '/api/product/backups' && method === 'GET') {
     return jsonResponse({ ok: true, items: await repo.listBackups(auth.user.id) }, { requestId });
   }
@@ -5518,6 +6063,141 @@ async function handleApi(request, env, url, requestId) {
 
   if (url.pathname === '/api/product/ai/config' && method === 'PUT') {
     return jsonResponse({ ok: true, config: publicAiProviderConfig(await repo.setAiConfig(auth.user.id, body)) }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/evals' && method === 'GET') {
+    const runs = await repo.getUserMeta(auth.user.id, 'ai_eval_runs', []);
+    return jsonResponse({
+      ok: true,
+      samples: DEFAULT_AI_EVAL_SAMPLES.map((sample) => ({ ...sample, userId: auth.user.id, source: 'default' })),
+      runs: (Array.isArray(runs) ? runs : []).slice(0, 20)
+    }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/evals/run' && method === 'POST') {
+    const run = buildAiEvalRun(auth.user.id, body.candidates || []);
+    const runs = await repo.getUserMeta(auth.user.id, 'ai_eval_runs', []);
+    await repo.setUserMeta(auth.user.id, 'ai_eval_runs', [run, ...(Array.isArray(runs) ? runs : [])].slice(0, 200));
+    return jsonResponse({ ok: true, run }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/feedback' && method === 'GET') {
+    const items = await repo.getUserMeta(auth.user.id, 'ai_feedback_items', []);
+    const safeItems = (Array.isArray(items) ? items : []).slice(0, 100);
+    return jsonResponse({ ok: true, summary: aiFeedbackSummary(safeItems), items: safeItems }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/feedback' && method === 'POST') {
+    const action = String(body.action || '').trim();
+    if (!['accepted', 'rejected', 'edited', 'rated'].includes(action)) {
+      throw Object.assign(new Error('feedback action must be accepted, rejected, edited, or rated'), { status: 400, code: 'BAD_REQUEST' });
+    }
+    const item = {
+      id: `ai_feedback_${crypto.randomUUID()}`,
+      userId: auth.user.id,
+      jobId: String(body.jobId || ''),
+      bookmarkId: String(body.bookmarkId || ''),
+      feature: String(body.feature || 'unknown').slice(0, 80),
+      action,
+      rating: Math.max(0, Math.min(5, Number(body.rating || 0) || 0)),
+      comment: sanitizeAiModelInput(body.comment || '', { maxLength: 1000 }),
+      editedOutput: body.editedOutput && typeof body.editedOutput === 'object' ? body.editedOutput : null,
+      createdAt: Date.now()
+    };
+    const items = await repo.getUserMeta(auth.user.id, 'ai_feedback_items', []);
+    await repo.setUserMeta(auth.user.id, 'ai_feedback_items', [item, ...(Array.isArray(items) ? items : [])].slice(0, 1000));
+    return jsonResponse({ ok: true, item }, { status: 201, requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/privacy-policy' && method === 'GET') {
+    const policy = {
+      ...DEFAULT_AI_PRIVACY_POLICY,
+      ...await repo.getUserMeta(auth.user.id, 'ai_privacy_policy', {})
+    };
+    return jsonResponse({
+      ok: true,
+      policy,
+      sample: sanitizeAiModelInput('email: owner@example.com token=sk-demo-secret phone +86 138 0000 0000')
+    }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/privacy-policy' && method === 'PUT') {
+    const current = {
+      ...DEFAULT_AI_PRIVACY_POLICY,
+      ...await repo.getUserMeta(auth.user.id, 'ai_privacy_policy', {})
+    };
+    const policy = {
+      ...current,
+      anonymize: typeof body.anonymize === 'boolean' ? body.anonymize : current.anonymize,
+      stripFields: Array.isArray(body.stripFields) ? body.stripFields.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 30) : current.stripFields,
+      maxPromptChars: Math.max(1000, Math.min(50_000, Number(body.maxPromptChars || current.maxPromptChars) || current.maxPromptChars)),
+      redactPatterns: Array.isArray(body.redactPatterns) ? body.redactPatterns.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 20) : current.redactPatterns,
+      updatedAt: Date.now()
+    };
+    await repo.setUserMeta(auth.user.id, 'ai_privacy_policy', policy);
+    return jsonResponse({ ok: true, policy }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/feature-policy' && method === 'GET') {
+    const policy = normalizeAiFeaturePolicy(await repo.getUserMeta(auth.user.id, 'ai_feature_policy', DEFAULT_AI_FEATURE_POLICY));
+    return jsonResponse({ ok: true, policy }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/feature-policy' && method === 'PUT') {
+    const current = normalizeAiFeaturePolicy(await repo.getUserMeta(auth.user.id, 'ai_feature_policy', DEFAULT_AI_FEATURE_POLICY));
+    const policy = normalizeAiFeaturePolicy({
+      ...current,
+      enabled: typeof body.enabled === 'boolean' ? body.enabled : current.enabled,
+      role: ['owner', 'editor', 'viewer'].includes(String(body.role || '')) ? String(body.role) : current.role,
+      capabilities: {
+        ...current.capabilities,
+        ...(body.capabilities && typeof body.capabilities === 'object' ? Object.fromEntries(Object.entries(body.capabilities).map(([key, value]) => [key, Boolean(value)])) : {})
+      },
+      updatedAt: Date.now()
+    });
+    await repo.setUserMeta(auth.user.id, 'ai_feature_policy', policy);
+    return jsonResponse({ ok: true, policy }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/health' && method === 'GET') {
+    const jobs = await repo.listAiJobs(auth.user.id, 100);
+    const checks = await repo.getUserMeta(auth.user.id, 'ai_provider_health_checks', []);
+    return jsonResponse({ ok: true, health: buildAiProviderHealth(jobs, Array.isArray(checks) ? checks : []), config: publicAiProviderConfig(await repo.getAiConfig(auth.user.id)) }, { requestId });
+  }
+
+  if (url.pathname === '/api/product/ai/health/probe' && method === 'POST') {
+    const config = await repo.getAiConfig(auth.user.id);
+    const startedAt = Date.now();
+    let check = null;
+    try {
+      const out = await testAiProviderConnection(config, { timeoutMs: 8000 });
+      check = {
+        id: `ai_health_${crypto.randomUUID()}`,
+        userId: auth.user.id,
+        ok: true,
+        providerType: out.providerType,
+        model: out.model,
+        transport: out.transport,
+        latencyMs: Date.now() - startedAt,
+        createdAt: Date.now()
+      };
+    } catch (error) {
+      check = {
+        id: `ai_health_${crypto.randomUUID()}`,
+        userId: auth.user.id,
+        ok: false,
+        providerType: config.providerType,
+        model: config.providerType === 'cloudflare_ai' ? config.cloudflareAI?.model : config.openaiCompatible?.model,
+        latencyMs: Date.now() - startedAt,
+        error: { message: String(error?.message || error) },
+        createdAt: Date.now()
+      };
+    }
+    const checks = await repo.getUserMeta(auth.user.id, 'ai_provider_health_checks', []);
+    const nextChecks = [check, ...(Array.isArray(checks) ? checks : [])].slice(0, 200);
+    await repo.setUserMeta(auth.user.id, 'ai_provider_health_checks', nextChecks);
+    const jobs = await repo.listAiJobs(auth.user.id, 100);
+    return jsonResponse({ ok: true, check, health: buildAiProviderHealth(jobs, nextChecks) }, { requestId });
   }
 
   if (url.pathname === '/api/product/ai/rules/config' && method === 'GET') {

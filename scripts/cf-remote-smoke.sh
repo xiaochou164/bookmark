@@ -9,8 +9,8 @@ Usage:
   bash scripts/cf-remote-smoke.sh <base-url>
 
 Examples:
-  bash scripts/cf-remote-smoke.sh https://rainboard.<subdomain>.workers.dev
-  CF_BASE_URL=https://rainboard.example.workers.dev bash scripts/cf-remote-smoke.sh
+  bash scripts/cf-remote-smoke.sh https://rainbow.<subdomain>.workers.dev
+  CF_BASE_URL=https://rainbow.example.workers.dev bash scripts/cf-remote-smoke.sh
 
 Notes:
   - Uses a temporary account created during the smoke run.
@@ -20,7 +20,7 @@ EOF
 fi
 
 BASE_URL="${BASE_URL%/}"
-COOKIE_JAR="$(mktemp -t rainboard-cf-remote-smoke-cookie.XXXXXX)"
+COOKIE_JAR="$(mktemp -t rainbow-cf-remote-smoke-cookie.XXXXXX)"
 trap 'rm -f "$COOKIE_JAR"' EXIT
 
 SMOKE_EMAIL="smoke.$(date +%s).$RANDOM@example.com"

@@ -1,0 +1,818 @@
+/*
+ * Layout safety fallbacks must stay below the component rules in cascade
+ * priority. This block used to be unlayered and overrode the established
+ * desktop/mobile dimensions, which made the workbench look like two layout
+ * systems were active at once.
+ */
+@layer layout-safety {
+/* Layout stabilization: keep dense tool surfaces readable at every width. */
+body {
+  min-width: 320px;
+}
+
+.shell,
+.main,
+.sidebar,
+.detail,
+.toolbar,
+.view-header,
+.advanced-search-panel,
+.card,
+.bookmark-row,
+.bookmark-headline,
+.dialog-form,
+.dialog-body {
+  min-width: 0;
+}
+
+button,
+select,
+input,
+textarea {
+  max-width: 100%;
+  min-width: 0;
+  font: inherit;
+}
+
+button {
+  line-height: 1.2;
+}
+
+select {
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  min-width: 16px;
+  max-width: none;
+  flex: 0 0 auto;
+}
+
+.main,
+.sidebar,
+.detail {
+  border-radius: 12px;
+}
+
+@media (min-width: 1281px) {
+  .shell {
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+  }
+
+  .shell .detail {
+    width: min(440px, 42vw);
+    min-width: min(360px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
+
+  .detail-panel-backdrop {
+    left: 300px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .shell {
+    grid-template-columns: 300px minmax(0, 1fr);
+    gap: 0;
+    padding: 0;
+  }
+}
+
+.toolbar {
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.toolbar-left,
+.toolbar-right,
+.search-wrap {
+  min-width: 0;
+}
+
+.toolbar-right {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.toolbar-right > button,
+.toolbar-right > .header-menu-wrap,
+.toolbar-add-split {
+  flex: 0 0 auto;
+}
+
+.search-wrap {
+  min-height: 44px;
+}
+
+.search-wrap input {
+  min-height: 44px;
+  height: auto;
+  border-radius: 10px !important;
+  padding-right: 74px;
+}
+
+#advancedSearchToggleBtn {
+  top: 6px;
+  right: 6px;
+  height: 32px;
+  width: 54px;
+  border-radius: 8px;
+}
+
+.toolbar-add-split,
+.toolbar-add-split > .add-main-btn,
+.toolbar-add-split > .add-caret-btn,
+button.ghost,
+.button-link.ghost {
+  border-radius: 8px;
+}
+
+.advanced-search-panel {
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.advanced-search-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: start;
+}
+
+.advanced-search-checkbox {
+  min-height: 40px;
+  padding-top: 20px;
+}
+
+.advanced-search-actions {
+  align-items: stretch;
+}
+
+.advanced-search-actions > button,
+.advanced-search-actions > select {
+  min-height: 36px;
+}
+
+.advanced-search-actions > button {
+  flex: 0 1 auto;
+}
+
+.advanced-search-actions > select {
+  flex: 1 1 220px;
+  width: auto;
+}
+
+.view-header {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  border-radius: 12px;
+  padding: 12px;
+  gap: 10px 14px;
+}
+
+.view-header-main {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 280px;
+}
+
+.view-title-block {
+  width: 100%;
+  min-width: 0;
+}
+
+.view-title-block h1 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#viewMeta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  flex: 1 1 320px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.actions-header-tools,
+.actions-bulk {
+  min-width: 0;
+}
+
+.actions-header-tools > .header-menu-wrap {
+  flex: 0 1 auto;
+}
+
+.actions-header-tools > .header-tool-btn,
+.actions-header-tools button,
+.actions-bulk button {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.actions-bulk {
+  flex: 1 1 100%;
+  justify-content: flex-end;
+}
+
+.actions-bulk select {
+  flex: 1 1 180px;
+}
+
+.header-menu {
+  max-width: min(320px, calc(100vw - 24px));
+  overflow: hidden;
+}
+
+.header-menu-item,
+.context-menu-item {
+  grid-template-columns: 18px minmax(0, 1fr);
+}
+
+.menu-item-label,
+.header-menu-item,
+.context-menu-item {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.header-menu-item .menu-item-label,
+.context-menu-item .menu-item-label {
+  white-space: normal;
+}
+
+.view-columns-menu {
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cards.layout-card {
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+}
+
+.cards.layout-list .bookmark-row {
+  grid-template-columns: auto 64px minmax(0, 1fr) minmax(124px, auto);
+  align-items: center;
+  gap: 12px;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.cards.layout-list .bookmark-row-main,
+.cards.layout-list .bookmark-row-side,
+.cards.layout-list .bookmark-row-titleline,
+.cards.layout-list .bookmark-row-subline,
+.cards.layout-list .bookmark-row-bottom {
+  min-width: 0;
+}
+
+.cards.layout-list .bookmark-row-subline {
+  flex-wrap: wrap;
+  row-gap: 3px;
+}
+
+.cards.layout-list .bookmark-row-subline > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cards.layout-list .bookmark-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.cards.layout-list .bookmark-row-actions .icon-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.cards.layout-card .card,
+.empty-state,
+.pager,
+.list-load-more-bar,
+.detail-summary-card,
+.detail-section,
+.sidebar-status-card {
+  border-radius: 12px;
+}
+
+.card-title-link,
+.row-title-link,
+.bookmark-headline-title,
+.detail-summary-title,
+.detail-related-item-title,
+.ai-qa-source-title {
+  overflow-wrap: anywhere;
+}
+
+.pager {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+}
+
+.pager-right {
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.detail-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  border-radius: 0;
+  padding: 8px 2px 10px;
+  margin: -2px 0 10px;
+}
+
+.detail-panel-head-main {
+  width: 100%;
+}
+
+.detail-panel-head-tools {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.detail-panel-nav,
+.detail-panel-preview-shortcuts,
+.detail-panel-mode-switch {
+  border-radius: 8px;
+}
+
+.detail-panel-mode-switch {
+  flex: 1 1 128px;
+}
+
+.detail-panel-mode-switch > button {
+  min-width: 0;
+}
+
+.detail-summary-top,
+.detail-section-head,
+.io-task-row,
+.auth-token-row,
+.preview-toolbar {
+  flex-wrap: wrap;
+}
+
+.detail-summary-toolbar,
+.detail-inline-actions,
+.highlight-actions,
+.annotation-actions,
+.preview-actions {
+  min-width: 0;
+}
+
+.preview-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.preview-toolbar-main,
+.preview-toolbar-top {
+  width: 100%;
+}
+
+.preview-toolbar-top h3 {
+  display: block;
+  flex: 1 1 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.detail-section-head {
+  align-items: flex-start;
+}
+
+.detail-section-head .detail-inline-actions {
+  flex: 1 1 100%;
+}
+
+.detail-inline-actions button,
+.highlight-actions button,
+.annotation-actions button {
+  white-space: normal;
+}
+
+.dialog-form,
+.plugin-dialog-shell,
+.preview-shell {
+  border-radius: 12px;
+}
+
+.dialog-grid-2,
+.ai-qa-body,
+.io-grid,
+.auth-grid,
+.tag-admin-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+}
+
+.settings-page-shell,
+.settings-nav,
+.settings-page-card,
+.settings-section,
+.settings-panel,
+.settings-form,
+.settings-nav-account,
+.settings-page-header-main {
+  min-width: 0;
+}
+
+.settings-page-card h1,
+.settings-section-head h2,
+.settings-panel h3,
+.settings-status-banner,
+.settings-panel,
+.settings-nav-page,
+.settings-back-link {
+  overflow-wrap: anywhere;
+}
+
+.settings-page-header-actions,
+.settings-section-head {
+  flex-wrap: wrap;
+}
+
+.settings-panel input,
+.settings-panel textarea,
+.settings-panel select,
+.settings-panel pre,
+.settings-panel .io-task-list {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.settings-panel input {
+  text-overflow: ellipsis;
+}
+
+.settings-panel pre,
+.settings-panel .io-task-list {
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.settings-nav-page {
+  min-height: 40px;
+  white-space: normal;
+}
+
+@media (max-width: 1180px) {
+  .toolbar,
+  .view-header,
+  .advanced-search-panel:not(.hidden) {
+    position: static;
+  }
+
+  .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .toolbar-right {
+    justify-content: flex-start;
+  }
+
+  .actions {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .actions-header-tools {
+    justify-content: flex-start;
+  }
+
+  #askAiBtn::after {
+    content: "询问";
+    margin-left: 4px;
+  }
+
+  #askAiBtn {
+    display: inline-flex;
+    min-width: 78px;
+    padding: 0 12px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
+  .cards.layout-list .bookmark-row-actions > *:nth-child(n+4) {
+    display: none;
+  }
+
+  .cards.layout-list .bookmark-row-actions > *:nth-child(9),
+  .cards.layout-list .bookmark-row-actions > *:nth-child(10) {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 920px) {
+  .shell {
+    grid-template-columns: 1fr;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .sidebar,
+  .main,
+  .detail {
+    border-radius: 12px;
+  }
+
+  .main {
+    order: 1;
+  }
+
+  .sidebar {
+    order: 2;
+  }
+
+  .detail {
+    order: 3;
+  }
+
+  .toolbar-right > button,
+  .toolbar-right > .header-menu-wrap,
+  .add-split-wrap,
+  .toolbar-add-split {
+    flex: 1 1 140px;
+  }
+
+  .toolbar-add-split > .add-main-btn {
+    flex: 1 1 auto;
+  }
+
+  .view-header-main,
+  .actions,
+  .actions-header-tools,
+  .actions-bulk,
+  .advanced-search-actions > button {
+    width: 100%;
+  }
+
+  .view-title-block h1 {
+    font-size: 18px;
+  }
+
+  .actions-header-tools > .header-menu-wrap {
+    flex: 1 1 30%;
+  }
+
+  .cards.layout-list .bookmark-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .cards.layout-list .bookmark-row-thumb {
+    grid-column: 1 / -1;
+    width: 100%;
+    height: 112px;
+    order: 2;
+  }
+
+  .cards.layout-list .bookmark-row-main {
+    grid-column: 2;
+  }
+
+  .cards.layout-list .bookmark-row-select {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .cards.layout-list .bookmark-row-mobile-bottom {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+
+  .pager-right {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .detail-panel-head {
+    position: static;
+  }
+
+  .detail-panel-head-tools > * {
+    flex: 0 1 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    padding: 8px;
+  }
+
+  .toolbar,
+  .view-header,
+  .advanced-search-panel,
+  .pager,
+  .list-load-more-bar {
+    padding: 10px;
+  }
+
+  .toolbar-right > button,
+  .toolbar-right > .header-menu-wrap,
+  .add-split-wrap,
+  .advanced-search-actions > button,
+  .pager-right > button,
+  .pager-right > select {
+    flex: 1 1 100%;
+  }
+
+  .toolbar-right {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .toolbar-right > button {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 8px;
+    justify-content: center;
+  }
+
+  #askAiBtn::after {
+    content: "询问";
+    margin-left: 4px;
+  }
+
+  .toolbar-right > .add-split-wrap {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  #headerSortBtn,
+  #headerViewBtn,
+  #headerMoreBtn,
+  .toolbar-add-split {
+    width: 100%;
+  }
+
+  .header-menu-wrap,
+  .view-columns-menu-wrap {
+    min-width: 0;
+  }
+
+  .header-menu,
+  .view-columns-menu {
+    left: 0;
+    right: 0;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .view-title-block h1 {
+    font-size: 17px;
+  }
+
+  .actions-header-tools > .header-menu-wrap {
+    flex-basis: 100%;
+  }
+
+  .bulk-selection-pill {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cards.layout-card {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-summary-toolbar .icon-action-btn,
+  .detail-panel-nav .icon-action-btn,
+  .detail-panel-preview-shortcuts .icon-action-btn,
+  .detail-panel-more-wrap .icon-action-btn,
+  #detailCloseBtn.icon-action-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .dialog-actions button,
+  .preview-actions button,
+  .ai-folder-summary-actions button,
+  .ai-qa-inline-actions button {
+    flex: 1 1 100%;
+  }
+
+  .settings-page-shell {
+    width: 100%;
+  }
+
+  .settings-nav,
+  .settings-page-card,
+  .settings-section,
+  .settings-panel {
+    padding: 14px;
+  }
+
+  .settings-page-card h1 {
+    font-size: 25px;
+  }
+
+  .settings-page-header-actions > *,
+  .settings-actions > button,
+  .settings-actions > .button-link {
+    flex: 1 1 100%;
+  }
+}
+
+/* Final overflow guards for dense controls and floating panels. */
+.sidebar-account-menu,
+.detail-panel-more-wrap .header-menu,
+.header-menu,
+.context-menu,
+.view-columns-menu {
+  max-width: min(360px, calc(100vw - 24px));
+}
+
+.sidebar-account-menu,
+.detail-panel-more-wrap .header-menu {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cards.layout-list .bookmark-row-side,
+.cards.layout-list .bookmark-row-actions,
+.cards.layout-list .bookmark-row-tags,
+.cards.layout-list .bookmark-row-mobile-bottom {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cards.layout-list .bookmark-row-tags {
+  overflow: hidden;
+}
+
+.cards.layout-list .bookmark-row-actions {
+  justify-content: flex-end;
+}
+
+.toolbar button,
+.view-header button,
+.dialog-actions button,
+.settings-actions button,
+.settings-actions .button-link,
+.header-menu-item,
+.context-menu-item {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  .cards.layout-list .bookmark-row {
+    grid-template-columns: auto 56px minmax(0, 1fr) minmax(0, auto);
+  }
+
+  .cards.layout-list .bookmark-row-side {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .sidebar-account-menu,
+  .detail-panel-more-wrap .header-menu,
+  .context-menu {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    min-width: 0;
+    max-width: calc(100vw - 16px);
+  }
+
+  .cards.layout-list .bookmark-row-actions {
+    justify-content: flex-start;
+  }
+}
+}

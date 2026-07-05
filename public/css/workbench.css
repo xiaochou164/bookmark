@@ -1,0 +1,116 @@
+/*
+ * Workbench-specific component refinements.
+ */
+
+.bookmark-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  color: var(--color-text-muted);
+}
+
+.bookmark-meta-part {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-meta-part + .bookmark-meta-part::before {
+  content: "•";
+  margin-right: 8px;
+  color: var(--color-border-strong);
+}
+
+.card-host-row-wrap {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.card-host-row-wrap img {
+  border-radius: 5px;
+}
+
+.card-select {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+}
+
+.card-select:hover {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.card-select input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.card-favicon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-muted);
+}
+
+.card-favicon img,
+.card-favicon-fallback {
+  grid-area: 1 / 1;
+}
+
+.card-favicon img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.card-favicon-fallback {
+  display: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: #f3f6fb;
+  place-items: center;
+}
+
+.card-favicon-fallback .ui-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.card-favicon.is-error img {
+  display: none;
+}
+
+.card-favicon.is-error .card-favicon-fallback {
+  display: grid;
+}
+
+.cards.layout-list .bookmark-row-subline {
+  gap: 4px 8px;
+}
+
+.cards.layout-list .bookmark-row-subline > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.cards.layout-list .bookmark-row-subline .bookmark-meta-host {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.bookmark-headline-meta .bookmark-meta-part,
+.bookmark-board-meta .bookmark-meta-part {
+  max-width: 18ch;
+}

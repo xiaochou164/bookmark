@@ -1,10 +1,10 @@
 {
-  "name": "bookmarktorain",
+  "name": "rainbow",
   "version": "1.0.0",
   "description": "Cloud Bookmarks Manager with plugin-based Raindrop sync",
   "main": "src/worker.mjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node --test tests/*.test.js",
     "start": "wrangler dev --local",
     "dev": "wrangler dev --local",
     "db:sqlite:migrate": "node scripts/sqlite-migrate.js",
@@ -14,13 +14,17 @@
     "cf:release": "bash scripts/cf-release.sh",
     "cf:check": "node --check src/worker.mjs",
     "cf:smoke": "node scripts/cf-worker-smoke.mjs",
-    "ui:check": "node scripts/ui-static-audit.mjs",
+    "ui:check": "node scripts/ui-static-audit.mjs && node scripts/ui-performance-budget.mjs",
+    "ui:browser": "node scripts/ui-browser-audit.mjs",
     "cf:smoke:remote": "bash scripts/cf-remote-smoke.sh",
     "cf:d1:migrate:local": "bash scripts/cf-apply-d1-migration.sh local",
     "cf:d1:migrate:remote": "bash scripts/cf-apply-d1-migration.sh remote",
     "cf:d1:ensure": "node scripts/cf-ensure-d1-binding.mjs",
     "cf:d1:create": "node scripts/cf-ensure-d1-binding.mjs",
-    "cf:migrate:data": "node scripts/cf-migrate-data.mjs"
+    "cf:migrate:data": "node scripts/cf-migrate-data.mjs",
+    "extension:safari:build": "node scripts/build-safari-extension.mjs",
+    "extension:check": "node --check chrome-extension/background.js chrome-extension/options.js chrome-extension/popup.js scripts/build-safari-extension.mjs && npm run extension:safari:build",
+    "ops:drill": "node scripts/ops-backup-restore-drill.mjs"
   },
   "keywords": [],
   "author": "",
