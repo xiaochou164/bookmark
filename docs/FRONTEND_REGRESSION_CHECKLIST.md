@@ -71,3 +71,12 @@
 - `e` 进入/退出详情编辑态
 - `Delete` 删除当前条目（确认后执行）
 - `?` 显示快捷键提示
+
+## 10. 浏览器扩展与服务端
+
+- `npm run extension:check` 通过，Chrome 脚本语法与 Safari 生成正常
+- `npm run extension:smoke:remote -- https://bookmark.sundays.ink` 完成 Token、设备注册、双向差异与状态上报验证
+- Chrome → Rainbow 首次同步只创建一条，第二次同步识别为重复且不重复写入
+- Rainbow → Chrome 返回正确的 `folderName`、`folderPath` 和待添加条目
+- 人工确认 Chrome 中加载的扩展目录和 `manifest.json` 版本一致，并在更新后点击“重新加载”
+- 当前 `previewMutatedServer` 应记录为已知限制；修复 dry-run 前不把预览标记为无副作用通过

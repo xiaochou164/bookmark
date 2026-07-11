@@ -5,7 +5,7 @@
 ## 已实现能力
 
 - Chrome/Safari 书签与 Rainbow 云书签双向同步
-- 预览变更：查看将新增、删除或跳过的条目，不写入本地或云端
+- 预览变更：当前不修改 Chrome 本地书签，但仍可能写入 Rainbow 服务端，详见下方“已知限制”
 - 应用同步：把浏览器书签写入 Rainbow，并把云端缺失项推回浏览器
 - 自动同步：支持配置同步开关与同步间隔
 - 云端连接：默认连接 `https://bookmark.sundays.ink`
@@ -17,7 +17,7 @@
 1. 打开 `chrome://extensions/`
 2. 开启“开发者模式”
 3. 点“加载已解压的扩展程序”
-4. 选择目录：`/Users/xiaochou164/Desktop/mycode/Rainbow/chrome-extension`
+4. 选择当前仓库下的 `chrome-extension/` 目录
 
 ## Safari 构建
 
@@ -43,15 +43,47 @@ xcrun safari-web-extension-converter safari-extension --project-location output/
 4. 按需开启自动同步并设置同步间隔
 5. 保存设置
 
-## 测试建议
+## 验证命令
+
+扩展语法和 Safari 生成：
+
+```bash
+npm run extension:check
+```
+
+线上服务端契约：
+
+```bash
+npm run extension:smoke:remote -- https://bookmark.sundays.ink
+```
+
+远端 smoke 使用独立测试账号，验证 Token 创建、设备注册、Chrome → Rainbow、Rainbow → Chrome、重复去重和设备状态上报。
+
+## 手工测试建议
 
 1. 先点“测试连接”，确认云端可访问
-2. 再点“预览变更”，确认新增/删除数量符合预期
-3. 最后执行“立即同步”
+2. 在测试账号上点“预览变更”，确认新增/删除数量符合预期；注意当前预览可能写入服务端
+3. 确认测试结果后执行“立即同步”
 4. Safari 版本需要额外确认网站访问权限、书签权限和 Token 自动识别是否已授权
+
+## 当前请求路径
+
+- 健康检查：`GET /api/health`
+- 自动创建 Token：`POST /api/auth/tokens`
+- Chrome 快照同步：`POST /api/chrome-sync`
+- 拉取云端书签：`GET /api/chrome-sync/bookmarks`
+- 设备注册：`POST /api/plugins/raindropSync/devices/register`
+- 设备状态：`POST /api/plugins/raindropSync/devices/:deviceId/status`
+
+完整请求与响应说明见 `../docs/CHROME_EXTENSION_SYNC.md`。
+
+## 已知限制
+
+- `PREVIEW_RAINBOW_SYNC` 当前与正式同步共用 `/api/chrome-sync`。它只跳过 Chrome 侧写入，服务端仍会处理 Chrome 快照，因此不是真正的 dry-run。
+- 在该问题修复前，不要在包含未同步 Chrome 新书签的真实账号上把“预览”视为无副作用操作。
 
 ## 注意
 
-- 扩展不再直连 `api.raindrop.io`，所有同步都通过 Rainbow 云端插件接口完成
+- 扩展不再直连 `api.raindrop.io`；Chrome 书签同步通过 Rainbow 的 `/api/chrome-sync` 完成，设备状态复用 `/api/plugins/raindropSync/devices/*`
 - Safari 版本由 `chrome-extension/` 生成，修改核心同步逻辑后请重新运行 `npm run extension:safari:build`
 - Safari 的签名、Bundle ID、App Store 分发由 Xcode 容器项目处理

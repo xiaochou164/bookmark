@@ -35,6 +35,9 @@ jobs:
       - name: Unit and integration tests
         run: npm test
 
+      - name: Documentation checks
+        run: npm run docs:check
+
       - name: Cloudflare Worker smoke
         run: npm run cf:smoke
 

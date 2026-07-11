@@ -284,9 +284,11 @@
 
 ### T. Chrome 扩展与云服务耦合
 
-- [x] `CE-001` 移除 extension 对 `api.raindrop.io` 直连：后台脚本统一通过云端 `/api/plugins/raindropSync/*` 接口执行映射/同步，不再依赖 Raindrop token
-- [x] `CE-002` 优化 Options UI：用云端返回的集合/映射配置替代本地 Raindrop collection/folder 选择，隐藏 Raindrop token 输入
-- [x] `CE-003` 统一状态与设备管理：扩展侧仅读取/上报云端 device 状态，确保手动/自动同步均走服务器任务队列
+- [x] `CE-001` 移除 extension 对 `api.raindrop.io` 直连：Chrome 书签快照统一通过云端 `/api/chrome-sync` 同步，不再依赖 Raindrop token
+- [x] `CE-002` 优化 Options UI：统一 Rainbow 地址、API Token、自动识别、连接测试和 Chrome ↔ Rainbow 自动同步配置
+- [x] `CE-003` 统一状态与设备管理：扩展通过 `/api/plugins/raindropSync/devices/*` 注册和上报状态，手动/自动同步共用 Chrome 快照协议与镜像索引
+
+当前已知限制：扩展预览只阻止 Chrome 侧写入，仍可能通过 `/api/chrome-sync` 修改 Rainbow。契约与修复方向见 `docs/CHROME_EXTENSION_SYNC.md`。
 
 ## AI 能力扩展（提供商接入）
 

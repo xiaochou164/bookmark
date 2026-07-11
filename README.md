@@ -1,8 +1,12 @@
 # Rainbow（Cloud Bookmarks）
 
-一个参考 Raindrop 工作流实现的云书签管理软件（本地可运行），包含 Web 工作台、插件系统、Raindrop 双向同步插件、抓取/预览/阅读模式、导入导出、协作与产品化接口等能力。
+一个参考 Raindrop 工作流实现的云书签管理软件，生产主路径运行在 Cloudflare Workers，包含 Web 工作台、浏览器书签同步、服务端 Raindrop 插件、抓取/预览/阅读模式、导入导出、协作与产品化接口等能力。
 
-当前代码库已经从早期脚本/MVP 演进为完整前后端项目，并持续在做 Raindrop 风格前端对齐。
+当前代码库已经从早期脚本/MVP 演进为完整前后端项目，并完成一轮基于 Raindrop 真实截图与运行时 DOM 的工作台、设置页和详情页对齐。
+
+- 生产地址：`https://bookmark.sundays.ink`
+- 架构说明：`docs/ARCHITECTURE.md`
+- 工程文档索引：`docs/README.md`
 
 ## 当前状态（截至本仓库当前版本）
 
@@ -38,16 +42,15 @@
 - 高亮 / 注释
 - 提醒（扫描、snooze、dismiss、clear）
 
-### 3. 插件与同步（Raindrop）
+### 3. 浏览器扩展与同步
 
-- 插件配置 / 预演 / 执行 / 运行日志 / 任务队列
-- `raindropSync` 双向同步（Chrome/本地书签 <-> Raindrop）
-- 顶级自动映射 + 手动映射
-- 删除同步（可选）
-- 防混乱机制：`deviceId`、lease、cursor、tombstone、幂等 `op_id`
-- 调度器（暂停/恢复/窗口/并发限制）
-- 设备注册与云端配置下发
-- 健康面板与审计视图
+- Chrome/Safari 扩展：浏览器书签 ↔ Rainbow 云书签，主协议为 `/api/chrome-sync`
+- API Token 自动识别、设备注册、状态上报、自动同步和镜像索引
+- Chrome 新增、改名、移动、删除与云端差异回传
+- 服务端 `raindropSync` 插件：独立承担 Rainbow ↔ Raindrop 的配置、任务、调度、健康与审计
+- 详细契约：`docs/CHROME_EXTENSION_SYNC.md`
+
+已知限制：扩展“预览变更”目前不会修改 Chrome，但仍可能写入 Rainbow 服务端。修复 dry-run 语义前，请勿把预览当作完全无写入操作。
 
 ### 4. 导入导出与协作
 
@@ -95,7 +98,7 @@ npm start
 ```bash
 npm run cf:check
 npm run cf:smoke
-npm run cf:smoke:remote -- https://rainbow.<subdomain>.workers.dev
+npm run cf:smoke:remote -- https://bookmark.sundays.ink
 npm run cf:d1:create
 npm run cf:d1:migrate:local
 npm run cf:dev
@@ -149,7 +152,8 @@ npm run cf:smoke
 远端 Worker 基础验收：
 
 ```bash
-npm run cf:smoke:remote -- https://rainbow.<subdomain>.workers.dev
+npm run cf:smoke:remote -- https://bookmark.sundays.ink
+npm run extension:smoke:remote -- https://bookmark.sundays.ink
 ```
 
 这两条通过时，当前仓库至少已经覆盖：
@@ -196,12 +200,21 @@ RATE_LIMIT_MAX=600
 
 ```bash
 npm test
+npm run docs:check
 npm run cf:smoke
 npm run ui:check
+npm run ui:browser
+npm run extension:check
 npm run ops:drill
 ```
-- plugin tasks / io tasks / ai tasks / backup tasks
-- collab shares / public links / `/public/c/:token(.json)`
+
+浏览器扩展的远端契约可单独执行：
+
+```bash
+npm run extension:smoke:remote -- https://bookmark.sundays.ink
+```
+
+该命令覆盖 Token、设备注册、Chrome 快照同步、重复去重、云端回传和状态上报，并输出 `previewMutatedServer` 已知限制探测结果。
 
 ## 本地旧数据迁移
 
@@ -238,6 +251,11 @@ npm run cf:d1:migrate:remote
 npm run cf:migrate:data
 npm run cf:deploy
 npm run cf:release
+npm run docs:check
+npm run ui:check
+npm run ui:browser
+npm run extension:check
+npm run extension:smoke:remote -- https://bookmark.sundays.ink
 ```
 
 ## 主要 API（示例）
@@ -282,6 +300,11 @@ npm run cf:release
 - `GET/PUT /api/plugins/raindropSync/schedule`
 - `GET /api/plugins/raindropSync/audit`
 - `GET /api/plugins/raindropSync/health`
+- `POST /api/plugins/raindropSync/devices/register`
+- `POST /api/plugins/raindropSync/devices/:deviceId/status`
+- `GET /api/chrome-sync/bookmarks`
+- `POST /api/chrome-sync`
+- `POST /api/chrome-sync/push`
 
 导入导出：
 

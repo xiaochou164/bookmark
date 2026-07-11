@@ -1136,3 +1136,12 @@
 - 内容：归档 Raindrop 登录态真实参照截图和 DOM 度量到 `docs/screenshots/raindrop-reference/`；设置页收口为 300px 浅灰侧栏 + 白底应用设置表单；书签详情/编辑页收口为轻量右侧 inspector；侧栏宽度偏好最小值提升到 300px，避免旧本地偏好回退到 280px。`ui-browser-audit` 增加大样本门禁，自动验证 153 个集合虚拟化、104 个标签折叠/展开虚拟化、99 条书签加载更多和 300px 侧栏。执行 `npm run cf:release` 完成生产部署。
 - 变更文件：`/Users/xiaochou164/Desktop/mycode/Rainbow/public/settings.html`, `/Users/xiaochou164/Desktop/mycode/Rainbow/public/app.mjs`, `/Users/xiaochou164/Desktop/mycode/Rainbow/public/css/settings.css`, `/Users/xiaochou164/Desktop/mycode/Rainbow/public/css/components.css`, `/Users/xiaochou164/Desktop/mycode/Rainbow/public/css/responsive.css`, `/Users/xiaochou164/Desktop/mycode/Rainbow/scripts/ui-browser-audit.mjs`, `/Users/xiaochou164/Desktop/mycode/Rainbow/docs/UI_UX_AUDIT_TODO.md`, `/Users/xiaochou164/Desktop/mycode/Rainbow/docs/UI_UX_TEST_CHECKLIST.md`, `/Users/xiaochou164/Desktop/mycode/Rainbow/docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`, `/Users/xiaochou164/Desktop/mycode/Rainbow/docs/screenshots/raindrop-reference/`
 - 验证：`git diff --check`；`npm run cf:check`；`npm run cf:smoke`；`npm run ui:check`；`npm test`；`npm run ops:drill`；`npm run ui:browser`（28 张截图，大样本门禁通过）；`npm run cf:release`；远端 `/api/health` 返回 `runtime=cloudflare-workers`、`schemaVersion=2`；`npm run cf:smoke:remote -- https://bookmark.sundays.ink` 7/7 通过。Cloudflare Worker 版本：`aa7216d6-45c3-4a17-867c-58c67c926e0d`。
+
+## 2026-07-11 Raindrop 1:1 复核、生产发布与扩展契约验证
+
+- 待办：UI 1:1 复核、扩展服务端交互验证、工程文档收口
+- 内容：基于 Raindrop 实时 DOM 和参考截图重新核对工作台几何，修正 48px 顶栏、16px 水平节奏、56×48px 列表缩略图、列表动作溢出、通知入口和添加 split-button 圆角；浏览器审计扩展到 33 张截图。生产部署到 `bookmark.sundays.ink`。新增扩展远端契约 smoke，验证 Token、设备注册、Chrome 快照同步、云端回传、去重和设备状态；确认预览仍可能写入 Rainbow 的真实限制。新增架构总览与扩展同步专题文档，纠正 README、扩展 README、TODO 和历史接口口径。
+- 变更文件：`README.md`, `docs/ARCHITECTURE.md`, `docs/CHROME_EXTENSION_SYNC.md`, `docs/README.md`, `docs/UI_UX_AUDIT_TODO.md`, `docs/UI_UX_TEST_CHECKLIST.md`, `docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`, `chrome-extension/README.md`, `scripts/extension-server-smoke.mjs`, `public/`, `chrome-extension/`, `safari-extension/`
+- 验证：`npm run ui:check`；`npm run ui:browser`（33 张截图）；`npm test`；`npm run cf:check`；`npm run extension:check`；`npm run cf:smoke:remote -- https://bookmark.sundays.ink`；`npm run extension:smoke:remote -- https://bookmark.sundays.ink`；线上 CSS/JS SHA-256 与本地一致；添加按钮左右外侧圆角计算样式正确。
+- 部署：Cloudflare Worker `d0ba8be8-0204-4ac7-b92f-b4fa5167306e`，后续样式修正版 `34abcaf6-b3f9-498e-a355-6c82b0349776`；代码提交 `6207e8b`。
+- 后续：为 `/api/chrome-sync` 增加真正的服务端 dry-run，修正扩展预览文案和行为后重新执行扩展远端 smoke。

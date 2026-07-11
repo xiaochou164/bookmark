@@ -2,13 +2,21 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Rainbow Cloud API",
-    "version": "0.1.0",
-    "description": "Baseline OpenAPI spec for Rainbow Cloud (Phase 0)."
+    "version": "0.2.0",
+    "description": "Maintained baseline OpenAPI spec for Rainbow Cloud. Worker source remains authoritative."
   },
   "servers": [
-    { "url": "http://localhost:3789" }
+    { "url": "https://bookmark.sundays.ink", "description": "Production" },
+    { "url": "http://127.0.0.1:8787", "description": "Wrangler local" },
+    { "url": "http://localhost:3789", "description": "Express compatibility server" }
   ],
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
     "schemas": {
       "ApiError": {
         "type": "object",
@@ -63,6 +71,42 @@
       "PluginRunResult": {
         "type": "object",
         "additionalProperties": true
+      },
+      "ChromeSyncBookmark": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "chromeId": { "type": "string" },
+          "folderPath": { "type": "array", "items": { "type": "string" } },
+          "createdAt": { "type": "number" }
+        },
+        "required": ["url", "title"]
+      },
+      "ChromeSyncFolder": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "array", "items": { "type": "string" } },
+          "bookmarks": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ChromeSyncBookmark" }
+          }
+        },
+        "required": ["name", "bookmarks"]
+      },
+      "ChromeSyncRequest": {
+        "type": "object",
+        "properties": {
+          "folders": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ChromeSyncFolder" }
+          },
+          "deviceId": { "type": "string" },
+          "mirrorIndex": { "type": "object", "additionalProperties": true },
+          "deleteSync": { "type": "boolean" }
+        },
+        "required": ["folders"]
       }
     },
     "responses": {
@@ -276,6 +320,69 @@
           "200": { "description": "Run result", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PluginRunResult" } } } },
           "500": { "$ref": "#/components/responses/Error" }
         }
+      }
+    },
+    "/api/auth/tokens": {
+      "get": {
+        "summary": "List API tokens for the current user",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Token metadata list" } }
+      },
+      "post": {
+        "summary": "Create an API token using the current authenticated session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "name": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "New token; plaintext token is returned only at creation" } }
+      }
+    },
+    "/api/chrome-sync/bookmarks": {
+      "get": {
+        "summary": "List Rainbow bookmarks in Chrome sync format",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Cloud bookmark list with folder paths" } }
+      }
+    },
+    "/api/chrome-sync": {
+      "post": {
+        "summary": "Merge a Chrome bookmark snapshot and return Chrome-side differences",
+        "description": "This endpoint currently mutates Rainbow state. It is not a dry-run endpoint.",
+        "security": [{ "BearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChromeSyncRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Sync stats, toAddInChrome, toDeleteInChrome and mirrorIndex" },
+          "400": { "$ref": "#/components/responses/Error" }
+        }
+      }
+    },
+    "/api/plugins/raindropSync/devices/register": {
+      "post": {
+        "summary": "Register or refresh a browser extension device",
+        "security": [{ "BearerAuth": [] }],
+        "responses": { "200": { "description": "Registered device id" } }
+      }
+    },
+    "/api/plugins/raindropSync/devices/{deviceId}/status": {
+      "post": {
+        "summary": "Report browser extension device and sync status",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [{ "in": "path", "name": "deviceId", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Device status accepted" } }
       }
     },
     "/api/product/dedupe/scan": {

@@ -199,6 +199,21 @@ npx wrangler d1 execute rainbow --remote --file data/cf-import.sql
 
 ## 11. 远端验收记录
 
+### 2026-07-11
+
+- 分支/提交基线：`master` / `6207e8b`
+- Cloudflare Worker 版本：`34abcaf6-b3f9-498e-a355-6c82b0349776`
+- 生产地址：`https://bookmark.sundays.ink`
+- `npm run ui:check`：通过；CSS、脚本和 DOM 性能预算通过。
+- `npm run ui:browser`：通过，33 张截图；覆盖四档页面、搜索建议、列表 hover、排序、通知菜单和详情编辑态。
+- `npm test`：通过，6/6。
+- `npm run cf:check`：通过。
+- `npm run extension:check`：通过，Chrome 语法与 Safari 生成成功。
+- `npm run cf:smoke:remote -- https://bookmark.sundays.ink`：7/7 通过。
+- `npm run extension:smoke:remote -- https://bookmark.sundays.ink`：Token、设备注册、Chrome → Rainbow、Rainbow → Chrome、重复去重和设备状态通过。
+- 扩展验收限制：`previewMutatedServer=true`，预览当前仍可能写入 Rainbow，不能视为完全无副作用的 dry-run。
+- 部署说明：主版本 `d0ba8be8-0204-4ac7-b92f-b4fa5167306e` 上传 10 个前端资源；随后 `34abcaf6-b3f9-498e-a355-6c82b0349776` 修复添加 split-button 圆角并完成线上计算样式核验。
+
 ### 2026-07-05
 
 - 分支/提交基线：当前工作区（包含 Raindrop 对齐与 UI 大样本门禁）

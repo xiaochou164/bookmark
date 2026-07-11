@@ -4,12 +4,12 @@
 
 ## 快速阅读路径
 
-- 新人接手：先读 `README.md`，再读 `docs/IMPLEMENTATION_PLAN.md` 和 `docs/TODO.md`。
-- 本地开发：读 `README.md` 的启动、脚本和环境变量章节，然后跑 `npm test`、`npm run cf:check`、`npm run ui:check`。
+- 新人接手：先读 `README.md` 和 `docs/ARCHITECTURE.md`，再按需查看 `docs/IMPLEMENTATION_PLAN.md`、`docs/TODO.md` 和 `docs/DEV_LOG.md`。
+- 本地开发：读 `README.md` 的启动、脚本和环境变量章节，然后跑 `npm test`、`npm run docs:check`、`npm run cf:check`、`npm run ui:check`。
 - Cloudflare 发布：读 `docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`，再按需看 `docs/CLOUDFLARE_WORKERS_MIGRATION_TODO.md`。
 - 前端 Raindrop 对齐：先读 `docs/UI_UX_AUDIT_TODO.md`，再读 `docs/RA_DOM_MY0_ACCEPTANCE_CHECKLIST.md`、`docs/RA_DOM_MY0_SCREENSHOT_COMPARE.md`、`docs/RA_DOM_MY0_INTERACTION_REGRESSION_CHECKLIST.md`。
 - 前端回归：读 `docs/UI_UX_TEST_CHECKLIST.md` 和 `docs/FRONTEND_REGRESSION_CHECKLIST.md`。
-- 浏览器扩展同步：读 `chrome-extension/README.md` 和 `safari-extension/README.md`，并关注后端 `/api/chrome-sync*` 与 `/api/plugins/raindropSync/*`。
+- 浏览器扩展同步：先读 `docs/CHROME_EXTENSION_SYNC.md`，再读 `chrome-extension/README.md` 和 `safari-extension/README.md`。
 
 ## 文档分组
 
@@ -17,6 +17,7 @@
 
 - `README.md`：项目定位、当前运行模型、启动命令、主要 API 和核心说明。
 - `docs/README.md`：当前文档索引与维护规则。
+- `docs/ARCHITECTURE.md`：当前生产架构、目录职责、关键数据流、验证矩阵和已知限制。
 - `docs/openapi.json`：OpenAPI 基线，用于接口消费方或接口审计。
 
 ### 计划与收口
@@ -46,6 +47,7 @@
 
 ### 浏览器扩展
 
+- `docs/CHROME_EXTENSION_SYNC.md`：Chrome 快照同步协议、Token、设备、正式同步、预览限制和远端 smoke。
 - `chrome-extension/README.md`：Chrome 安装、Safari 构建入口、配置、测试建议和同步注意事项。
 - `safari-extension/README.md`：Safari Web Extension 生成产物说明和 Xcode 转换步骤。
 - 扩展默认连接主域名应为 `https://bookmark.sundays.ink`；旧 `workers.dev` 默认值会迁移到主域名。
@@ -61,5 +63,7 @@
 - 新增大块计划先写入 `docs/TODO.md` 或对应清单，完成后在 `docs/DEV_LOG.md` 追加记录。
 - Cloudflare 发布或远端验证结果追加到 `docs/CLOUDFLARE_ACCEPTANCE_CHECKLIST.md`。
 - UI 对齐变更同时更新对应 Raindrop/前端清单，并保留截图基线路径。
+- 浏览器扩展的请求路径、响应字段或语义变化时，同步更新 `docs/CHROME_EXTENSION_SYNC.md`、`chrome-extension/README.md` 和 `docs/openapi.json`。
 - 文档链接优先使用相对路径，避免写死本机绝对路径。
+- 修改关键文档或 OpenAPI 后运行 `npm run docs:check`。
 - 只保留一个事实入口：当前状态以 `README.md` 和本索引为准，历史细节放 `DEV_LOG.md`。
