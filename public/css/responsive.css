@@ -133,6 +133,26 @@
 }
 
 @media (max-width: 640px) {
+  .view-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 48px;
+    padding-inline: 12px;
+  }
+
+  .view-header .actions,
+  .view-header .actions-header-tools,
+  #headerSortMenuWrap,
+  #headerViewMenuWrap,
+  #headerMoreMenuWrap {
+    width: auto;
+  }
+
+  .view-header .actions-header-tools {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
   .toolbar {
     grid-template-columns: minmax(0, 1fr);
     gap: var(--space-2);
@@ -182,6 +202,11 @@
     grid-template-columns: auto 72px minmax(0, 1fr);
     align-items: center;
     gap: 8px 10px;
+  }
+
+  .cards.layout-list .bookmark-row-select {
+    position: static;
+    transform: none;
   }
 
   .cards.layout-list .bookmark-row-select {

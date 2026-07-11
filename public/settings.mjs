@@ -318,10 +318,10 @@ function settingsSectionElement(sectionKey) {
     app: 'settingsSectionAccount',
     account: 'settingsSectionAccount',
     collab: 'settingsSectionCollab',
-    import: 'settingsSectionOperations',
+    import: 'settingsSectionImport',
     product: 'settingsSectionProduct',
     operations: 'settingsSectionOperations',
-    security: 'settingsSectionAccount',
+    security: 'settingsSectionSecurity',
     ai: 'settingsSectionAi'
   };
   return byId(map[key] || '');
@@ -330,11 +330,7 @@ function settingsSectionElement(sectionKey) {
 function setActiveSettingsNav(sectionKey) {
   const sections = ['app', 'account', 'product', 'import', 'collab', 'operations', 'security', 'ai'];
   const key = sections.includes(String(sectionKey || '')) ? String(sectionKey) : 'app';
-  const targetSection = ({
-    app: 'account',
-    import: 'operations',
-    security: 'account'
-  }[key] || key);
+  const targetSection = ({ app: 'account' }[key] || key);
   settingsNavActiveSection = key;
   document.querySelectorAll('[data-settings-target]').forEach((btn) => {
     btn.classList.toggle('active', String(btn.getAttribute('data-settings-target')) === key);
@@ -343,6 +339,19 @@ function setActiveSettingsNav(sectionKey) {
   document.querySelectorAll('[data-settings-section]').forEach((sec) => {
     sec.classList.toggle('settings-section-hidden', String(sec.getAttribute('data-settings-section')) !== targetSection);
   });
+  document.querySelectorAll('[data-settings-pages]').forEach((panel) => {
+    const pages = String(panel.getAttribute('data-settings-pages') || '').split(/\s+/).filter(Boolean);
+    panel.classList.toggle('settings-panel-page-hidden', targetSection === 'account' && !pages.includes(key));
+  });
+  const accountSectionTitle = byId('accountSectionTitle');
+  const accountSectionSubtitle = byId('accountSectionSubtitle');
+  if (accountSectionTitle && accountSectionSubtitle) {
+    const isApp = key === 'app';
+    accountSectionTitle.textContent = isApp ? '应用' : (key === 'security' ? '2FA' : '帐户');
+    accountSectionSubtitle.textContent = isApp
+      ? '主题、密度与界面行为偏好。'
+      : (key === 'security' ? '账号安全、登录会话与访问凭据。' : '账号资料、API Token、登录会话与同步设备。');
+  }
   const titleEl = byId('settingsPageTitle');
   if (titleEl) {
     titleEl.textContent = ({
@@ -394,10 +403,7 @@ function initSettingsNav() {
         .filter((e) => e.isIntersecting)
         .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
       const key = visible?.target?.getAttribute?.('data-settings-section');
-      const aliases = {
-        account: ['app', 'account', 'security'],
-        operations: ['import', 'operations']
-      };
+      const aliases = { account: ['app', 'account'] };
       if (key && !(aliases[key] || [key]).includes(settingsNavActiveSection)) setActiveSettingsNav(key);
     }, {
       root: null,

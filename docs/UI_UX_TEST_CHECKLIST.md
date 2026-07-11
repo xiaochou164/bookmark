@@ -9,7 +9,7 @@
 - `npm run cf:check` 通过。
 - `npm run cf:smoke` 通过，覆盖 Worker 主路径、AI 治理、公开集合 AI 导览、任务与协作流程。
 - `npm run ui:check` 通过，覆盖 CSS 分层、静态 UI 门禁、性能预算、对比度、触控目标和 DOM 预算。
-- `npm run ui:browser` 通过，生成 28 张截图到 `docs/screenshots/ui-visual-baseline/`，覆盖登录、主工作台、详情、设置、插件、公开页的四档视口，检查无页面级横向溢出、键盘烟测、控制台/网络错误、200% 缩放、reduced-motion，以及大样本集合/标签/加载更多门禁。
+- `npm run ui:browser` 通过，生成 32 张截图到 `docs/screenshots/ui-visual-baseline/`，覆盖登录、主工作台、详情、设置、插件、公开页的四档视口，并补充搜索建议、列表行 hover、排序菜单和详情编辑态；检查无页面级横向溢出、键盘烟测、控制台/网络错误、200% 缩放、reduced-motion，以及大样本集合/标签/加载更多门禁。
 - Raindrop 登录态参照截图与 DOM 度量已归档到 `docs/screenshots/raindrop-reference/`，用于核对 300px 侧栏、80px 列表行和设置页应用壳结构。
 - `npm test` 通过，覆盖队列、对象存储、指标、日志脱敏和 HTTP 安全中间件。
 

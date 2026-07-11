@@ -1145,7 +1145,7 @@ function layoutMenuLabel(mode) {
 
 function renderHeaderMenuControls() {
   const sortBtn = byId('headerSortBtn');
-  if (sortBtn) sortBtn.textContent = sortLabelText(state.filters.sort);
+  if (sortBtn) setIconButtonLabel(sortBtn, 'sort', sortLabelText(state.filters.sort));
   byId('headerSortMenu')?.querySelectorAll('[data-sort-option]').forEach((el) => {
     const active = String(el.dataset.sortOption || '') === String(state.filters.sort || '');
     el.classList.toggle('active', active);
@@ -1153,7 +1153,7 @@ function renderHeaderMenuControls() {
   });
 
   const viewBtn = byId('headerViewBtn');
-  if (viewBtn) viewBtn.textContent = layoutMenuLabel(bookmarkLayoutMode);
+  if (viewBtn) setIconButtonLabel(viewBtn, 'grid', layoutMenuLabel(bookmarkLayoutMode));
   byId('headerViewMenu')?.querySelectorAll('[data-layout-option]').forEach((el) => {
     const active = String(el.dataset.layoutOption || '') === String(bookmarkLayoutMode || '');
     el.classList.toggle('active', active);
@@ -1974,7 +1974,7 @@ function hydrateWorkbenchHeaderIcons() {
 
   const askBtn = byId('askAiBtn');
   if (askBtn && !askBtn.dataset.iconHydrated) {
-    setIconButtonLabel(askBtn, 'ai', '询问 AI', { srOnly: true });
+    setIconButtonLabel(askBtn, 'ai', '询问');
     askBtn.dataset.iconHydrated = '1';
   }
 
@@ -3145,7 +3145,8 @@ function renderSidebar() {
   const nav = byId('quickNav');
   nav?.classList.add('sidebar-system-list');
   const folderIsAll = String(state.filters.folderId || 'all') === 'all';
-  nav.innerHTML = renderSidebarVirtualList(nav, quickViews, (item) => {
+  const primaryViews = quickViews.filter((item) => ['all', 'inbox', 'trash'].includes(String(item.key || '')));
+  nav.innerHTML = renderSidebarVirtualList(nav, primaryViews, (item) => {
       const active = folderIsAll && state.filters.view === item.key ? 'active' : '';
       let count = state.stats.total || 0;
       if (item.key === 'favorites') count = state.stats.favorites || 0;
@@ -3241,7 +3242,19 @@ function renderSidebar() {
   const quickFiltersList = byId('quickFiltersList');
   const quickFilterItems = buildSidebarQuickFilters().filter((x) => Number(x.count || 0) > 0);
   if (quickFiltersList) {
-    quickFiltersList.innerHTML = quickFilterItems.length
+    const secondaryViews = quickViews.filter((item) => ['favorites', 'archive'].includes(String(item.key || '')));
+    const secondaryHtml = secondaryViews.map((item) => {
+      const count = item.key === 'favorites' ? Number(state.stats.favorites || 0) : Number(state.stats.archive || 0);
+      const active = folderIsAll && state.filters.view === item.key ? 'active' : '';
+      return `<div class="sidebar-row sidebar-filter-row ${active}" data-secondary-system-view-row="${escapeHtml(item.key)}">
+        <button type="button" class="sidebar-row-main" data-secondary-system-view="${escapeHtml(item.key)}">
+          <span class="sidebar-row-icon" aria-hidden="true">${iconSvg(item.icon || 'search')}</span>
+          <span class="sidebar-row-title">${escapeHtml(item.label)}</span>
+          <span class="sidebar-row-count muted">${count}</span>
+        </button>
+      </div>`;
+    }).join('');
+    const customHtml = quickFilterItems.length
       ? renderSidebarVirtualList(quickFiltersList, quickFilterItems, (item) => {
         const active = isQuickFilterActiveQuery(item.query) ? 'active' : '';
         return `<div class="sidebar-row sidebar-filter-row ${active}" data-quick-filter-row="${escapeHtml(item.id)}" data-quick-filter-query="${escapeHtml(item.query)}">
@@ -3253,7 +3266,14 @@ function renderSidebar() {
             <button type="button" class="sidebar-row-more ghost" data-quick-filter-menu="${escapeHtml(item.id)}" title="更多" aria-label="更多">…</button>
           </div>`;
       })
-      : renderSidebarVirtualList(quickFiltersList, [], () => '') || `<div class="sidebar-empty muted">暂无快速过滤</div>`;
+      : '';
+    quickFiltersList.innerHTML = `${secondaryHtml}${customHtml}`;
+
+    quickFiltersList.querySelectorAll('[data-secondary-system-view]').forEach((el) => {
+      el.addEventListener('click', async () => {
+        await activateSystemView(el.getAttribute('data-secondary-system-view'));
+      });
+    });
 
     quickFiltersList.querySelectorAll('[data-quick-filter]').forEach((el) => {
       el.addEventListener('click', async (e) => {
@@ -7210,6 +7230,7 @@ function addRealtimeNotification(title, message) {
 function renderRealtimeNotifications() {
   const btn = byId('realtimeNotificationsBtn');
   const badge = byId('realtimeNotificationsBadge');
+  const headerBadge = byId('headerNotificationsBadge');
   const menu = byId('realtimeNotificationsMenu');
   if (btn) btn.setAttribute('aria-expanded', String(realtimeNotificationsOpen));
   if (menu) menu.classList.toggle('hidden', !realtimeNotificationsOpen);
@@ -7217,6 +7238,10 @@ function renderRealtimeNotifications() {
   if (badge) {
     badge.textContent = String(Math.min(99, unread));
     badge.classList.toggle('hidden', unread <= 0);
+  }
+  if (headerBadge) {
+    headerBadge.textContent = String(Math.min(99, unread));
+    headerBadge.classList.toggle('hidden', unread <= 0);
   }
   if (!menu) return;
   if (!realtimeNotifications.length) {
@@ -7495,6 +7520,11 @@ function bindActions() {
     e.stopPropagation();
     const action = String(item.dataset.headerMoreAction || '');
     setHeaderMoreMenuOpen(false);
+    if (action === 'notifications') {
+      realtimeNotificationsOpen = true;
+      realtimeNotifications = realtimeNotifications.map((notification) => ({ ...notification, unread: false }));
+      renderRealtimeNotifications();
+    }
     if (action === 'export') byId('exportBtn')?.click();
     if (action === 'ai-folder-summary') openAiFolderSummaryDialog();
     if (action === 'plugin') byId('pluginPanelBtn')?.click();

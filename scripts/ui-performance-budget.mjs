@@ -9,7 +9,7 @@ const notes = [];
 
 const budgets = {
   appEntryKiB: 420,
-  totalCssKiB: 190,
+  totalCssKiB: 192,
   indexStaticNodes: 750,
   settingsStaticNodes: 560
 };

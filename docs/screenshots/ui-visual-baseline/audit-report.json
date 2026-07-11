@@ -1,6 +1,6 @@
 {
-  "createdAt": "2026-07-05T10:42:19.543Z",
-  "baseUrl": "http://127.0.0.1:55905",
+  "createdAt": "2026-07-11T09:31:13.586Z",
+  "baseUrl": "http://127.0.0.1:59596",
   "viewports": [
     {
       "name": "mobile",
@@ -90,57 +90,57 @@
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           }
         ]
       }
@@ -211,57 +211,57 @@
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           },
           {
             "tag": "div",
             "id": "",
             "className": "bookmark-row-side",
-            "scrollWidth": 96,
-            "clientWidth": 92
+            "scrollWidth": 108,
+            "clientWidth": 104
           }
         ]
       }
@@ -547,7 +547,7 @@
       },
       "screenshot": "docs/screenshots/ui-visual-baseline/public-mobile-360.png",
       "overflow": {
-        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
         "clientWidth": 360,
         "scrollWidth": 360,
         "ok": true,
@@ -563,7 +563,7 @@
       },
       "screenshot": "docs/screenshots/ui-visual-baseline/public-small-640.png",
       "overflow": {
-        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
         "clientWidth": 640,
         "scrollWidth": 640,
         "ok": true,
@@ -579,7 +579,7 @@
       },
       "screenshot": "docs/screenshots/ui-visual-baseline/public-tablet-920.png",
       "overflow": {
-        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
         "clientWidth": 920,
         "scrollWidth": 920,
         "ok": true,
@@ -595,11 +595,327 @@
       },
       "screenshot": "docs/screenshots/ui-visual-baseline/public-desktop-1280.png",
       "overflow": {
-        "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+        "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
         "clientWidth": 1280,
         "scrollWidth": 1280,
         "ok": true,
         "offenders": []
+      }
+    },
+    {
+      "state": "search-suggest",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/search-suggest-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          }
+        ]
+      }
+    },
+    {
+      "state": "row-hover",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/row-hover-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          }
+        ]
+      }
+    },
+    {
+      "state": "sort-menu",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/sort-menu-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          }
+        ]
+      }
+    },
+    {
+      "state": "notifications-menu",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/notifications-menu-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          },
+          {
+            "tag": "div",
+            "id": "",
+            "className": "bookmark-row-side",
+            "scrollWidth": 108,
+            "clientWidth": 104
+          }
+        ]
+      }
+    },
+    {
+      "state": "detail-edit",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/ui-visual-baseline/detail-edit-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": [
+          {
+            "tag": "form",
+            "id": "detailForm",
+            "className": "",
+            "scrollWidth": 366,
+            "clientWidth": 354
+          }
+        ]
       }
     }
   ],
@@ -628,57 +944,57 @@
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         }
       ]
     },
@@ -713,57 +1029,57 @@
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         },
         {
           "tag": "div",
           "id": "",
           "className": "bookmark-row-side",
-          "scrollWidth": 96,
-          "clientWidth": 92
+          "scrollWidth": 108,
+          "clientWidth": 104
         }
       ]
     },
@@ -799,21 +1115,6 @@
       "path": "/",
       "clientWidth": 360,
       "scrollWidth": 360,
-      "ok": true,
-      "offenders": [
-        {
-          "tag": "div",
-          "id": "",
-          "className": "detail-panel-mode-switch",
-          "scrollWidth": 101,
-          "clientWidth": 96
-        }
-      ]
-    },
-    {
-      "path": "/",
-      "clientWidth": 640,
-      "scrollWidth": 640,
       "ok": true,
       "offenders": [
         {
@@ -827,6 +1128,21 @@
     },
     {
       "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "detail-panel-mode-switch",
+          "scrollWidth": 101,
+          "clientWidth": 96
+        }
+      ]
+    },
+    {
+      "path": "/",
       "clientWidth": 920,
       "scrollWidth": 920,
       "ok": true,
@@ -896,32 +1212,303 @@
       "offenders": []
     },
     {
-      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
       "clientWidth": 360,
       "scrollWidth": 360,
       "ok": true,
       "offenders": []
     },
     {
-      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
       "clientWidth": 640,
       "scrollWidth": 640,
       "ok": true,
       "offenders": []
     },
     {
-      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
       "clientWidth": 920,
       "scrollWidth": 920,
       "ok": true,
       "offenders": []
     },
     {
-      "path": "/public/c/6b8dbedd-a432-4199-8637-bfd8c12f84b7",
+      "path": "/public/c/e584f77a-b4c2-424c-ad65-d3a69d5dce06",
       "clientWidth": 1280,
       "scrollWidth": 1280,
       "ok": true,
       "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        },
+        {
+          "tag": "div",
+          "id": "",
+          "className": "bookmark-row-side",
+          "scrollWidth": 108,
+          "clientWidth": 104
+        }
+      ]
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": [
+        {
+          "tag": "form",
+          "id": "detailForm",
+          "className": "",
+          "scrollWidth": 366,
+          "clientWidth": 354
+        }
+      ]
     }
   ],
   "keyboard": {
@@ -964,32 +1551,32 @@
       {
         "tag": "BUTTON",
         "id": "",
-        "text": "收藏\n          2"
-      },
-      {
-        "tag": "BUTTON",
-        "id": "",
-        "text": "…"
-      },
-      {
-        "tag": "BUTTON",
-        "id": "",
-        "text": "归档\n          0"
-      },
-      {
-        "tag": "BUTTON",
-        "id": "",
-        "text": "…"
-      },
-      {
-        "tag": "BUTTON",
-        "id": "",
         "text": "废纸篓\n          0"
       },
       {
         "tag": "BUTTON",
         "id": "",
         "text": "…"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "collectionsSectionMenuBtn",
+        "text": "⋯"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "collapseAllCollectionsBtn",
+        "text": "▾"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "newCollectionBtn",
+        "text": "+"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "Design\n        1"
       }
     ]
   },

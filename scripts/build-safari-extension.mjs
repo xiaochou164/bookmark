@@ -11,7 +11,8 @@ const SOURCE_FILES = [
   'popup.js',
   'options.html',
   'options.js',
-  'shared.css'
+  'shared.css',
+  'logo.svg'
 ];
 
 const SAFARI_HOST_PERMISSIONS = [

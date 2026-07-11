@@ -22,6 +22,7 @@
   --radius-panel: 12px;
   --sidebar-width: 300px;
   --detail-width: 420px;
+  --layer-control-overlay: 1;
   --layer-sticky: 40;
   --layer-popover: 1200;
   --layer-drawer-backdrop: 1300;

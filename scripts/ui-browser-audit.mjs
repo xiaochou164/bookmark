@@ -139,7 +139,6 @@ async function startChrome() {
     '--headless=new',
     '--no-first-run',
     '--no-default-browser-check',
-    '--disable-gpu',
     '--disable-dev-shm-usage',
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${userDataDir}`,
@@ -335,6 +334,40 @@ async function captureState(session, baseUrl, viewport, state, publicPath) {
     await prepareWorkbench(session, baseUrl, 'list');
     await evaluate(session, `document.querySelector('#cards [data-id]')?.click()`);
     await waitForExpression(session, `Boolean(document.querySelector('.detail:not(.hidden), #detailCloseBtn'))`);
+  } else if (state === 'detail-edit') {
+    await prepareWorkbench(session, baseUrl, 'list');
+    await evaluate(session, `document.querySelector('#cards [data-id]')?.click()`);
+    await waitForExpression(session, `Boolean(document.querySelector('#detailPanelEditModeBtn'))`);
+    await evaluate(session, `document.querySelector('#detailPanelEditModeBtn')?.click()`);
+    await waitForExpression(session, `document.querySelector('#detailPanelEditModeBtn')?.getAttribute('aria-selected') === 'true'`);
+  } else if (state === 'search-suggest') {
+    await prepareWorkbench(session, baseUrl, 'list');
+    await evaluate(session, `(() => {
+      const input = document.querySelector('#searchInput');
+      if (!input) return;
+      input.focus();
+      input.value = 'example';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    })()`);
+    await waitForExpression(session, `!document.querySelector('#searchSuggestPopover')?.classList.contains('hidden')`);
+  } else if (state === 'row-hover') {
+    await prepareWorkbench(session, baseUrl, 'list');
+    const point = await evaluate(session, `(() => {
+      const rect = document.querySelector('#cards [data-id]')?.getBoundingClientRect();
+      return rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null;
+    })()`);
+    if (point) await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: point.x, y: point.y });
+    await waitForExpression(session, `getComputedStyle(document.querySelector('#cards [data-id] .bookmark-row-select')).opacity === '1'`);
+  } else if (state === 'sort-menu') {
+    await prepareWorkbench(session, baseUrl, 'list');
+    await evaluate(session, `document.querySelector('#headerSortBtn')?.click()`);
+    await waitForExpression(session, `!document.querySelector('#headerSortMenu')?.classList.contains('hidden')`);
+  } else if (state === 'notifications-menu') {
+    await prepareWorkbench(session, baseUrl, 'list');
+    await evaluate(session, `document.querySelector('#headerMoreBtn')?.click()`);
+    await waitForExpression(session, `!document.querySelector('#headerMoreMenu')?.classList.contains('hidden')`);
+    await evaluate(session, `document.querySelector('[data-header-more-action="notifications"]')?.click()`);
+    await waitForExpression(session, `!document.querySelector('#realtimeNotificationsMenu')?.classList.contains('hidden')`);
   } else if (state === 'settings') {
     await navigate(session, `${baseUrl}/settings.html#app`);
     await waitForExpression(session, `Boolean(document.querySelector('#settingsSectionAccount'))`);
@@ -522,6 +555,11 @@ async function main() {
         report.screenshots.push(result);
         report.overflow.push(result.overflow);
       }
+    }
+    for (const state of ['search-suggest', 'row-hover', 'sort-menu', 'notifications-menu', 'detail-edit']) {
+      const result = await captureState(session, server.baseUrl, viewports[3], state, seed.publicPath);
+      report.screenshots.push(result);
+      report.overflow.push(result.overflow);
     }
     report.keyboard = await keyboardSmoke(session, server.baseUrl);
     report.largeSample = await largeSampleSmoke(session, server.baseUrl);

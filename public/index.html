@@ -125,14 +125,12 @@
           </div>
         </div>
         <div class="toolbar-right">
-          <div id="realtimeNotificationsWrap" class="realtime-notifications-wrap">
+          <div id="realtimeNotificationsWrap" class="realtime-notifications-wrap hidden">
             <button id="realtimeNotificationsBtn" class="ghost realtime-notifications-btn" type="button"
               aria-haspopup="menu" aria-expanded="false" aria-label="实时通知" title="实时通知"><span
                 class="sr-only">实时通知</span>
               <span id="realtimeNotificationsBadge" class="realtime-notifications-badge hidden">0</span>
             </button>
-            <div id="realtimeNotificationsMenu" class="realtime-notifications-menu hidden" role="menu"
-              aria-label="实时通知"></div>
           </div>
           <button id="askAiBtn" class="ghost toolbar-ask-btn" type="button" aria-label="询问 AI" title="询问 AI"><span
               class="sr-only">询问 AI</span></button>
@@ -297,6 +295,8 @@
               <button id="headerMoreBtn" type="button" class="ghost header-tool-btn header-menu-trigger"
                 aria-haspopup="menu" aria-expanded="false" aria-label="更多" title="更多">更多</button>
               <div id="headerMoreMenu" class="header-menu hidden" role="menu" aria-label="更多菜单">
+                <button type="button" class="header-menu-item" data-header-more-action="notifications"
+                  role="menuitem">实时通知 <span id="headerNotificationsBadge" class="header-menu-badge hidden">0</span></button>
                 <button type="button" class="header-menu-item" data-header-more-action="export"
                   role="menuitem">导出书签</button>
                 <button type="button" class="header-menu-item" data-header-more-action="ai-folder-summary"
@@ -304,6 +304,8 @@
                 <button type="button" class="header-menu-item" data-header-more-action="plugin"
                   role="menuitem">同步插件</button>
               </div>
+              <div id="realtimeNotificationsMenu" class="realtime-notifications-menu hidden" role="menu"
+                aria-label="实时通知"></div>
             </div>
             <button id="exportBtn" class="ghost header-tool-btn ra-export-btn" aria-label="导出书签"
               title="导出书签">导出书签</button>

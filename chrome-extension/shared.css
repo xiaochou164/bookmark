@@ -75,7 +75,7 @@ button[disabled] {
 
 .btn-accent {
   color: #fff;
-  background: #4f46e5;
+  background: var(--color-primary);
 }
 
 .btn-icon {
@@ -173,9 +173,14 @@ button[disabled] {
   display: grid;
   place-items: center;
   border-radius: 8px;
+  overflow: hidden;
   background: rgba(255, 255, 255, .22);
-  font-size: 12px;
-  font-weight: 900;
+}
+
+.popup-logo img {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .popup-header-text strong,
@@ -276,21 +281,23 @@ button[disabled] {
 .options-body {
   min-width: 320px;
   padding: var(--space-4);
+  background: var(--color-surface);
 }
 
 .options-shell {
-  width: min(900px, 100%);
+  width: min(592px, 100%);
   margin: 0 auto;
   display: grid;
-  gap: var(--space-4);
+  gap: 0;
 }
 
 .options-section {
   display: grid;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
+  padding: 24px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
   background: var(--color-surface);
 }
 

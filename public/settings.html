@@ -68,12 +68,12 @@
           <section id="settingsSectionAccount" class="settings-section" data-settings-section="account">
             <div class="settings-section-head">
               <div>
-                <h2>应用</h2>
-                <p class="muted">语言、界面偏好、账号资料、API Token、登录会话与同步设备。</p>
+                <h2 id="accountSectionTitle">应用</h2>
+                <p id="accountSectionSubtitle" class="muted">主题、密度与界面行为偏好。</p>
               </div>
             </div>
             <div class="settings-section-grid">
-              <section class="settings-panel">
+              <section class="settings-panel" data-settings-pages="app">
                 <h3>界面偏好</h3>
                 <div class="settings-form">
                   <label>主题
@@ -92,7 +92,7 @@
                 </div>
               </section>
 
-              <section class="settings-panel">
+              <section class="settings-panel" data-settings-pages="account security">
                 <h3>账号信息</h3>
                 <form id="profileForm" class="settings-form">
                   <label>昵称<input id="profileDisplayName" /></label>
@@ -105,7 +105,7 @@
                 <div id="profileMeta" class="muted"></div>
               </section>
 
-              <section class="settings-panel">
+              <section class="settings-panel" data-settings-pages="account security">
                 <h3>API Token</h3>
                 <div class="settings-form">
                   <label>名称<input id="settingsTokenName" placeholder="我的 API Token" /></label>
@@ -118,7 +118,7 @@
                 <div id="settingsTokensList" class="io-task-list"></div>
               </section>
 
-              <section class="settings-panel">
+              <section class="settings-panel" data-settings-pages="account security">
                 <h3>登录会话</h3>
                 <div class="settings-actions">
                   <button type="button" class="ghost" id="settingsRefreshSessionsBtn">刷新会话</button>
@@ -126,7 +126,7 @@
                 <div id="settingsSessionsList" class="io-task-list"></div>
               </section>
 
-              <section class="settings-panel">
+              <section class="settings-panel" data-settings-pages="account security">
                 <h3>同步设备（Raindrop 插件）</h3>
                 <div class="settings-actions">
                   <button type="button" class="ghost" id="settingsRefreshDevicesBtn">刷新设备</button>
@@ -227,6 +227,24 @@
             </div>
           </section>
 
+          <section id="settingsSectionImport" class="settings-section" data-settings-section="import">
+            <div class="settings-section-head">
+              <div>
+                <h2>导入</h2>
+                <p class="muted">从浏览器书签文件或其他服务迁移到 Rainbow。</p>
+              </div>
+            </div>
+            <div class="settings-section-grid">
+              <section class="settings-panel">
+                <h3>导入书签</h3>
+                <p class="muted">导入操作位于主工作台的“添加”菜单，可上传浏览器导出的 HTML 文件。</p>
+                <div class="settings-actions">
+                  <a class="button-link" href="/">前往主工作台</a>
+                </div>
+              </section>
+            </div>
+          </section>
+
           <section id="settingsSectionOperations" class="settings-section" data-settings-section="operations">
             <div class="settings-section-head">
               <div>
@@ -273,6 +291,21 @@
                 </div>
                 <div id="backupOutput" class="settings-output" role="status" aria-live="polite"></div>
                 <div id="backupList" class="io-task-list"></div>
+              </section>
+            </div>
+          </section>
+
+          <section id="settingsSectionSecurity" class="settings-section" data-settings-section="security">
+            <div class="settings-section-head">
+              <div>
+                <h2>2FA</h2>
+                <p class="muted">双重认证状态与账号安全说明。</p>
+              </div>
+            </div>
+            <div class="settings-section-grid">
+              <section class="settings-panel">
+                <h3>双重认证尚未启用</h3>
+                <p class="muted">当前版本还没有可配置的 2FA 后端能力。此页面明确展示真实状态，不会复用帐户或备份页面。</p>
               </section>
             </div>
           </section>

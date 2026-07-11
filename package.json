@@ -24,6 +24,7 @@
     "cf:migrate:data": "node scripts/cf-migrate-data.mjs",
     "extension:safari:build": "node scripts/build-safari-extension.mjs",
     "extension:check": "node --check chrome-extension/background.js chrome-extension/options.js chrome-extension/popup.js scripts/build-safari-extension.mjs && npm run extension:safari:build",
+    "extension:smoke:remote": "node scripts/extension-server-smoke.mjs",
     "ops:drill": "node scripts/ops-backup-restore-drill.mjs"
   },
   "keywords": [],
