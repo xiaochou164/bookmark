@@ -5,9 +5,9 @@
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
 ## P0：正确性与高风险
-- [ ] **BK-AUD-001 / P0 / 部署入口一致性（已证实存在配置分歧）**：`Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，同时镜像按 production only 安装依赖而 Wrangler 位于 devDependencies；Docker 健康检查使用端口 3789。核实 Docker 实际目标应为 Node 服务还是 Worker，统一启动命令、依赖、端口、健康检查和 README；使用 `docker build`、容器启动、`/api/health` 验证，不可仅改文案。
-- [ ] **BK-AUD-002 / P0 / 扩展同步预览的零写入契约（需复测）**：`docs/CHROME_EXTENSION_SYNC.md` 声称 PREVIEW 会写入服务端，而当前 `chrome-extension/background.js` 的云端预览入口实际改用 `/api/plugins/raindropSync/preview`，并仍有独立 `SYNC_WITH_RAINBOW` 代码路径。逐一验证 Chrome/Safari Popup、Options、消息分发和两个后端预览路径是否写云端/本地数据；预览必须不写、不删、不更新索引，修正文档及测试。若仅发现文档过期，更新文档并附测试证据，不要无故修改稳定逻辑。
-- [ ] **BK-AUD-003 / P0 / 认证、数据隔离与输入安全专项（待验证）**：审阅 `src/routes/*`、`src/worker.mjs`、`src/http/middleware.js`、`src/services/*`，覆盖权限越权/跨租户、session/token、CSRF、SSRF（元数据抓取）、URL scheme、HTML 插值、同步删除、公开分享令牌、日志泄密；对每个发现提供具体路径/行号/攻击条件和回归测试；没有证据的风险不得称为漏洞。
+- [x] **BK-AUD-001 / P0 / 部署入口一致性（已证实存在配置分歧）**：`Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，同时镜像按 production only 安装依赖而 Wrangler 位于 devDependencies；Docker 健康检查使用端口 3789。核实 Docker 实际目标应为 Node 服务还是 Worker，统一启动命令、依赖、端口、健康检查和 README；使用 `docker build`、容器启动、`/api/health` 验证，不可仅改文案。
+- [x] **BK-AUD-002 / P0 / 扩展同步预览的零写入契约（需复测）**：`docs/CHROME_EXTENSION_SYNC.md` 声称 PREVIEW 会写入服务端，而当前 `chrome-extension/background.js` 的云端预览入口实际改用 `/api/plugins/raindropSync/preview`，并仍有独立 `SYNC_WITH_RAINBOW` 代码路径。逐一验证 Chrome/Safari Popup、Options、消息分发和两个后端预览路径是否写云端/本地数据；预览必须不写、不删、不更新索引，修正文档及测试。若仅发现文档过期，更新文档并附测试证据，不要无故修改稳定逻辑。
+- [x] **BK-AUD-003 / P0 / 认证、数据隔离与输入安全专项（待验证）**：审阅 `src/routes/*`、`src/worker.mjs`、`src/http/middleware.js`、`src/services/*`，覆盖权限越权/跨租户、session/token、CSRF、SSRF（元数据抓取）、URL scheme、HTML 插值、同步删除、公开分享令牌、日志泄密；对每个发现提供具体路径/行号/攻击条件和回归测试；没有证据的风险不得称为漏洞。
 
 ## P1：前端布局与操作体验
 - [ ] **BK-AUD-101 / P1 / 列表操作区局部溢出（历史报告已证实）**：`docs/screenshots/ui-visual-baseline/audit-report.json` 的 1280px 报告记录 `.bookmark-row-side` 108px scrollWidth 对 104px clientWidth。定位当前生效 CSS（包括 legacy 层）与 DOM，修复而非隐藏溢出；覆盖 hover、focus、选中、详情打开和 360/640/920/1280px；以新的运行截图和尺寸断言收口。
@@ -29,3 +29,18 @@
 3. 必跑：`npm ci`、`npm test`、`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check`、`npm run ui:browser`（若环境不具备，记录原因及替代证据）；补充 Docker 构建和两种运行模式的健康检查。
 4. 浏览器矩阵：主工作台列表/卡片/详情查看与编辑/搜索建议/批量操作/菜单/通知/AI、登录、设置、插件、公开分享、Chrome/Safari Popup/Options；宽度 360/640/920/1280，至少桌面/移动分别验证键盘和触控操作。
 5. 本文是 2026-11-16 首轮静态审计清单。动态验证、依赖漏洞扫描、完整逐行安全评估及修复尚未完成；不得报告「全项目已通过」。
+
+## 本轮执行记录（持续更新）
+
+基线：`origin/master a571df4`；分支：`codex/bookmark-audit-2026-11-16`。仅临时本地数据，未访问生产。
+
+### P0 修复与证据
+
+- **BK-AUD-001**：根因是生产依赖镜像调用 devDependency Wrangler；`Dockerfile` 改为 `start:node`，Compose 使用真实 `PORT`，构建上下文排除数据/凭据/Worker 状态。`README.md` 区分两种运行链。已实际 `docker build -t rainbow-audit:20261116 .`，容器映射本机 13789，`curl /api/health` 返回 ok，Docker health 为 healthy。后续安全改动完成后重建最终镜像。
+- **BK-AUD-002**：实际 Popup/Options 消息仍走 `/api/chrome-sync`，并非旧文档推测的 provider preview。两后端新增内存 dry-run；认证时间更新、Worker 读集合建根目录、Node tenant bootstrap 和 provider 预览日志均绕过写入；扩展预览不创建 deviceId。涉及 `chrome-extension/background.js`、生成的 Safari、`src/routes/chromeSyncRoutes.js`、`src/services/syncPreviewRepo.mjs`、`src/pluginManager.js`、auth/tenantScope、Worker。`npm test` 覆盖 Chrome/Safari VM 消息分发及两后端 SQL/文件零写断言，均通过。
+- **BK-AUD-003**：已复现并修复 IPv6 方括号/尾点 localhost 校验绕过、重定向未重新校验、抓取正文无大小/超时上限、Worker 缺失 CSRF guard 和内部错误回显、Node 鉴权前静态暴露对象、同步忽略 deleteSync 删除本地缺失项及误删空集合、Worker 复活未知时间墓碑、同步接收非 HTTP scheme。URL policy 与限量 fetch 共用；Node socket DNS lookup 再校验阻止重绑定；对象按书签/任务/备份真实归属校验，HTML sandbox；Worker JSON 正文限 10MiB。测试 `tests/security-audit.test.js` 使用真实 SQLite adapter 和隔离 Node JSON 服务测试身份、越权读写删、CSRF、对象隔离、预览与同步幂等。依赖 `npm audit fix` 更新兼容版本，当前 audit 0 项。仍在继续复核其他业务边界，不把这些测试等同完整渗透测试。
+
+回退：按阶段 revert 提交；无 schema 变更。预览客户端必须与服务器一起升级，旧服务端不识别 dry-run。
+风险：Cloudflare 的 outbound DNS/网络策略无法由本地 SQLite adapter 模拟；Safari 原生权限、签名与上架仍需 macOS Safari 扩展宿主验收。
+
+补充安全复核：Worker 上传备份的 `ON CONFLICT(id)` 原来可以覆盖其他用户记录，已加全量归属预检（在 replace 删除前）、SQL 所属用户条件、R2 源对象权限。真实 SQLite 队列回归证明失败快照不改变任一租户。IO 使用条件 UPDATE 原子领取以防重投；JSON 存储改为权限 0600 的临时文件原子 rename，并做并发读写回归。AI endpoint 禁止私网字面量与重定向，Node 通过 socket DNS 验证；正文限 2MiB。Worker 统一 CSP/安全头，预览 frame 过滤 scheme。22 项测试通过；本轮发现均有修复，云平台网络边界与 Safari 原生宿主列为外部验证限制。

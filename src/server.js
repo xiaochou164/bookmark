@@ -1,3 +1,4 @@
+require('./services/aiProviderService').setAiHttpTransport(require('./utils/nodePublicFetch').fetchPublicWithPinnedDns);
 const path = require('node:path');
 const express = require('express');
 const { loadConfig, startupConfigView } = require('./config');
@@ -546,10 +547,6 @@ async function main() {
     }
   });
 
-  if (objectStorage.backend === 'local') {
-    app.use('/api/assets', express.static(config.objectStorageDir));
-  }
-
   registerStaticAndDocs(app, {
     publicDir: path.join(__dirname, '..', 'public'),
     openApiFile: path.join(__dirname, '..', 'docs', 'openapi.json')
@@ -570,6 +567,29 @@ async function main() {
   );
   app.use('/api', createTenantBootstrapMiddleware(dbRepo));
   app.use('/api', createAuthorizationMiddleware());
+
+  if (objectStorage.backend === 'local') {
+    app.use('/api/assets', async (req, res, next) => {
+      try {
+        const [bucket, ...parts] = decodeURIComponent(req.path).replace(/^\//, '').split('/');
+        const key = parts.join('/');
+        const ref = require('./utils/objectAccess').objectOwnerReference(bucket, key);
+        const userId = req.auth.user.id;
+        const db = await dbRepo.read();
+        const owned = ref && (ref.kind === 'bookmark'
+          ? db.bookmarks.some((item) => item.id === ref.id && item.userId === userId)
+          : ref.kind === 'task'
+            ? db.ioTasks.some((item) => item.id === ref.id && item.userId === userId)
+            : (db.backups || []).some((item) => item.userId === userId && item.file?.key === key));
+        if (!owned) return next(notFound('object not found'));
+        res.setHeader('x-frame-options', 'SAMEORIGIN');
+        res.setHeader('cache-control', 'private, no-store');
+        res.setHeader('content-security-policy', "sandbox allow-same-origin; default-src 'none'; img-src https: data:; style-src 'unsafe-inline'");
+        next();
+      } catch (error) { next(error); }
+    }, express.static(config.objectStorageDir, { dotfiles: 'deny' }));
+  }
+
 
   registerSystemRoutes(app, {
     dbRepo,

@@ -6,7 +6,7 @@ services:
       - "3789:3789"
     environment:
       - NODE_ENV=production
-      - RB_PORT=3789
+      - PORT=3789
       # - RB_SECRET=change-this-to-a-secure-random-string
     volumes:
       - rainbow-data:/app/data

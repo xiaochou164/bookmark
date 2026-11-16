@@ -169,6 +169,7 @@ function createTenantBootstrapMiddleware(dbRepo) {
     try {
       const userId = String(req?.auth?.user?.id || '').trim();
       if (!userId) return next();
+      if (req.method === 'POST' && (req.path === '/chrome-sync' && req.body?.preview === true || /^\/plugins\/[^/]+\/preview$/.test(req.path))) return next();
       if (initialized.has(userId)) return next();
       await dbRepo.update((db) => {
         ensureTenantData(db, userId);

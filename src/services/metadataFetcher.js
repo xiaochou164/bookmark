@@ -1,5 +1,6 @@
+const { fetchPublicWithPinnedDns } = require('../utils/nodePublicFetch');
 const { ensureUrlIsSafe } = require('../utils/url');
-const { readBodyWithLimit } = require('../utils/http');
+const { fetchPublicResource } = require('../utils/publicFetch');
 
 const MAX_FETCH_BYTES = 512 * 1024; // 512 KB cap for metadata fetches
 
@@ -72,32 +73,11 @@ function toAbsoluteUrl(baseUrl, maybeUrl) {
 async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
   const url = String(targetUrl || '').trim();
   if (!url) throw new Error('url is required');
-  await ensureUrlIsSafe(url);
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RainbowBot/0.1 (+metadata-fetcher)',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      }
-    });
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    throw new Error(`metadata fetch failed: HTTP ${res.status}`);
-  }
-
+  const fetched = await fetchPublicResource(url, { timeoutMs, maxBytes: MAX_FETCH_BYTES, validate: ensureUrlIsSafe, fetchImpl: fetchPublicWithPinnedDns });
+  const res = fetched.response;
   const contentType = String(res.headers.get('content-type') || '');
-  const finalUrl = res.url || url;
-  const html = await readBodyWithLimit(res, MAX_FETCH_BYTES, { encoding: 'utf8' });
+  const finalUrl = fetched.finalUrl;
+  const html = fetched.text();
 
   const ogTitle = extractMetaContent(html, { property: 'og:title' });
   const ogDescription = extractMetaContent(html, { property: 'og:description' });

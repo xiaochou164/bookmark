@@ -1,3 +1,7 @@
+import objectAccess from './utils/objectAccess.js';
+import publicFetch from './utils/publicFetch.js';
+const { fetchPublicResource } = publicFetch;
+import { createSyncPreviewRepo } from './services/syncPreviewRepo.mjs';
 import crypto from 'node:crypto';
 import openapiSpec from '../docs/openapi.json' with { type: 'json' };
 import {
@@ -36,7 +40,7 @@ const ROOT_FOLDER_ID = 'root';
 const DEFAULT_PLUGIN_ID = 'raindropSync';
 const SCHEMA_VERSION = 2;
 
-let schemaReadyPromise = null;
+const schemaReadyPromises = new WeakMap();
 
 function sha256Hex(input) {
   return crypto.createHash('sha256').update(String(input || ''), 'utf8').digest('hex');
@@ -546,7 +550,32 @@ function applyBookmarkFilters(items, db, query) {
 async function parseJsonBody(request) {
   const contentType = String(request.headers.get('content-type') || '').toLowerCase();
   if (!contentType.includes('application/json')) return {};
-  return request.json().catch(() => ({}));
+  const reader = request.body?.getReader();
+  const chunks = [];
+  let size = 0;
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 10 * 1024 * 1024) {
+          await reader.cancel();
+          throw Object.assign(new Error('Request body too large'), { status: 413, code: 'BODY_TOO_LARGE' });
+        }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+  }
+  if (size === 0) return {};
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  try {
+    const body = JSON.parse(new TextDecoder().decode(bytes));
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error();
+    return body;
+  } catch { throw Object.assign(new Error('Invalid JSON object'), { status: 400, code: 'INVALID_JSON' }); }
 }
 
 function buildSqlPlaceholders(count) {
@@ -870,8 +899,8 @@ const SCHEMA_SQL = `
 
 function ensureSchema(env) {
   ensureD1(env);
-  if (schemaReadyPromise) return schemaReadyPromise;
-  schemaReadyPromise = (async () => {
+  if (schemaReadyPromises.has(env.DB)) return schemaReadyPromises.get(env.DB);
+  const ready = (async () => {
     const statements = SCHEMA_SQL
       .split(/;\s*\n/g)
       .map((statement) => statement.trim())
@@ -880,7 +909,9 @@ function ensureSchema(env) {
       await env.DB.prepare(`${statement};`).run();
     }
   })();
-  return schemaReadyPromise;
+  schemaReadyPromises.set(env.DB, ready);
+  ready.catch(() => schemaReadyPromises.delete(env.DB));
+  return ready;
 }
 
 async function allResults(statement, ...binds) {
@@ -897,7 +928,7 @@ async function runStatement(statement, ...binds) {
   return statement.bind(...binds).run();
 }
 
-function createRepo(env) {
+function createRepo(env, { readOnly = false } = {}) {
   const db = env.DB;
   const repo = {
     async ensureUserRootFolder(userId) {
@@ -929,7 +960,7 @@ function createRepo(env) {
     },
 
     async listFolders(userId) {
-      await repo.ensureUserRootFolder(userId);
+      if (!readOnly) await repo.ensureUserRootFolder(userId);
       const rows = await allResults(
         db.prepare(`
           SELECT id, user_id as userId, name, parent_id as parentId, color, icon, ai_suggestions_json as aiSuggestionsJson, position, created_at as createdAt, updated_at as updatedAt
@@ -939,7 +970,9 @@ function createRepo(env) {
         `),
         userId
       );
-      return rows.map((row) => repo.sanitizeFolderRow(row));
+      const folders = rows.map((row) => repo.sanitizeFolderRow(row));
+      if (!folders.some((folder) => folder.id === ROOT_FOLDER_ID)) folders.unshift({ id: ROOT_FOLDER_ID, userId, name: 'Root', parentId: null });
+      return folders;
     },
 
     async createFolder(userId, input) {
@@ -1414,7 +1447,7 @@ function createRepo(env) {
       };
     },
 
-    async resolveSession(rawToken) {
+    async resolveSession(rawToken, { readOnly = false } = {}) {
       const parsed = parseOpaqueToken(rawToken);
       if (!parsed || parsed.prefix !== SESSION_TOKEN_PREFIX) return null;
       const row = await firstResult(
@@ -1433,7 +1466,7 @@ function createRepo(env) {
       if (Number(row.expiresAt || 0) <= Date.now()) return null;
       if (String(row.secretHash || '') !== sha256Hex(parsed.secret)) return null;
       const now = Date.now();
-      await runStatement(db.prepare(`UPDATE auth_sessions SET last_seen_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
+      if (!readOnly) await runStatement(db.prepare(`UPDATE auth_sessions SET last_seen_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
       return {
         authenticated: true,
         method: 'session',
@@ -1460,7 +1493,7 @@ function createRepo(env) {
       };
     },
 
-    async resolveApiToken(rawToken) {
+    async resolveApiToken(rawToken, { readOnly = false } = {}) {
       const parsed = parseOpaqueToken(rawToken);
       if (!parsed || parsed.prefix !== API_TOKEN_PREFIX) return null;
       const row = await firstResult(
@@ -1479,7 +1512,7 @@ function createRepo(env) {
       if (!row || row.revokedAt || row.userDisabledAt) return null;
       if (String(row.secretHash || '') !== sha256Hex(parsed.secret)) return null;
       const now = Date.now();
-      await runStatement(db.prepare(`UPDATE api_tokens SET last_used_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
+      if (!readOnly) await runStatement(db.prepare(`UPDATE api_tokens SET last_used_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
       return {
         authenticated: true,
         method: 'api_token',
@@ -1966,6 +1999,17 @@ function createRepo(env) {
 
     async restoreBackupState(userId, payload, { mode = 'merge' } = {}) {
       const data = normalizeBackupPayload(payload);
+      // Validate the complete snapshot before replace mode deletes any tenant data.
+      for (const [table, items] of [['folders', data.folders], ['bookmarks', data.bookmarks]]) {
+        for (const item of items) {
+          const id = String(item?.id || '');
+          if (!id || table === 'folders' && id === ROOT_FOLDER_ID) continue;
+          const existing = await firstResult(db.prepare(`SELECT user_id as userId FROM ${table} WHERE id = ?1`), id);
+          if (existing && String(existing.userId) !== String(userId)) {
+            throw Object.assign(new Error('Backup contains an ID owned by another account'), { status: 409, code: 'BACKUP_ID_CONFLICT' });
+          }
+        }
+      }
       const now = Date.now();
       await repo.ensureUserRootFolder(userId);
       if (mode === 'replace') {
@@ -2001,6 +2045,7 @@ function createRepo(env) {
               ai_suggestions_json = excluded.ai_suggestions_json,
               position = excluded.position,
               updated_at = excluded.updated_at
+            WHERE folders.user_id = excluded.user_id
           `),
           folder.id,
           folder.userId,
@@ -2070,6 +2115,7 @@ function createRepo(env) {
               article_json = excluded.article_json,
               ai_suggestions_json = excluded.ai_suggestions_json,
               preview_json = excluded.preview_json
+            WHERE bookmarks.user_id = excluded.user_id
           `),
           next.id,
           next.userId,
@@ -2907,17 +2953,17 @@ function clientIp(request) {
   return xff || '';
 }
 
-async function resolveAuth(env, request) {
+async function resolveAuth(env, request, { readOnly = false } = {}) {
   const repo = createRepo(env);
   const authz = String(request.headers.get('authorization') || '');
   const bearer = authz.toLowerCase().startsWith('bearer ') ? authz.slice(7).trim() : '';
   if (bearer) {
-    const tokenAuth = await repo.resolveApiToken(bearer);
+    const tokenAuth = await repo.resolveApiToken(bearer, { readOnly });
     if (tokenAuth) return tokenAuth;
   }
   const cookies = parseCookies(request.headers.get('cookie') || '');
   if (cookies[SESSION_COOKIE_NAME]) {
-    const sessionAuth = await repo.resolveSession(cookies[SESSION_COOKIE_NAME]);
+    const sessionAuth = await repo.resolveSession(cookies[SESSION_COOKIE_NAME], { readOnly });
     if (sessionAuth) return sessionAuth;
   }
   return { authenticated: false, user: null, method: null, session: null, apiToken: null };
@@ -3109,35 +3155,10 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
   if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
     throw workerError('metadata url protocol is unsupported', { code: 'METADATA_URL_PROTOCOL', category: 'validation' });
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RainbowBot/worker (+metadata-fetcher)',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      }
-    });
-  } catch (error) {
-    const failure = classifyExternalError(error, { prefix: 'METADATA_FETCH' });
-    throw workerError(failure.message, failure);
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) {
-    throw workerError(`metadata fetch failed: HTTP ${res.status}`, {
-      code: `METADATA_FETCH_HTTP_${res.status}`,
-      category: Number(res.status) >= 500 ? 'http_5xx' : 'http_4xx',
-      retryable: Number(res.status) >= 500,
-      httpStatus: Number(res.status || 0)
-    });
-  }
-  const html = await res.text();
-  const finalUrl = res.url || url;
+  const fetched = await fetchPublicResource(url, { timeoutMs, maxBytes: 524288 });
+  const res = fetched.response;
+  const html = fetched.text();
+  const finalUrl = fetched.finalUrl;
   const ogTitle = extractMetaContent(html, { property: 'og:title' });
   const ogDescription = extractMetaContent(html, { property: 'og:description' });
   const ogImage = extractMetaContent(html, { property: 'og:image' });
@@ -3182,34 +3203,9 @@ function extractArticleTextFromHtml(html) {
 
 async function fetchBookmarkArticle(targetUrl, { timeoutMs = 10_000 } = {}) {
   const metadata = await fetchBookmarkMetadata(targetUrl, { timeoutMs });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-  let res;
-  try {
-    res = await fetch(metadata.finalUrl || targetUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RainbowBot/worker (+article-extractor)',
-        Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'
-      }
-    });
-  } catch (error) {
-    const failure = classifyExternalError(error, { prefix: 'ARTICLE_FETCH' });
-    throw workerError(failure.message, failure);
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) {
-    throw workerError(`article fetch failed: HTTP ${res.status}`, {
-      code: `ARTICLE_FETCH_HTTP_${res.status}`,
-      category: Number(res.status) >= 500 ? 'http_5xx' : 'http_4xx',
-      retryable: Number(res.status) >= 500,
-      httpStatus: Number(res.status || 0)
-    });
-  }
-  const html = await res.text();
+  const fetched = await fetchPublicResource(metadata.finalUrl || targetUrl, { timeoutMs, maxBytes: 1048576 });
+  const res = fetched.response;
+  const html = fetched.text();
   const textContent = extractArticleTextFromHtml(html);
   return {
     status: 'success',
@@ -3349,6 +3345,7 @@ const CHROME_SYNC_UNCATEGORIZED_FOLDER = '待归档';
 function normalizeChromeSyncUrl(input) {
   try {
     const url = new URL(String(input || '').trim());
+    if (!['http:', 'https:'].includes(url.protocol)) return null;
     url.hash = '';
     const pathname = url.pathname.endsWith('/') && url.pathname !== '/' ? url.pathname.slice(0, -1) : url.pathname;
     const params = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
@@ -3830,8 +3827,10 @@ async function processPluginTask(env, message) {
 async function processIoTask(env, message) {
   const repo = createRepo(env);
   const task = await repo.getIoTask(message.userId, message.taskId);
-  if (!task) return;
+  if (!task || task.status !== 'queued') return;
   const startAt = Date.now();
+  const claim = await runStatement(env.DB.prepare(`UPDATE io_tasks SET status = 'running', started_at = ?3 WHERE user_id = ?1 AND id = ?2 AND status = 'queued'`), message.userId, task.id, startAt);
+  if (claim.meta?.changes === 0) return;
   await repo.updateIoTask(task.id, {
     status: 'running',
     progress: { percent: 20, step: 'starting' },
@@ -3869,6 +3868,10 @@ async function processIoTask(env, message) {
       }
       result = { imported: created, total: entries.length };
     } else if (task.type === 'restore_backup') {
+      const sourceKey = String(task.input?.backupFile?.key || '');
+      if (sourceKey && !(await repo.listBackups(message.userId)).some((backup) => backup.file?.key === sourceKey)) {
+        throw Object.assign(new Error('Backup object not found'), { status: 404, code: 'NOT_FOUND' });
+      }
       const source = task.input?.backupFile?.key
         ? await readR2Text(env, String(task.input.backupFile.key || ''))
         : String(task.input?.content || '');
@@ -4866,10 +4869,16 @@ async function handleApi(request, env, url, requestId) {
     return jsonResponse({ ok: true, runtime: 'cloudflare-workers', schemaVersion: SCHEMA_VERSION }, { requestId });
   }
 
-  await ensureSchema(env);
-  const repo = createRepo(env);
-  const auth = await resolveAuth(env, request);
   const body = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? await parseJsonBody(request) : {};
+  const readOnly = method === 'POST' && (url.pathname === '/api/chrome-sync' && body.preview === true || url.pathname.endsWith('/preview'));
+  // Migrations are an explicit prerequisite for previews; never run DDL in a dry-run.
+  if (!readOnly) await ensureSchema(env);
+  const repo = createRepo(env, { readOnly });
+  const auth = await resolveAuth(env, request, { readOnly });
+  const origin = request.headers.get('origin');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && origin && origin !== url.origin && auth.method !== 'api_token') {
+    throw Object.assign(new Error('Cross-origin write request rejected'), { status: 403, code: 'CSRF_ORIGIN_REJECTED' });
+  }
   const requireAuth = () => {
     if (!auth.authenticated) {
       throw Object.assign(new Error('authentication required'), { status: 401, code: 'AUTH_REQUIRED' });
@@ -5008,6 +5017,27 @@ async function handleApi(request, env, url, requestId) {
   }
 
   if (url.pathname.startsWith('/api/')) requireAuth();
+
+  if (url.pathname.startsWith('/api/assets/') && ['GET', 'HEAD'].includes(method)) {
+    const [bucket, ...parts] = url.pathname.slice('/api/assets/'.length).split('/').map(decodeURIComponent);
+    const key = parts.join('/');
+    const ref = objectAccess.objectOwnerReference(bucket, key);
+    const owned = ref && (ref.kind === 'bookmark'
+      ? await repo.getBookmark(auth.user.id, ref.id)
+      : ref.kind === 'task'
+        ? await repo.getIoTask(auth.user.id, ref.id)
+        : (await repo.listBackups(auth.user.id)).some((item) => item.file?.key === key));
+    if (!owned) return errorResponse('object not found', { status: 404, code: 'NOT_FOUND', requestId });
+    const object = await env.OBJECTS?.get(key);
+    if (!object) return errorResponse('object not found', { status: 404, code: 'NOT_FOUND', requestId });
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('cache-control', 'private, no-store');
+    headers.set('x-content-type-options', 'nosniff');
+    headers.set('content-security-policy', "sandbox allow-same-origin; default-src 'none'; img-src https: data:; style-src 'unsafe-inline'");
+    return new Response(method === 'HEAD' ? null : object.body, { headers });
+  }
+
   if (url.pathname.startsWith('/api/product/ai/') && !['GET', 'HEAD'].includes(method) && !isAiGovernancePath(url.pathname)) {
     const policy = normalizeAiFeaturePolicy(await repo.getUserMeta(auth.user.id, 'ai_feature_policy', DEFAULT_AI_FEATURE_POLICY));
     const capability = aiCapabilityForPath(url.pathname);
@@ -5112,6 +5142,7 @@ async function handleApi(request, env, url, requestId) {
   }
 
   if (url.pathname === '/api/chrome-sync' && method === 'POST') {
+    const syncRepo = body.preview === true ? await createSyncPreviewRepo(repo, auth.user.id) : repo;
     const chromeFolders = Array.isArray(body.folders) ? body.folders : [];
     const deleteSync = Boolean(body.deleteSync);
     const mirrorIndex = normalizeChromeSyncMirrorIndex(body.mirrorIndex || {});
@@ -5122,8 +5153,8 @@ async function handleApi(request, env, url, requestId) {
     const chromeByUrl = buildChromeFolderIndex(chromeFolders);
     const chromeFolderPaths = buildChromeFolderNameSet(chromeFolders);
     const chromeById = buildChromeIdIndex(chromeByUrl);
-    const folders = await repo.listFolders(auth.user.id);
-    const bookmarks = await repo.listBookmarks(auth.user.id);
+    const folders = await syncRepo.listFolders(auth.user.id);
+    const bookmarks = await syncRepo.listBookmarks(auth.user.id);
     const folderById = new Map(folders.map((folder) => [folder.id, folder]));
     const aliveByUrl = new Map();
     const byId = new Map();
@@ -5155,7 +5186,7 @@ async function handleApi(request, env, url, requestId) {
     const toDeleteInChrome = [];
     const folderPathCache = new Map();
     const ensureFolderCached = async (folderPath) => {
-      const folder = await ensureChromeSyncFolderPath(repo, auth.user.id, folderPath, folderPathCache);
+      const folder = await ensureChromeSyncFolderPath(syncRepo, auth.user.id, folderPath, folderPathCache);
       folderById.set(folder.id, folder);
       if (!folders.some((item) => String(item.id) === String(folder.id))) folders.push(folder);
       return folder;
@@ -5171,7 +5202,8 @@ async function handleApi(request, env, url, requestId) {
       const oldNorm = normalizeChromeSyncUrl(bookmark.url);
 
       if (!chromeBookmark) {
-        const deleted = await repo.updateBookmark(auth.user.id, bookmark.id, { deleted: true });
+        if (!deleteSync) continue;
+        const deleted = await syncRepo.updateBookmark(auth.user.id, bookmark.id, { deleted: true });
         if (deleted) {
           if (oldNorm) {
             aliveByUrl.delete(oldNorm);
@@ -5198,7 +5230,7 @@ async function handleApi(request, env, url, requestId) {
       if (nextNorm && oldNorm !== nextNorm) patch.url = nextUrl;
 
       if (Object.keys(patch).length > 0) {
-        const updated = await repo.updateBookmark(auth.user.id, bookmark.id, patch);
+        const updated = await syncRepo.updateBookmark(auth.user.id, bookmark.id, patch);
         if (updated) {
           if (oldNorm && oldNorm !== nextNorm) aliveByUrl.delete(oldNorm);
           if (nextNorm) aliveByUrl.set(nextNorm, updated);
@@ -5219,11 +5251,11 @@ async function handleApi(request, env, url, requestId) {
       if (deletedBookmark) {
         const chromeAge = Number(chromeBookmark.createdAt || 0);
         const deletedAt = Number(deletedBookmark.deletedAt || 0);
-        const looksLikeOldGhost = chromeAge > 0 && (chromeAge <= deletedAt || chromeAge < Date.now() - 365 * 24 * 60 * 60 * 1000);
+        const looksLikeOldGhost = chromeAge <= deletedAt || chromeAge < Date.now() - 365 * 24 * 60 * 60 * 1000;
         if (looksLikeOldGhost) continue;
 
         const folder = await ensureFolderCached(chromeBookmark.folderPath);
-        const revived = await repo.updateBookmark(auth.user.id, deletedBookmark.id, {
+        const revived = await syncRepo.updateBookmark(auth.user.id, deletedBookmark.id, {
           deleted: false,
           title: chromeBookmark.title,
           url: chromeBookmark.url,
@@ -5239,7 +5271,7 @@ async function handleApi(request, env, url, requestId) {
       }
 
       const folder = await ensureFolderCached(chromeBookmark.folderPath);
-      const created = await repo.createBookmark(auth.user.id, {
+      const created = await syncRepo.createBookmark(auth.user.id, {
         title: chromeBookmark.title,
         url: chromeBookmark.url,
         folderId: folder.id
@@ -5276,24 +5308,7 @@ async function handleApi(request, env, url, requestId) {
       }
     }
 
-    const aliveFolderIds = new Set();
-    for (const bookmark of byId.values()) {
-      if (bookmark && !bookmark.deletedAt && bookmark.folderId) {
-        aliveFolderIds.add(String(bookmark.folderId));
-      }
-    }
-    for (const folder of folders) {
-      if (!folder || String(folder.id) === ROOT_FOLDER_ID) continue;
-      const name = String(folder.name || '').trim();
-      const pathKey = folderPathForId(folders, folder.id).join('\u001f');
-      if (!name || chromeFolderPaths.has(pathKey)) continue;
-      if (aliveFolderIds.has(String(folder.id))) continue;
-      const deleted = await repo.deleteFolder(auth.user.id, folder.id);
-      if (deleted) {
-        folderById.delete(folder.id);
-        stats.deletedFoldersInDb += 1;
-      }
-    }
+    // Missing browser folders never authorize cloud folder deletion.
 
     const nextMirrorIndex = {};
     for (const bookmark of byId.values()) {
@@ -5317,6 +5332,7 @@ async function handleApi(request, env, url, requestId) {
 
     return jsonResponse({
       ok: true,
+      preview: body.preview === true,
       toAddInChrome,
       toDeleteInChrome,
       mirrorIndex: nextMirrorIndex,
@@ -7371,8 +7387,7 @@ async function handleApi(request, env, url, requestId) {
   });
 }
 
-export default {
-  async fetch(request, env) {
+async function fetchHandler(request, env) {
     const requestId = crypto.randomUUID();
     const url = new URL(request.url);
     try {
@@ -7388,12 +7403,25 @@ export default {
       if (authRedirect) return authRedirect;
       return await handleAssets(request, env, url);
     } catch (error) {
-      return errorResponse(error?.message || 'Unexpected worker error.', {
+      return errorResponse(Number(error?.status || 500) >= 500 ? 'Internal server error' : (error?.message || 'Request failed'), {
         status: Number(error?.status || 500),
         code: String(error?.code || 'INTERNAL_ERROR'),
         requestId
       });
     }
+
+}
+
+export default {
+  async fetch(request, env) {
+    const response = await fetchHandler(request, env);
+    const headers = new Headers(response.headers);
+    headers.set('x-content-type-options', 'nosniff');
+    headers.set('x-frame-options', new URL(request.url).pathname.startsWith('/api/assets/') ? 'SAMEORIGIN' : 'DENY');
+    headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+    if (!headers.has('content-security-policy')) headers.set('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' https:; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    if (new URL(request.url).pathname.startsWith('/api/') || new URL(request.url).pathname.startsWith('/public/')) headers.set('cache-control', 'private, no-store');
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },
   async queue(batch, env) {
     await handleQueue(batch, env);

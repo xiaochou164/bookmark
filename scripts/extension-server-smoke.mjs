@@ -1,4 +1,4 @@
-const baseUrl = String(process.argv[2] || 'https://bookmark.sundays.ink').replace(/\/+$/, '');
+const baseUrl = String(process.argv[2] || 'http://127.0.0.1:8787').replace(/\/+$/, '');
 const stamp = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
 const email = `extension-smoke.${stamp}@example.com`;
 const password = 'password123';
@@ -140,13 +140,14 @@ const previewFolders = [{
 await readJson(await request('/api/chrome-sync', {
   method: 'POST',
   token,
-  body: { folders: previewFolders, deviceId, mirrorIndex: serverToChrome.mirrorIndex, deleteSync: true }
+  body: { preview: true, folders: previewFolders, deviceId, mirrorIndex: serverToChrome.mirrorIndex, deleteSync: true }
 }), 'extension preview-equivalent request');
 
 const bookmarks = await readJson(await request('/api/chrome-sync/bookmarks', { token }), 'list synced bookmarks');
 const matching = (bookmarks.items || []).filter((item) => item.url === bookmarkUrl);
 assert(matching.length === 1, 'list synced bookmarks: expected exactly one matching bookmark', { total: bookmarks.total, matching });
 const previewMutatedServer = (bookmarks.items || []).some((item) => item.url === previewOnlyUrl);
+assert(!previewMutatedServer, 'preview must not mutate server');
 
 const status = await readJson(await request(`/api/plugins/raindropSync/devices/${encodeURIComponent(deviceId)}/status`, {
   method: 'POST',

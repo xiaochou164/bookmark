@@ -28,6 +28,8 @@ function securityHeaders() {
         "img-src 'self' data: https:",
         "font-src 'self' data:",
         "connect-src 'self'",
+        "frame-src 'self' https:",
+        "media-src 'self' https:",
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'"
@@ -81,7 +83,7 @@ function requestTelemetry({ logger, metrics } = {}) {
     const started = process.hrtime.bigint();
     res.on('finish', () => {
       const durationMs = Number(process.hrtime.bigint() - started) / 1e6;
-      const path = String(req.originalUrl || req.url || '/').split('?')[0];
+      const path = String(req.originalUrl || req.url || '/').split('?')[0].replace(/^(\/public\/c\/)[^/]+/, '$1[REDACTED]');
       metrics?.observeHttp?.({
         method: req.method,
         path,
@@ -136,13 +138,13 @@ function errorHandler() {
     const message = status >= 500 ? 'Internal server error' : String(err?.message || 'Request error');
     const details = status >= 500 ? null : (err?.details || null);
 
-    console.error('[api.error]', {
+    console.error('[api.error]', require('../infra/logger').redactValue({
       requestId: req?.requestId,
       status,
       code,
       message: err?.message || String(err),
       stack: err?.stack
-    });
+    }));
 
     return res.status(status).json(errorPayload(req, { status, code, message, details }));
   };

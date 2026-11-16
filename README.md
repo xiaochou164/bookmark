@@ -239,6 +239,21 @@ npm run cf:migrate:data          # SQLite/JSON -> D1 SQL
 - `SQLITE_FILE`：旧 SQLite 状态文件路径
 - `CF_MIGRATION_SQL_FILE`：生成的 D1 导入 SQL 文件路径
 
+## Node 与 Docker 本地兼容运行
+
+`npm start` 保持启动本地 Worker（8787）；Node/Docker 使用独立入口，不能混用：
+
+```bash
+npm ci
+npm run start:node
+# Node 默认端口 3789；支持 PORT、HOST、SQLITE_FILE、DATA_FILE。
+docker build -t rainbow-local .
+docker run --rm -p 127.0.0.1:3789:3789 -v rainbow-local-data:/app/data rainbow-local
+```
+
+镜像仅安装生产依赖，以非 root 用户启动 Express，健康检查为 `/api/health`。
+本地审计请使用临时卷；生产备份与恢复须独立安排。回退使用上一镜像和对应数据备份，不能把 Worker 的 D1 文件直接挂载为 Node SQLite。
+
 ## 主要脚本命令
 
 ```bash

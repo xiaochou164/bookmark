@@ -1,3 +1,4 @@
+const { Buffer } = require('node:buffer');
 const MIN_LIMIT_BYTES = 1024;
 
 async function readBodyWithLimit(res, limitBytes = 512 * 1024, { encoding = null } = {}) {

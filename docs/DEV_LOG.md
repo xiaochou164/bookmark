@@ -1145,3 +1145,15 @@
 - 验证：`npm run ui:check`；`npm run ui:browser`（33 张截图）；`npm test`；`npm run cf:check`；`npm run extension:check`；`npm run cf:smoke:remote -- https://bookmark.sundays.ink`；`npm run extension:smoke:remote -- https://bookmark.sundays.ink`；线上 CSS/JS SHA-256 与本地一致；添加按钮左右外侧圆角计算样式正确。
 - 部署：Cloudflare Worker `d0ba8be8-0204-4ac7-b92f-b4fa5167306e`，后续样式修正版 `34abcaf6-b3f9-498e-a355-6c82b0349776`；代码提交 `6207e8b`。
 - 后续：为 `/api/chrome-sync` 增加真正的服务端 dry-run，修正扩展预览文案和行为后重新执行扩展远端 smoke。
+
+
+## 2026-11-16 — BK-AUD P0 本地审计修复
+
+- BK-AUD-001：Docker 改用 Node 生产入口、PORT 与健康检查一致；已构建并启动 healthy，最终镜像将在安全回归后重建。
+- BK-AUD-002：Chrome/Safari 快照显式 preview；Node/Worker 的数据库、认证时间、集合、日志和本地镜像均零写入。新增 VM 与实际 HTTP/SQLite 回归。
+- BK-AUD-003：修复 SSRF 重定向/IPv6、本地对象越权、Worker CSRF/异常泄漏、正文限额、同步删除保护；更新兼容依赖，audit 从 13 项（含 1 critical）降为 0。
+- 修改路径、根因、测试与风险详见 `CODE_AUDIT_2026-11-16.md` 本轮执行记录。当前 `npm test` 20/20；Worker smoke、文档、扩展构建和静态 UI 均已跑通。浏览器基线发现局部溢出和 CSP 事件错误，未标通过，将在 P1 处理。
+
+- P0 追加：Worker 备份恢复外来 ID/任意 R2 key、IO 重投、JSON 半写文件、AI egress、Worker CSP 一并修复。真实 SQLite restore attack 与 Node 并发读取加入回归，测试扩为 22 项。无数据库结构迁移。
+
+- P0 最终复验：`npm test` 22/22、`cf:check`、`cf:smoke`、`extension:check`、`docs:check`、`ui:check` 通过；`npm audit --audit-level=low` 0。`docker build -t rainbow-audit:p0 .` 成功，另启临时容器核验最终构建。P0 完成仅覆盖本轮可验证边界，外部宿主限制保持记录。

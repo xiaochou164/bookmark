@@ -87,7 +87,7 @@ Worker 与 Express 路径需要保持接口契约一致；新增接口时至少�
 
 ## 6. 当前已知限制
 
-- 浏览器扩展的“预览变更”当前不会修改 Chrome，但仍会调用具有写入行为的 `/api/chrome-sync`，因此 Chrome 新书签可能在预览阶段写入 Rainbow。修复前不得把它描述为完全无写入的 dry-run。
+- 浏览器扩展通过 `preview: true` 获取内存差异；Node 与 Worker 均有零持久化写入回归。服务端 provider 预览是另一条契约，Worker 当前只返回配置摘要。
 - `docs/openapi.json` 是人工维护的基线，不会自动从 Worker 生成；接口变更后必须同步更新。
 - `safari-extension/` 是生成产物。修改 `chrome-extension/` 后需重新运行 `npm run extension:safari:build`。
 - 生产部署依赖本机已登录 Wrangler，并要求现有 D1、R2、Queues、DLQ 和 Cron 绑定名称保持一致。
@@ -109,4 +109,4 @@ npm run cf:smoke:remote -- https://bookmark.sundays.ink
 npm run extension:smoke:remote -- https://bookmark.sundays.ink
 ```
 
-扩展 smoke 当前会输出 `previewMutatedServer`，该字段用于显式暴露上述预览限制。
+扩展 smoke 显式断言 `previewMutatedServer === false`。Docker 使用 `npm run start:node`（3789）；`npm start` 保持本地 Worker（8787）。
