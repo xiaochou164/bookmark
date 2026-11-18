@@ -147,7 +147,7 @@ if (!settingsSource.includes('renderAiAuditPanel') || !settingsSource.includes('
 if (!collabRoutesSource.includes('aiGuide') || !collabRoutesSource.includes('renderAiGuide') || !read('public/css/public.css').includes('.public-ai-guide')) {
   failures.push('AI-501 public collection page must expose AI guide summary, tags, FAQ, and recommendations');
 }
-if (!read('public/public-share.mjs').includes('renderAiGuide') || !collabRoutesSource.includes('src="/public-share.mjs"') || !workerSource.includes('src="/public-share.mjs"')) {
+if (!read('public/public-share.mjs').includes('renderAiGuide') || !collabRoutesSource.includes('src="/public-share.mjs"') || !read('src/worker/publicShareHtml.mjs').includes('src="/public-share.mjs"')) {
   failures.push('public collection pages must use the external public-share.mjs module for CSP-safe behavior');
 }
 if (/<script>\s*\(async function|<script>\s*\(function/.test(collabRoutesSource) || /<script>\s*\(async function|<script>\s*\(function/.test(workerSource)) {

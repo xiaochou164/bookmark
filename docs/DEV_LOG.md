@@ -1197,3 +1197,10 @@
 - 风险：保持现有输出及 URL 校验语义，无 API/schema/persistence 变化；Safari 原生宿主仍未实际运行。
 
 - **BK-AUD-201 Worker presentation 托管验收**：`2b7626d` 在本地 44/44 单测、101/8/16 浏览器矩阵与 Docker 健康检查通过后推送；GitHub Actions run `44304695292` 16/16 步通过，Docker PR build run `44304695208` 成功，零 warning annotations。BK-AUD-201 仍未完成。
+
+## 2026-11-18 — BK-AUD-201 Worker public share HTML 拆分
+
+- 待办：进一步拆分 Worker 主入口中的公开集合 HTML rendering，并锁定 escaping/scheme 行为。
+- 修改：新增 `src/worker/publicShareHtml.mjs` 抽取公开页 template，新增 `tests/public-share-html.test.js` 覆盖标题/说明/书签/AI 数据转义与 `javascript:` URL 限制；Worker 入口从 6,809 行降至 6,710 行。静态门禁从 Worker 源码调整到新 rendering module 检查外部 CSP-safe 脚本标记。
+- 验证：XSS 模板回归 1/1；全套 `npm test` 45/45、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）、Docker build/start/healthy `/api/health` 通过；hosted CI 待推送后运行。
+- 风险：无 API/schema/persistence 变化；`BK-AUD-201` 其他大型路由/前端渲染入口仍待增量拆分。
