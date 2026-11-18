@@ -1313,5 +1313,14 @@
 - 证据：`src/services/aiGovernance.js` 的三个 `DEFAULT_AI_EVAL_SAMPLES` 含 URL 与 note；提取前 Worker 的 `src/worker.mjs` 对应样本缺少一条或两条辅助字段，因此 Worker `/api/product/ai/evals` 输入 fixture 与 Node 不一致。
 - 根因：Node CJS 与 Worker ESM 重复维护 defaults，没有跨实现 parity assertion。
 - 修改：在 `src/worker/aiGovernance.mjs` 补全三条 Worker 样本，使其与 Node fixture 完全一致；`tests/worker-ai-governance.test.js` 新增 `DEFAULT_AI_EVAL_SAMPLES`、privacy policy 和 feature policy 的深比较。
-- 验证：`node --test tests/worker-ai-governance.test.js` 4/4、全套 `npm test` 61/61；docs/UI/CF/extension 门禁和 Docker build/start/healthy 通过。hosted CI pending，暂不勾选。
+- 验证：`node --test tests/worker-ai-governance.test.js` 4/4、全套 `npm test` 61/61；docs/UI/CF/extension 门禁和 Docker build/start/healthy 通过。GitHub CI run `44327200479`（含浏览器矩阵）与 Docker PR build run `44327200197` 均成功。
 - 风险：defaults 仍在两处维护，parity test 会阻止静默漂移；无持久化/schema/API 变化。
+
+
+## BK-AUD-201 / P2 — Worker task summaries 解耦
+
+- 证据：`src/worker.mjs` 原先内联 `summarizeTaskHealth`、`summarizeRealtimeTasks` 和 `buildRealtimeSnapshot`，混合任务状态汇总、提醒筛选与 Worker 路由代码。
+- 根因：实时任务面板的纯汇总规则没有独立模块和直接回归测试。
+- 修改：抽取到 `src/worker/taskSummaries.mjs`；repo 持续按 `userId` 查询，默认插件 ID 维持 `raindropSync`，注入 `now` 供可重复测试；Worker 文件从 6,514 行降至 6,433 行。新增两项测试覆盖租户传参、任务/DLQ 状态、提醒完成/删除过滤与签名。
+- 验证：目标测试 2/2；`npm test` 63/63；`cf:check`、`cf:smoke`、`docs:check`、`ui:check`、`extension:check` 通过。Docker 镜像 build/start 成功，`/api/health` 返回 200；当前代码 hosted CI 待提交后确认。
+- 风险：无 API、schema 或持久化变化；BK-AUD-201 保持未完成，可独立回滚 helper/import/test。

@@ -383,4 +383,6 @@
 - [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理
 - [x] **P2** `BK-AUD-204` 设计系统细节收口
-- [ ] **P2** `BK-AUD-205` Node/Worker AI 默认评估样本漂移（Worker 原 fixture 缺 3 条 URL/note，已补齐并加入 Node/Worker defaults parity test；目标测试 4/4、npm test 61/61 和本地门禁通过，hosted CI 验收待完成）
+- [x] **P2** `BK-AUD-205` Node/Worker AI 默认评估样本漂移（Worker 原 fixture 缺 3 条 URL/note，已补齐并加入 parity test；本地 4/4、npm test 61/61、GitHub CI `44327200479`（16 步）与 Docker PR build `44327200197` 通过）
+
+BK-AUD-201 最新增量（2026-11-18）：Worker task health/realtime snapshot helper 已抽到 `src/worker/taskSummaries.mjs`，Worker 主入口降至 6,433 行；新增两项租户边界、DLQ 与提醒过滤测试。目标 2/2、全套 `npm test` 63/63，docs/UI/CF/extension 本地门禁通过；Docker 镜像启动后 `/api/health` 返回 200；当前 commit hosted CI 待完成，BK-AUD-201 仍未完成。
