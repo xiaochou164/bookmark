@@ -1206,3 +1206,10 @@
 - 风险：无 API/schema/persistence 变化；`BK-AUD-201` 其他大型路由/前端渲染入口仍待增量拆分。
 
 - **BK-AUD-201 Worker public share 托管验收**：`4cf6124` 的 GitHub Actions run `44306759467` 16/16 步通过，Docker PR build run `44306758987` 成功且无 warning annotations。
+
+## 2026-11-18 — BK-AUD-201 Node 订阅路由拆分
+
+- 待办：继续缩小 `src/routes/productRoutes.js` 的业务路由入口。
+- 修改：新增 `src/routes/productSubscriptionRoutes.js`，迁出 entitlement、subscription 与 quota 4 个 API handlers；路由依赖通过参数注入。新增 `tests/product-subscription-routes.test.js` 检查注册、订阅写入和 Alice/Bob 租户边界。`productRoutes.js` 从 4,052 行降至 3,993 行。
+- 验证：目标测试 1/1、`npm test` 46/46、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）及 Docker build/start/healthy `/api/health` 通过；hosted CI 待推送后运行。
+- 风险：无 API/schema 变化；其他产品路由和 Worker/app 入口仍待逐步迁移，BK-AUD-201 未关闭。
