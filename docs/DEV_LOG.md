@@ -1188,3 +1188,10 @@
 - 修改：新增 `src/worker/bookmarkIntelligence.mjs` 并迁出摘要、关键词、标签、目录、重复项、相似度、问答及搜索条件纯函数；修正中英文标签条件分组；新增 `tests/bookmark-intelligence.test.js` 覆盖搜索解析和推荐逻辑。
 - 验证：目标测试 `node --test tests/bookmark-intelligence.test.js`（3/3）；`npm run cf:check`；全套 `npm test` 42/42、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 扩展截图）及 Docker 镜像健康检查通过；hosted CI run `44302676562` 全部 16 步成功，Docker PR build run `44302676439` 成功且无 warning annotations。`npm audit --audit-level=low` 因 npm registry audit endpoint 返回 HTTP 400 未完成；本轮 `npm ci` 输出 0 vulnerabilities。
 - 风险：无接口、schema 或数据格式变化；`BK-AUD-201` 仍未完成，回退可单独 revert 本次标签解析/Worker 拆分提交。
+
+## 2026-11-18 — BK-AUD-201 Worker HTML 与预览模块拆分
+
+- 待办：继续从 Worker 入口迁出有明确边界的纯展示/解析辅助逻辑。
+- 修改：新增 `src/worker/bookmarkPresentation.mjs`，迁出 HTML entity/title/meta/link/article 提取、预览类型、YouTube embed URL、公开 URL scheme 校验与 HTML escaping；`src/worker.mjs` 从 6,925 行减至 6,809 行。新增 `tests/bookmark-presentation.test.js` 两项回归。
+- 验证：目标测试 2/2；全套 `npm test` 44/44、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）、Docker 镜像构建与隔离容器健康检查通过。hosted CI 待提交后运行。
+- 风险：保持现有输出及 URL 校验语义，无 API/schema/persistence 变化；Safari 原生宿主仍未实际运行。
