@@ -137,7 +137,8 @@ const collabRoutesSource = read('src/routes/collabRoutes.js');
 if (!productRoutesSource.includes('aiCallsPerDay') || !productRoutesSource.includes('aiBatchItemsPerTask') || !productRoutesSource.includes('AI_QUOTA_EXCEEDED') || !productRoutesSource.includes('AI_BATCH_LIMIT_EXCEEDED')) {
   failures.push('AI-404 AI quota guardrails must enforce daily calls and batch-size limits');
 }
-if (!productRoutesSource.includes('DEFAULT_AI_PROMPT_TEMPLATES') || !productRoutesSource.includes('/api/product/ai/prompts') || !productRoutesSource.includes('version = Number(item.version || 0) + 1')) {
+const productAiSettingsSource = read('src/routes/productAiSettingsRoutes.js');
+if (!productAiSettingsSource.includes('DEFAULT_AI_PROMPT_TEMPLATES') || !productAiSettingsSource.includes('/api/product/ai/prompts') || !productAiSettingsSource.includes('version = Number(item.version || 0) + 1')) {
   failures.push('AI-405 prompt templates must be configurable and versioned through product routes');
 }
 const settingsSource = read('public/settings.mjs');
