@@ -1225,3 +1225,13 @@
 - 风险：其余产品路由、Worker 与前端大入口还需拆分，BK-AUD-201 仍未完成；本地验证完成，hosted CI/Docker checks 待推送后核验。
 
 - **BK-AUD-201 saved-search 托管验收**：代码 head `6f18c51` 的 GitHub Actions CI run `44310585890` 全部 16 步成功，包含浏览器矩阵、扩展 parity、Docker 启动与 operations drill；Docker PR build run `44310585793` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node backup 路由拆分
+
+- 待办：继续将产品 API 按边界拆出，并以租户隔离回归保护备份恢复。
+- 修改：将备份创建、列表与恢复 handlers 移入 `src/routes/productBackupRoutes.js`；`productRoutes.js` 从 3,918 行降至 3,841 行。新增 `tests/product-backup-routes.test.js`，验证 Alice 的快照不含 Bob 数据，Bob 无法列出或恢复 Alice 的备份，Alice 恢复时 Bob 现有书签、目录和 saved search 保持不变。
+- 验证：目标测试 1/1、`npm test` 48/48、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 Docker build/start/healthy `/api/health` 通过；`ui:browser`（101 张/8 项 E2E/16 张扩展截图）通过；浏览器报告截图已恢复到已审阅基线。hosted GitHub CI run `44312644489` 全部 16 步成功，Docker PR build run `44312644522` 成功。
+- 风险：无 API/schema/持久化格式变化；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 backup routes 托管验收**：代码 head `b0353ef` 的 GitHub Actions CI run `44312644489` 16/16 步通过，包含浏览器矩阵、扩展 parity、Docker 启动与 operations drill；Docker PR build run `44312644522` 成功。BK-AUD-201 仍保持未完成。
