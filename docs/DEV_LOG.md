@@ -1255,3 +1255,13 @@
 - 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44316388306` 全部 16 步成功，Docker PR build run `44316388326` 成功；BK-AUD-201 仍未完成。
 
 - **BK-AUD-201 duplicate scan routes 托管验收**：代码 head `e2af39e` 的 GitHub Actions CI run `44316388306` 16/16 步成功，Docker PR build run `44316388326` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node semantic dedupe 路由拆分
+
+- 待办：继续把产品路由按业务域拆出，并确认语义索引与聚类只使用当前租户数据。
+- 修改：将约 200 行 `/api/product/ai/dedupe/semantic-scan` handler 移至 `src/routes/productSemanticDedupeRoutes.js`，通过注入依赖保持 Node handler 行为和租户过滤；`productRoutes.js` 从 3,775 行降至 3,577 行。新增 `tests/product-semantic-dedupe-routes.test.js`，验证 feature gates、embedding 仅包含 Alice 书签、聚类和 job 记录归属 Alice。
+- 验证：目标测试 1/1、`npm test` 51/51、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 张扩展截图）和 Docker build/start/healthy `/api/health` 通过；测试生成的审阅报告已还原。
+- 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44318376574` 全部 16 步通过，Docker PR build run `44318376449` 通过；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 semantic dedupe routes 托管验收**：代码 head `0c19c37` 的 GitHub Actions CI run `44318376574` 16/16 步成功，Docker PR build run `44318376449` 成功。BK-AUD-201 仍保持未完成。
