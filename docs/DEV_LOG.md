@@ -1235,3 +1235,13 @@
 - 风险：无 API/schema/持久化格式变化；BK-AUD-201 仍未完成。
 
 - **BK-AUD-201 backup routes 托管验收**：代码 head `b0353ef` 的 GitHub Actions CI run `44312644489` 16/16 步通过，包含浏览器矩阵、扩展 parity、Docker 启动与 operations drill；Docker PR build run `44312644522` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node broken-link routes 拆分
+
+- 待办：继续拆分产品路由域并验证扫描任务按用户隔离。
+- 修改：将 broken-link scan 与 task history handlers 移至 `src/routes/productBrokenLinkRoutes.js`；`productRoutes.js` 从 3,841 行降至 3,796 行。新增 `tests/product-broken-link-routes.test.js`，验证扫描仅处理调用用户的书签，任务列表仅返回所属用户的记录。
+- 验证：目标测试 1/1、`npm test` 49/49、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 张扩展截图）和 Docker build/start/healthy `/api/health` 通过；测试生成的审阅截图已恢复。
+- 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44314512969` 全部 16 步成功，Docker PR build run `44314512956` 成功；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 broken-link routes 托管验收**：代码 head `f80672d` 的 GitHub Actions CI run `44314512969` 16/16 步成功，Docker PR build run `44314512956` 成功。BK-AUD-201 仍保持未完成。
