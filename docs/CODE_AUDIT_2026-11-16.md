@@ -1,6 +1,6 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。最新代码提交 `ffbdde5` 的 GitHub Actions run `44294235227`（16 步）全部通过，Docker build run `44294235225` 通过；首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
+> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。最终代码提交 `57d51d1` 的 GitHub Actions run `44296561913`（16 步）全部通过，Docker build run `44296561819` 通过；Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
@@ -19,7 +19,7 @@
 
 ## P2：工程质量、性能与交付
 - [ ] **BK-AUD-201 / P2 / 大模块解耦（分阶段进行，仍未完成）**：`public/app.mjs`、`src/worker.mjs`、`src/routes/productRoutes.js` 仍是大型集中入口。本轮将约 300 行 AI 权益、策略、评估和反馈状态逻辑抽至 `src/services/aiGovernance.js`，共享词元处理抽至 `src/services/textTokens.js`，AI governance API handlers 抽至 `src/routes/productAiGovernanceRoutes.js`；将 Chrome sync folder/index transformations 抽至 `src/worker/chromeSync.mjs`；将完整 AI side drawer 状态、DOM 渲染、问答、历史和绑定抽至 `public/js/app/aiDrawer.mjs`。`public/app.mjs` 从 9,748 行减至 9,552 行，静态入口从 383.6KiB 降至 374.9KiB。新增单测覆盖用户隔离、能力门禁、策略上限、评估样本归属、API 路由挂载/租户策略以及 Worker sync URL、目录索引、镜像状态和幂等目录创建；AI 抽屉拆分后本机 `npm run ui:browser` 的 101 状态矩阵、8 项 E2E 和 16 个扩展状态通过，托管 CI run `44294235227` 的全部 16 步也通过。`productRoutes.js` 从 4,709 行减至 4,246 行；`worker.mjs` 从 7,432 行减至 7,316 行。Worker 剩余路由、app 其他渲染域和其他大型业务域仍待迁移与 Node/Worker 契约覆盖，本项保持未完成。
-- [x] **BK-AUD-202 / P2 / 测试门禁和性能（托管验收通过）**：CI 加入 Chrome headless UI/E2E/扩展回归、Cloudflare 语法门禁、Docker 构建启动和截图 artifact；浏览器脚本采集 FCP/LCP/CLS、INP observer、heap、长任务、布局/脚本耗时，并运行低速网、CPU 限速和大样本检查。首次托管运行显示 runner 的 user namespace/AppArmor 限制导致 Chrome `No usable sandbox`；`scripts/ui-browser-audit.mjs` 现仅在 `CI` 环境传入 `--no-sandbox`，本机保持默认沙箱。最新代码 CI run `44294235227` 的全部 16 步通过，Docker PR build run `44294235225` 通过且未推送镜像。INP 若未捕获用户交互则不作为性能结论。
+- [x] **BK-AUD-202 / P2 / 测试门禁和性能（托管验收通过）**：CI 加入 Chrome headless UI/E2E/扩展回归、Cloudflare 语法门禁、Docker 构建启动和截图 artifact；浏览器脚本采集 FCP/LCP/CLS、INP observer、heap、长任务、布局/脚本耗时，并运行低速网、CPU 限速和大样本检查。首次托管运行显示 runner 的 user namespace/AppArmor 限制导致 Chrome `No usable sandbox`；`scripts/ui-browser-audit.mjs` 现仅在 `CI` 环境传入 `--no-sandbox`，本机保持默认沙箱。最终代码 CI run `44296561913` 的全部 16 步通过，Docker PR build run `44296561819` 通过且未推送镜像；Docker action 已升级到 Node 24，`ubuntu-latest` 改固定 `ubuntu-24.04`，两项 checks 无 warning annotations。INP 若未捕获用户交互则不作为性能结论。
 - [x] **BK-AUD-203 / P2 / 文档与实现漂移**：修正 OpenAPI 对 `/api/chrome-sync` preview 的写入描述与 schema，说明 `preview: true` 零持久化写入；更新架构、扩展同步、UI 审计和 UI 测试清单，区分本轮证据与历史状态，并补充隔离测试、部署边界和外部限制。
 - [x] **BK-AUD-204 / P2 / 设计系统视觉收口（浏览器矩阵验证）**：修正深色卡片/分页 surface、设置状态色、扩展状态反馈及窄窗宽度；核验控件、焦点、触屏目标和响应式动作区。具体截图、视口和 axe 结果列在 P1 执行记录。
 
@@ -62,5 +62,7 @@
 - **BK-AUD-204**：与 P1 一起用四档截图、暗色/Reduced Motion、局部溢出、axe 和键盘场景回归；详细机器报告见 `docs/screenshots/audit-2026-11-16/after/`。
 - **完整本地验证**：`npm ci`（0 vulnerabilities）；`npm audit --audit-level=low`（0 vulnerabilities）；`npm test`（24/24）；`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 和最终 `npm run ui:browser` 均通过；Docker 镜像构建、容器启动及 `/api/health` 通过。
 - **风险**：本轮性能样本未捕获 FCP/LCP/INP，只能报告导航、CLS、heap 和主线程耗时；200% 以 640 CSS px 重排宽度近似验证；Safari 原生安装/签名与 GitHub runner 未在本地验证。无生产部署、远程真实数据访问或合并。
+
+- **CI 升级验收（2026-11-18）**：`checkout@v5`、`setup-node@v5`、`setup-chrome@v2`、`upload-artifact@v6` 和 Docker actions `setup-qemu@v4`、`setup-buildx@v4`、`metadata@v6`、`build-push@v7` 均通过 hosted workflow；workflow 固定 `ubuntu-24.04`。最终 head `57d51d1` 的 CI run `44296561913` 全部 16 步通过，Docker run `44296561819` 构建通过，PR 条件下 registry login/push 跳过；两个 check 均无 annotation/warning。没有部署或推送镜像。
 
 补充安全复核：Worker 上传备份的 `ON CONFLICT(id)` 原来可以覆盖其他用户记录，已加全量归属预检（在 replace 删除前）、SQL 所属用户条件、R2 源对象权限。真实 SQLite 队列回归证明失败快照不改变任一租户。IO 使用条件 UPDATE 原子领取以防重投；JSON 存储改为权限 0600 的临时文件原子 rename，并做并发读写回归。AI endpoint 禁止私网字面量与重定向，Node 通过 socket DNS 验证；正文限 2MiB。Worker 统一 CSP/安全头，预览 frame 过滤 scheme。22 项测试通过；本轮发现均有修复，云平台网络边界与 Safari 原生宿主列为外部验证限制。

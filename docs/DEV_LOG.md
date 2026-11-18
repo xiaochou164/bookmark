@@ -1173,3 +1173,5 @@
 - **审计文档状态校准**：将首轮清单中 P0-001/002/003 的“待验证/需复测”改为本轮实际修复证据与回归结果；修正 `docs/TODO.md` 阶段标题；明确本轮自动化验证不等同第三方渗透测试，保留 BK-AUD-201、Safari 原生宿主和远端网络边界。验证：`npm run docs:check` 与 `git diff --check` 通过。
 
 - **CI 运行时与 Runner 告警收敛**：GitHub hosted checks 提示旧 Action 将被强制迁移到 Node 24，且 `ubuntu-latest` 即将切换到 Ubuntu 26。根据上游发布说明，将 checkout/setup-node/setup-chrome/upload-artifact 更新到 v5/v5/v2/v6，将 Docker actions QEMU/Buildx/metadata/build-push 更新到 v4/v4/v6/v7，并将两个 workflow 固定在 Ubuntu 24.04，避免 runner 镜像无意迁移；未改变 PR 构建不登录、不推送镜像的条件。Node24 Docker action 版本已完成构建验证；最终 pinned-runner CI 验证待完成。
+
+- **CI 最终验收**：最终 head `57d51d1` 的 GitHub Actions CI run `44296561913` 16/16 步通过；Docker PR build run `44296561819` 成功。诊断无 warning annotations；Docker registry login/push 按 PR 条件跳过。`npm run docs:check` 与 `git diff --check` 通过；当前唯一保持未完成的审计项为 `BK-AUD-201`，原生 Safari 宿主和 FCP/LCP/INP 采样边界继续公开记录。
