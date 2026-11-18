@@ -1286,3 +1286,12 @@
 - 风险/回退：接口与配置持久化格式保持不变；BK-AUD-201 未关闭，可单独回滚本次模块、入口注册和测试。
 
 - Hosted 验收：AI settings 代码 head `4e9f848` 的 GitHub CI run `44322630733` 全部 16 步成功（含 browser/extension 回归、Docker 启动及 operations drill）；Docker PR build run `44322630665` 成功。
+
+
+## 2026-11-18 — BK-AUD-201 Node AI action routes 拆分
+
+- 待办：把产品路由入口的 AI bookmark/tag/search/reader/recommendation action handlers 迁至专属模块。
+- 根因/边界：15 个 action handlers 只负责归一化请求参数、调用已存在的业务 job 函数及映射资源 not-found 错误，但与任务/搜索等主入口代码放在一起。
+- 修改：新增 `src/routes/productAiActionRoutes.js`，注入 `runAi*Job` callbacks，路由路径与行为保持不变；新增 `tests/product-ai-action-routes.test.js` 两项测试检查 15 个 endpoints 的参数和 folder/bookmark 404 转换。`productRoutes.js` 从 3,292 行降至 3,088 行。
+- 验证：目标测试 2/2；全套 `npm test` 57/57；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和隔离 Docker `/api/health` healthy 通过。本地 `ui:browser` 未在此增量重跑（无 UI 源变更），由待运行的 hosted workflow 覆盖浏览器矩阵。
+- 风险/回退：无 API/schema/persistence 变化；BK-AUD-201 未关闭，可独立回滚路由模块、入口注册和测试。
