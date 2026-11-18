@@ -1180,3 +1180,11 @@
 
 - **BK-AUD-201 Worker 继续解耦**：移出 `src/worker.mjs` 的导入/导出序列化和解析代码至 `src/worker/bookmarkTransfer.mjs`，Worker 主入口由 7,316 行降至 7,224 行。
 - **BK-AUD-107 / P1 导入导出数据完整性修复**：发现 CSV exporter 已正确加引号，但 Worker importer 以逗号直接切行，含逗号、引号或换行的标题/备注会损坏。新 quote-aware CSV parser 支持双引号、CRLF、多行 cell 和 BOM，对未闭合引号/缺 URL 列明确报错；HTML exporter 对标题、URL、标签和文件夹内容统一转义，parser 在 round-trip 时解码实体。新增 `tests/bookmark-transfer.test.js` 三项 codec 测试。验证：`npm test` 39/39，目标测试 3/3，`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）及 Docker build + 临时容器 `/api/health` 通过。PNG 重新生成后已恢复到原有审阅截图。无 API、数据库 schema 或持久化格式变化；最终 hosted CI run `44300423004` 16/16、Docker run `44300423001` 均通过，无 warning annotations；BK-AUD-107 已按验收要求勾选。
+
+## 2026-11-18 — BK-AUD-201 Worker 智能逻辑拆分与标签搜索修复
+
+- 待办：继续拆分 `src/worker.mjs`，修复搜索标签条件无法正确解析的问题。
+- 根因：Worker 的智能书签文本/推荐函数都位于主入口；`parseSearchToFilters` 的 `/标签|tag.../` alternation 先匹配“标签”，其匹配结果没有标签值捕获组。
+- 修改：新增 `src/worker/bookmarkIntelligence.mjs` 并迁出摘要、关键词、标签、目录、重复项、相似度、问答及搜索条件纯函数；修正中英文标签条件分组；新增 `tests/bookmark-intelligence.test.js` 覆盖搜索解析和推荐逻辑。
+- 验证：目标测试 `node --test tests/bookmark-intelligence.test.js`（3/3）；`npm run cf:check`；全套 `npm test` 42/42、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 扩展截图）及 Docker 镜像健康检查通过；hosted CI 待提交后运行。`npm audit --audit-level=low` 因 npm registry audit endpoint 返回 HTTP 400 未完成；本轮 `npm ci` 输出 0 vulnerabilities。
+- 风险：无接口、schema 或数据格式变化；`BK-AUD-201` 仍未完成，回退可单独 revert 本次 P2 拆分修复提交。
