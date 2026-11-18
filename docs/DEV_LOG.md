@@ -1306,3 +1306,12 @@
 - 修改：新增 `src/worker/aiGovernance.mjs`，迁出 readiness、job record、feature policy、eval、feedback/health、capability/path mapping 和 public guide；`src/worker.mjs` 从 6,710 行降至 6,514 行。新增 `tests/worker-ai-governance.test.js` 四项测试，其中显式比较 Node/Worker `DEFAULT_AI_FEATURE_POLICY`。
 - 验证：目标测试 4/4；全套 `npm test` 61/61；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 均通过；Docker build 成功，临时容器 `/api/health` 为 ok 且 health status 为 healthy。未在此纯 Worker 增量重复本地浏览器截图矩阵，hosted CI 将覆盖浏览器步骤。
 - 风险/回退：无 API/schema/data-format 变化；Node 与 Worker 仍保留独立实现，但新增默认值 parity test；BK-AUD-201 未关闭，可单独回滚新 helper、import 和测试。
+
+
+## BK-AUD-205 / P2 — Node/Worker AI eval fixtures 漂移
+
+- 证据：`src/services/aiGovernance.js` 的三个 `DEFAULT_AI_EVAL_SAMPLES` 含 URL 与 note；提取前 Worker 的 `src/worker.mjs` 对应样本缺少一条或两条辅助字段，因此 Worker `/api/product/ai/evals` 输入 fixture 与 Node 不一致。
+- 根因：Node CJS 与 Worker ESM 重复维护 defaults，没有跨实现 parity assertion。
+- 修改：在 `src/worker/aiGovernance.mjs` 补全三条 Worker 样本，使其与 Node fixture 完全一致；`tests/worker-ai-governance.test.js` 新增 `DEFAULT_AI_EVAL_SAMPLES`、privacy policy 和 feature policy 的深比较。
+- 验证：`node --test tests/worker-ai-governance.test.js` 4/4、全套 `npm test` 61/61；docs/UI/CF/extension 门禁和 Docker build/start/healthy 通过。hosted CI pending，暂不勾选。
+- 风险：defaults 仍在两处维护，parity test 会阻止静默漂移；无持久化/schema/API 变化。
