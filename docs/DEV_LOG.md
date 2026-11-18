@@ -1145,3 +1145,182 @@
 - 验证：`npm run ui:check`；`npm run ui:browser`（33 张截图）；`npm test`；`npm run cf:check`；`npm run extension:check`；`npm run cf:smoke:remote -- https://bookmark.sundays.ink`；`npm run extension:smoke:remote -- https://bookmark.sundays.ink`；线上 CSS/JS SHA-256 与本地一致；添加按钮左右外侧圆角计算样式正确。
 - 部署：Cloudflare Worker `d0ba8be8-0204-4ac7-b92f-b4fa5167306e`，后续样式修正版 `34abcaf6-b3f9-498e-a355-6c82b0349776`；代码提交 `6207e8b`。
 - 后续：为 `/api/chrome-sync` 增加真正的服务端 dry-run，修正扩展预览文案和行为后重新执行扩展远端 smoke。
+
+
+## 2026-11-16 — BK-AUD P0 本地审计修复
+
+- BK-AUD-001：Docker 改用 Node 生产入口、PORT 与健康检查一致；已构建并启动 healthy，最终镜像将在安全回归后重建。
+- BK-AUD-002：Chrome/Safari 快照显式 preview；Node/Worker 的数据库、认证时间、集合、日志和本地镜像均零写入。新增 VM 与实际 HTTP/SQLite 回归。
+- BK-AUD-003：修复 SSRF 重定向/IPv6、本地对象越权、Worker CSRF/异常泄漏、正文限额、同步删除保护；更新兼容依赖，audit 从 13 项（含 1 critical）降为 0。
+- 修改路径、根因、测试与风险详见 `CODE_AUDIT_2026-11-16.md` 本轮执行记录。当前 `npm test` 20/20；Worker smoke、文档、扩展构建和静态 UI 均已跑通。浏览器基线发现局部溢出和 CSP 事件错误，未标通过，将在 P1 处理。
+
+- P0 追加：Worker 备份恢复外来 ID/任意 R2 key、IO 重投、JSON 半写文件、AI egress、Worker CSP 一并修复。真实 SQLite restore attack 与 Node 并发读取加入回归，测试扩为 22 项。无数据库结构迁移。
+
+- P0 最终复验：`npm test` 22/22、`cf:check`、`cf:smoke`、`extension:check`、`docs:check`、`ui:check` 通过；`npm audit --audit-level=low` 0。`docker build -t rainbow-audit:p0 .` 成功，另启临时容器核验最终构建。P0 完成仅覆盖本轮可验证边界，外部宿主限制保持记录。
+
+## 2026-11-18 — BK-AUD P1/P2 前端回归与文档收口
+
+- 待办：`BK-AUD-101`–`106`、`BK-AUD-202`–`204`；`BK-AUD-201` 增量拆分
+- 内容：修复工作台溢出、详情模式/键盘焦点、CSP 登录提交、drawer 焦点限制、扩展 Popup 状态反馈和 legacy 样式覆盖；增加 Chrome headless UI/E2E/扩展回归与性能采样。AI drawer history 存取抽到独立模块并由两项单测保护。纠正 OpenAPI 中 preview 的旧描述，并区分本轮结果与历史 UI checklist 记录。
+- 变更文件：`.github/workflows/ci.yml`、`public/app.mjs`、`public/js/app/aiDrawerHistory.mjs`、`public/css/`、`public/index.html`、`chrome-extension/`、`safari-extension/`、`scripts/`、`tests/app-modules.test.js`、`docs/`
+- 验证：`npm ci`（0 vulnerabilities）；`npm test`（24/24）；`npm run docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`；Docker 镜像和隔离健康检查通过。
+- 遗留：`BK-AUD-201` 其余大入口拆分未完成；Safari 原生宿主和远程 Cloudflare 未运行。无生产部署、真实数据访问或 PR 合并。
+
+- **CI 浏览器启动复验**：首个 PR Actions 运行中，单测、文档、Worker 与静态 UI 门禁通过；浏览器步骤因 Ubuntu runner 限制 user namespaces 导致 Chrome 报 `No usable sandbox`。`scripts/ui-browser-audit.mjs` 现在只对 `CI` 环境追加 Chrome `--no-sandbox`，本机 `npm run ui:browser` 复验成功（主站 101 张、E2E 8 项、扩展 16 张）。首次修复验证 run `44289283424` 通过；后续代码 run `44291803799`、最新抽屉模块 run `44294235227` 的 16 步均通过。Docker runs `44289283256`、`44291803628`、`44294235225` 构建通过且登录/推送步骤跳过。对应截图 artifact 已由 Actions 留存；本机截图未重新入库，避免平台渲染差异造成基线噪声。
+
+- **BK-AUD-201 增量解耦（P2）**：将 AI 抽屉状态、DOM 渲染、问答、历史和事件绑定移入 `public/js/app/aiDrawer.mjs`，主入口 `public/app.mjs` 从 9,748 行/383.6KiB 降至 9,552 行/374.9KiB；静态 UI 门禁调整为检查新的功能模块边界。Node 产品路由的 AI entitlement/feature/privacy policy/eval/feedback 逻辑和 handlers 分别移入 `src/services/aiGovernance.js`、`src/services/textTokens.js`、`src/routes/productAiGovernanceRoutes.js`；Worker Chrome sync helpers 移入 `src/worker/chromeSync.mjs`。`productRoutes.js` 从 4,709 行降至 4,246 行，`worker.mjs` 从 7,432 行降至 7,316 行。治理 5 项和 Worker helper 3 项测试通过；`npm test` 32/32、`npm run ui:check` 通过；AI drawer 拆分后 `npm run ui:browser` 101 状态/8 项 E2E/16 扩展状态全部通过，截图报告写入 `/tmp/rainbow-ui-audit-ai-drawer`。风险：Worker 剩余路由和 app 其他渲染入口仍待拆分；回退可 revert P2 模块提交，无数据/schema 变化。
+
+- **审计文档状态校准**：将首轮清单中 P0-001/002/003 的“待验证/需复测”改为本轮实际修复证据与回归结果；修正 `docs/TODO.md` 阶段标题；明确本轮自动化验证不等同第三方渗透测试，保留 BK-AUD-201、Safari 原生宿主和远端网络边界。验证：`npm run docs:check` 与 `git diff --check` 通过。
+
+- **CI 运行时与 Runner 告警收敛**：GitHub hosted checks 提示旧 Action 将被强制迁移到 Node 24，且 `ubuntu-latest` 即将切换到 Ubuntu 26。根据上游发布说明，将 checkout/setup-node/setup-chrome/upload-artifact 更新到 v5/v5/v2/v6，将 Docker actions QEMU/Buildx/metadata/build-push 更新到 v4/v4/v6/v7，并将两个 workflow 固定在 Ubuntu 24.04，避免 runner 镜像无意迁移；未改变 PR 构建不登录、不推送镜像的条件。Node 24 Docker action 版本和固定 Runner 已完成 hosted 验证，CI/Docker 检查均通过且无 warning annotations。
+
+- **CI 最终验收**：最终代码 head `1b948f9` 的 GitHub Actions CI run `44300423004` 16/16 步通过；Docker PR build run `44300423001` 成功。诊断无 warning annotations；Docker registry login/push 按 PR 条件跳过。当前唯一保持未完成的审计项为 `BK-AUD-201`，原生 Safari 宿主和 FCP/LCP/INP 采样边界继续公开记录。
+
+- **BK-AUD-201 追加解耦**：将 `src/routes/productRoutes.js` 中 URL 与检索文本规范化、向量工具、语义索引批处理和文件夹路径 helper 拆到 `src/services/bookmarkSearch.js`，路由文件由 4,273 行降至 4,052 行。新模块允许注入 embedding 函数，新增 `tests/bookmark-search.test.js` 覆盖索引批量更新、跨租户行保留、fresh row 无写入、provider 异常不写库。验证：目标单测 4/4、`npm test` 36/36、docs/UI/Worker smoke/扩展检查、101/8/16 浏览器回归、Docker build 与临时容器健康检查通过；GitHub Actions CI run `44298730651` 16 步和 Docker run `44298730581` 均通过且无警告。修改无 API/schema 变化，其他 Worker/app/product route 大入口仍待迁移。
+
+- **BK-AUD-201 Worker 继续解耦**：移出 `src/worker.mjs` 的导入/导出序列化和解析代码至 `src/worker/bookmarkTransfer.mjs`，Worker 主入口由 7,316 行降至 7,224 行。
+- **BK-AUD-107 / P1 导入导出数据完整性修复**：发现 CSV exporter 已正确加引号，但 Worker importer 以逗号直接切行，含逗号、引号或换行的标题/备注会损坏。新 quote-aware CSV parser 支持双引号、CRLF、多行 cell 和 BOM，对未闭合引号/缺 URL 列明确报错；HTML exporter 对标题、URL、标签和文件夹内容统一转义，parser 在 round-trip 时解码实体。新增 `tests/bookmark-transfer.test.js` 三项 codec 测试。验证：`npm test` 39/39，目标测试 3/3，`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）及 Docker build + 临时容器 `/api/health` 通过。PNG 重新生成后已恢复到原有审阅截图。无 API、数据库 schema 或持久化格式变化；最终 hosted CI run `44300423004` 16/16、Docker run `44300423001` 均通过，无 warning annotations；BK-AUD-107 已按验收要求勾选。
+
+## 2026-11-18 — BK-AUD-201 Worker 智能逻辑拆分与标签搜索修复
+
+- 待办：继续拆分 `src/worker.mjs`，修复搜索标签条件无法正确解析的问题。
+- 根因：Worker 的智能书签文本/推荐函数都位于主入口；`parseSearchToFilters` 的 `/标签|tag.../` alternation 先匹配“标签”，其匹配结果没有标签值捕获组。
+- 修改：新增 `src/worker/bookmarkIntelligence.mjs` 并迁出摘要、关键词、标签、目录、重复项、相似度、问答及搜索条件纯函数；修正中英文标签条件分组；新增 `tests/bookmark-intelligence.test.js` 覆盖搜索解析和推荐逻辑。
+- 验证：目标测试 `node --test tests/bookmark-intelligence.test.js`（3/3）；`npm run cf:check`；全套 `npm test` 42/42、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 扩展截图）及 Docker 镜像健康检查通过；hosted CI run `44302676562` 全部 16 步成功，Docker PR build run `44302676439` 成功且无 warning annotations。`npm audit --audit-level=low` 因 npm registry audit endpoint 返回 HTTP 400 未完成；本轮 `npm ci` 输出 0 vulnerabilities。
+- 风险：无接口、schema 或数据格式变化；`BK-AUD-201` 仍未完成，回退可单独 revert 本次标签解析/Worker 拆分提交。
+
+## 2026-11-18 — BK-AUD-201 Worker HTML 与预览模块拆分
+
+- 待办：继续从 Worker 入口迁出有明确边界的纯展示/解析辅助逻辑。
+- 修改：新增 `src/worker/bookmarkPresentation.mjs`，迁出 HTML entity/title/meta/link/article 提取、预览类型、YouTube embed URL、公开 URL scheme 校验与 HTML escaping；`src/worker.mjs` 从 6,925 行减至 6,809 行。新增 `tests/bookmark-presentation.test.js` 两项回归。
+- 验证：目标测试 2/2；全套 `npm test` 44/44、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）、Docker 镜像构建与隔离容器健康检查通过。hosted CI run `44304695292` 的 16 步全部成功，Docker PR build run `44304695208` 成功且无 warning annotations。
+- 风险：保持现有输出及 URL 校验语义，无 API/schema/persistence 变化；Safari 原生宿主仍未实际运行。
+
+- **BK-AUD-201 Worker presentation 托管验收**：`2b7626d` 在本地 44/44 单测、101/8/16 浏览器矩阵与 Docker 健康检查通过后推送；GitHub Actions run `44304695292` 16/16 步通过，Docker PR build run `44304695208` 成功，零 warning annotations。BK-AUD-201 仍未完成。
+
+## 2026-11-18 — BK-AUD-201 Worker public share HTML 拆分
+
+- 待办：进一步拆分 Worker 主入口中的公开集合 HTML rendering，并锁定 escaping/scheme 行为。
+- 修改：新增 `src/worker/publicShareHtml.mjs` 抽取公开页 template，新增 `tests/public-share-html.test.js` 覆盖标题/说明/书签/AI 数据转义与 `javascript:` URL 限制；Worker 入口从 6,809 行降至 6,710 行。静态门禁从 Worker 源码调整到新 rendering module 检查外部 CSP-safe 脚本标记。
+- 验证：XSS 模板回归 1/1；全套 `npm test` 45/45、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）、Docker build/start/healthy `/api/health` 通过；hosted CI run `44306759467` 的 16 步全部成功，Docker PR build run `44306758987` 成功且无 warning annotations。
+- 风险：无 API/schema/persistence 变化；`BK-AUD-201` 其他大型路由/前端渲染入口仍待增量拆分。
+
+- **BK-AUD-201 Worker public share 托管验收**：`4cf6124` 的 GitHub Actions run `44306759467` 16/16 步通过，Docker PR build run `44306758987` 成功且无 warning annotations。
+
+## 2026-11-18 — BK-AUD-201 Node 订阅路由拆分
+
+- 待办：继续缩小 `src/routes/productRoutes.js` 的业务路由入口。
+- 修改：新增 `src/routes/productSubscriptionRoutes.js`，迁出 entitlement、subscription 与 quota 4 个 API handlers；路由依赖通过参数注入。新增 `tests/product-subscription-routes.test.js` 检查注册、订阅写入和 Alice/Bob 租户边界。`productRoutes.js` 从 4,052 行降至 3,993 行。
+- 验证：目标测试 1/1、`npm test` 46/46、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）及 Docker build/start/healthy `/api/health` 通过；hosted CI run `44308568325` 的 16 步全部成功，Docker PR build run `44308568271` 成功且无 warning annotations。
+- 风险：无 API/schema 变化；其他产品路由和 Worker/app 入口仍待逐步迁移，BK-AUD-201 未关闭。
+
+- **BK-AUD-201 Subscription routes 托管验收**：`67fa297` 的 GitHub Actions run `44308568325` 16/16 步成功，Docker PR build run `44308568271` 成功且无 warning annotations。BK-AUD-201 仍保持未完成。
+
+## 2026-11-18 — BK-AUD-201 Node saved-search 路由拆分
+
+- 待办：继续缩小 `src/routes/productRoutes.js`，并确认用户只能访问自己的已保存搜索。
+- 根因/修改：saved-search CRUD 原先与其他产品 handlers 混在大型路由模块中；迁入 `src/routes/productSavedSearchRoutes.js`，依赖通过参数注入，保持既有请求和响应行为。新增 `tests/product-saved-search-routes.test.js` 覆盖创建、列表、更新、删除以及 Alice/Bob 隔离，Bob 无法读取 Alice 的条目，也无法更新或删除。
+- 影响：`productRoutes.js` 从 3,993 行降至 3,918 行；无 API/schema/持久化格式变化。
+- 验证：目标测试 1/1；`npm test` 47/47；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 报告 101 张截图、8 项 E2E、16 个扩展状态通过。Docker 镜像启动后健康状态为 healthy，临时映射端口访问 `/api/health` 返回 `200`；仅由浏览器脚本重生成的审阅截图已恢复。
+- 风险：其余产品路由、Worker 与前端大入口还需拆分，BK-AUD-201 仍未完成；本地验证完成，hosted CI/Docker checks 待推送后核验。
+
+- **BK-AUD-201 saved-search 托管验收**：代码 head `6f18c51` 的 GitHub Actions CI run `44310585890` 全部 16 步成功，包含浏览器矩阵、扩展 parity、Docker 启动与 operations drill；Docker PR build run `44310585793` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node backup 路由拆分
+
+- 待办：继续将产品 API 按边界拆出，并以租户隔离回归保护备份恢复。
+- 修改：将备份创建、列表与恢复 handlers 移入 `src/routes/productBackupRoutes.js`；`productRoutes.js` 从 3,918 行降至 3,841 行。新增 `tests/product-backup-routes.test.js`，验证 Alice 的快照不含 Bob 数据，Bob 无法列出或恢复 Alice 的备份，Alice 恢复时 Bob 现有书签、目录和 saved search 保持不变。
+- 验证：目标测试 1/1、`npm test` 48/48、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 Docker build/start/healthy `/api/health` 通过；`ui:browser`（101 张/8 项 E2E/16 张扩展截图）通过；浏览器报告截图已恢复到已审阅基线。hosted GitHub CI run `44312644489` 全部 16 步成功，Docker PR build run `44312644522` 成功。
+- 风险：无 API/schema/持久化格式变化；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 backup routes 托管验收**：代码 head `b0353ef` 的 GitHub Actions CI run `44312644489` 16/16 步通过，包含浏览器矩阵、扩展 parity、Docker 启动与 operations drill；Docker PR build run `44312644522` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node broken-link routes 拆分
+
+- 待办：继续拆分产品路由域并验证扫描任务按用户隔离。
+- 修改：将 broken-link scan 与 task history handlers 移至 `src/routes/productBrokenLinkRoutes.js`；`productRoutes.js` 从 3,841 行降至 3,796 行。新增 `tests/product-broken-link-routes.test.js`，验证扫描仅处理调用用户的书签，任务列表仅返回所属用户的记录。
+- 验证：目标测试 1/1、`npm test` 49/49、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 张扩展截图）和 Docker build/start/healthy `/api/health` 通过；测试生成的审阅截图已恢复。
+- 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44314512969` 全部 16 步成功，Docker PR build run `44314512956` 成功；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 broken-link routes 托管验收**：代码 head `f80672d` 的 GitHub Actions CI run `44314512969` 16/16 步成功，Docker PR build run `44314512956` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node duplicate scan route 拆分
+
+- 待办：继续减小产品路由入口，并保护重复项扫描的租户范围和套餐门禁。
+- 修改：将 `/api/product/dedupe/scan` handler 移至 `src/routes/productDuplicateScanRoutes.js`；`productRoutes.js` 从 3,796 行降至 3,775 行。新增 `tests/product-duplicate-scan-routes.test.js`，验证只聚合同一用户的有效书签，过滤软删除项，并继续要求 `dedupeScan` feature。
+- 验证：目标测试 1/1、`npm test` 50/50、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 张扩展截图）和 Docker build/start/healthy `/api/health` 通过；浏览器生成的基线报告已还原。
+- 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44316388306` 全部 16 步成功，Docker PR build run `44316388326` 成功；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 duplicate scan routes 托管验收**：代码 head `e2af39e` 的 GitHub Actions CI run `44316388306` 16/16 步成功，Docker PR build run `44316388326` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node semantic dedupe 路由拆分
+
+- 待办：继续把产品路由按业务域拆出，并确认语义索引与聚类只使用当前租户数据。
+- 修改：将约 200 行 `/api/product/ai/dedupe/semantic-scan` handler 移至 `src/routes/productSemanticDedupeRoutes.js`，通过注入依赖保持 Node handler 行为和租户过滤；`productRoutes.js` 从 3,775 行降至 3,577 行。新增 `tests/product-semantic-dedupe-routes.test.js`，验证 feature gates、embedding 仅包含 Alice 书签、聚类和 job 记录归属 Alice。
+- 验证：目标测试 1/1、`npm test` 51/51、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 张扩展截图）和 Docker build/start/healthy `/api/health` 通过；测试生成的审阅报告已还原。
+- 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44318376574` 全部 16 步通过，Docker PR build run `44318376449` 通过；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 semantic dedupe routes 托管验收**：代码 head `0c19c37` 的 GitHub Actions CI run `44318376574` 16/16 步成功，Docker PR build run `44318376449` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node AI digest 路由拆分
+
+- 待办：继续缩小集中式产品路由入口，并验证 AI 摘要仅处理及持久化当前用户数据。
+- 根因/边界：`/api/product/ai/digest` 在 `src/routes/productRoutes.js` 内部同时负责套餐门禁、书签采样、统计、provider 调用、成功摘要与失败任务持久化，约 137 行逻辑混在主路由注册器。
+- 修改：抽取至 `src/routes/productDigestRoutes.js`，依赖通过注册参数注入；新增 `tests/product-digest-routes.test.js`，验证软删除和租户过滤、成功写入及保留 Bob 的既有数据，并验证 provider 失败仅记录 Alice 任务且错误继续传递。`productRoutes.js` 当前 3,444 行（本次净减 133 行）。
+- 验证：目标测试 2/2；`npm ci` 安装 166 个包且 0 vulnerabilities；`npm test` 53/53；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 均通过；`ui:browser` 通过（101 张页面状态、8 项 E2E、16 张扩展截图）；Docker build 成功，临时容器 `/api/health` 返回 `ok:true` 且 health status 为 `healthy`。hosted CI/Docker workflow 待提交后复验。
+- Hosted 验收：CI run `44320680576` 全部 16 步成功，Docker PR build run `44320680529` 成功。
+- 风险/回退：无 API/schema/数据格式变化；BK-AUD-201 仍未完成，可单独回滚本路由模块、注册改动和对应测试。
+
+
+## 2026-11-18 — BK-AUD-201 Node AI settings 路由拆分
+
+- 待办：从产品路由入口迁出 AI provider、prompt template 与 rules settings endpoints。
+- 根因/边界：配置读写、连接测试、prompt override 和规则配置/运行/history 共 8 个 handlers 与其他 AI 产品处理混在 `productRoutes.js`。
+- 修改：迁至 `src/routes/productAiSettingsRoutes.js`，依赖通过注册参数注入；新增 `tests/product-ai-settings-routes.test.js`，验证 provider config 与 prompt override 用户隔离、API key 只返回 masked 字段、provider test 对嵌套配置做 merge 且不保存修改、规则 endpoints 使用认证用户 ID。入口从 3,444 行降至 3,292 行。
+- 验证：目标测试 2/2；全套 `npm test` 55/55；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；Docker build 成功，隔离容器 `/api/health` 返回 `ok:true` 且 health status 为 `healthy`。`ui:check` 初次因静态规则仍检查旧路由文件而失败，规则已更新为检查 `productAiSettingsRoutes.js` 后复跑通过。UI 浏览器矩阵此前在本轮 AI digest 同一审计周期执行通过，当前改动仅在 API 路由，无 UI 源变更。hosted CI/Docker 待提交后验收。
+- 风险/回退：接口与配置持久化格式保持不变；BK-AUD-201 未关闭，可单独回滚本次模块、入口注册和测试。
+
+- Hosted 验收：AI settings 代码 head `4e9f848` 的 GitHub CI run `44322630733` 全部 16 步成功（含 browser/extension 回归、Docker 启动及 operations drill）；Docker PR build run `44322630665` 成功。
+
+
+## 2026-11-18 — BK-AUD-201 Node AI action routes 拆分
+
+- 待办：把产品路由入口的 AI bookmark/tag/search/reader/recommendation action handlers 迁至专属模块。
+- 根因/边界：15 个 action handlers 只负责归一化请求参数、调用已存在的业务 job 函数及映射资源 not-found 错误，但与任务/搜索等主入口代码放在一起。
+- 修改：新增 `src/routes/productAiActionRoutes.js`，注入 `runAi*Job` callbacks，路由路径与行为保持不变；新增 `tests/product-ai-action-routes.test.js` 两项测试检查 15 个 endpoints 的参数和 folder/bookmark 404 转换。`productRoutes.js` 从 3,292 行降至 3,088 行。
+- 验证：目标测试 2/2；全套 `npm test` 57/57；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和隔离 Docker `/api/health` healthy 通过。本地 `ui:browser` 未在此增量重跑（无 UI 源变更），由待运行的 hosted workflow 覆盖浏览器矩阵。
+- 风险/回退：无 API/schema/persistence 变化；BK-AUD-201 未关闭，可独立回滚路由模块、入口注册和测试。
+
+- Hosted 验收：AI action route code head `2874fbf` 的 GitHub Actions CI run `44324485032` 全部 16 步成功（含 browser matrix、extension parity、Docker startup 和 operations drill）；Docker PR build run `44324485034` 成功。
+
+
+## 2026-11-18 — BK-AUD-201 Worker AI governance helpers 解耦
+
+- 待办：拆出 Worker AI capability、eval、feedback/provider health 和公开集合 AI guide 纯逻辑，以 Node policy 作兼容对照。
+- 根因/边界：上述 10 个 helpers 与 Worker crypto/schema/repository/HTTP handler 同处入口，难以单独回归；Node 已有对应 AI governance defaults，Worker 默认值存在双实现漂移风险。
+- 修改：新增 `src/worker/aiGovernance.mjs`，迁出 readiness、job record、feature policy、eval、feedback/health、capability/path mapping 和 public guide；`src/worker.mjs` 从 6,710 行降至 6,514 行。新增 `tests/worker-ai-governance.test.js` 四项测试，其中显式比较 Node/Worker `DEFAULT_AI_FEATURE_POLICY`。
+- 验证：目标测试 4/4；全套 `npm test` 61/61；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 均通过；Docker build 成功，临时容器 `/api/health` 为 ok 且 health status 为 healthy。未在此纯 Worker 增量重复本地浏览器截图矩阵，hosted CI 将覆盖浏览器步骤。
+- 风险/回退：无 API/schema/data-format 变化；Node 与 Worker 仍保留独立实现，但新增默认值 parity test；BK-AUD-201 未关闭，可单独回滚新 helper、import 和测试。
+
+
+## BK-AUD-205 / P2 — Node/Worker AI eval fixtures 漂移
+
+- 证据：`src/services/aiGovernance.js` 的三个 `DEFAULT_AI_EVAL_SAMPLES` 含 URL 与 note；提取前 Worker 的 `src/worker.mjs` 对应样本缺少一条或两条辅助字段，因此 Worker `/api/product/ai/evals` 输入 fixture 与 Node 不一致。
+- 根因：Node CJS 与 Worker ESM 重复维护 defaults，没有跨实现 parity assertion。
+- 修改：在 `src/worker/aiGovernance.mjs` 补全三条 Worker 样本，使其与 Node fixture 完全一致；`tests/worker-ai-governance.test.js` 新增 `DEFAULT_AI_EVAL_SAMPLES`、privacy policy 和 feature policy 的深比较。
+- 验证：`node --test tests/worker-ai-governance.test.js` 4/4、全套 `npm test` 61/61；docs/UI/CF/extension 门禁和 Docker build/start/healthy 通过。GitHub CI run `44327200479`（含浏览器矩阵）与 Docker PR build run `44327200197` 均成功。
+- 风险：defaults 仍在两处维护，parity test 会阻止静默漂移；无持久化/schema/API 变化。
+
+
+## BK-AUD-201 / P2 — Worker task summaries 解耦
+
+- 证据：`src/worker.mjs` 原先内联 `summarizeTaskHealth`、`summarizeRealtimeTasks` 和 `buildRealtimeSnapshot`，混合任务状态汇总、提醒筛选与 Worker 路由代码。
+- 根因：实时任务面板的纯汇总规则没有独立模块和直接回归测试。
+- 修改：抽取到 `src/worker/taskSummaries.mjs`；repo 持续按 `userId` 查询，默认插件 ID 维持 `raindropSync`，注入 `now` 供可重复测试；Worker 文件从 6,514 行降至 6,433 行。新增两项测试覆盖租户传参、任务/DLQ 状态、提醒完成/删除过滤与签名。
+- 验证：目标测试 2/2；`npm test` 63/63；`cf:check`、`cf:smoke`、`docs:check`、`ui:check`、`extension:check` 通过。Docker 镜像 build/start 成功，`/api/health` 返回 200；GitHub CI run `44328101550`（16 步）与 Docker PR build run `44328102056` 均成功。
+- 风险：无 API、schema 或持久化变化；BK-AUD-201 保持未完成，可独立回滚 helper/import/test。

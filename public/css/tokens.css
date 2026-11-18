@@ -1,5 +1,6 @@
 :root {
   color-scheme: light;
+  --color-sidebar: #f6f5f4;
   --color-canvas: #f3f5f8;
   --color-surface: #ffffff;
   --color-surface-subtle: #f7f8fa;
@@ -42,6 +43,7 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --color-sidebar: #181e26;
   --color-canvas: #12161c;
   --color-surface: #1d232b;
   --color-surface-subtle: #252d37;
@@ -55,7 +57,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root[data-theme="system"] {
-    --color-canvas: #12161c;
+    --color-sidebar: #181e26;
+  --color-canvas: #12161c;
     --color-surface: #1d232b;
     --color-surface-subtle: #252d37;
     --color-text: #f4f7fb;

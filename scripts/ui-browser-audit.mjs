@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
@@ -12,8 +13,9 @@ const viewports = [
   { name: 'tablet', width: 920, height: 900 },
   { name: 'desktop', width: 1280, height: 900 }
 ];
-const screenshotDir = path.join(root, 'docs/screenshots/ui-visual-baseline');
+const screenshotDir = path.resolve(root, process.env.UI_AUDIT_DIR || 'docs/screenshots/audit-2026-11-16/after');
 const reportPath = path.join(screenshotDir, 'audit-report.json');
+const axeSource = fs.readFileSync(path.join(root, 'node_modules/axe-core/axe.min.js'), 'utf8');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -137,6 +139,7 @@ async function startChrome() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rainbow-chrome-'));
   const child = spawn(chromePath, [
     '--headless=new',
+    ...(process.env.CI ? ['--no-sandbox'] : []),
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-dev-shm-usage',
@@ -174,13 +177,9 @@ async function evaluate(session, expression) {
 
 async function navigate(session, url) {
   await session.send('Page.navigate', { url });
-  const started = Date.now();
-  while (Date.now() - started < 15000) {
-    const ready = await evaluate(session, 'document.readyState');
-    if (ready === 'complete') return;
-    await sleep(100);
-  }
-  throw new Error(`Timed out navigating to ${url}`);
+  const expected = new URL(url);
+  await waitForExpression(session, `document.readyState === 'complete' && location.pathname === ${JSON.stringify(expected.pathname)} && location.hash === ${JSON.stringify(expected.hash)}`, 15000);
+  await sleep(100);
 }
 
 async function setViewport(session, viewport) {
@@ -235,6 +234,20 @@ async function key(session, keyName) {
     windowsVirtualKeyCode: code,
     nativeVirtualKeyCode: code
   });
+}
+
+async function pressKey(session, keyName, modifiers = 0) {
+  const code = { Tab: 9, Enter: 13, Escape: 27, Space: 32, ArrowRight: 39, ArrowLeft: 37, Home: 36, End: 35 }[keyName] || 0;
+  for (const type of ['rawKeyDown', 'keyUp']) {
+    await session.send('Input.dispatchKeyEvent', {
+      type,
+      key: keyName === 'Space' ? ' ' : keyName,
+      code: keyName,
+      modifiers,
+      windowsVirtualKeyCode: code,
+      nativeVirtualKeyCode: code
+    });
+  }
 }
 
 async function seedSession(session, baseUrl) {
@@ -324,10 +337,44 @@ async function prepareWorkbench(session, baseUrl, layout = 'list') {
 async function captureState(session, baseUrl, viewport, state, publicPath) {
   await setViewport(session, viewport);
   const name = `${state}-${viewport.name}-${viewport.width}`;
+  let loginCookies = [];
   if (state === 'login') {
+    loginCookies = (await session.send('Network.getCookies', { urls: [baseUrl] })).cookies;
+    for (const cookie of loginCookies) await session.send('Network.deleteCookies', { name: cookie.name, domain: cookie.domain, path: cookie.path });
     await navigate(session, `${baseUrl}/login.html`);
   } else if (state === 'main-list') {
     await prepareWorkbench(session, baseUrl, 'list');
+  } else if (state === 'dark-main') {
+    await evaluate(session, `localStorage.setItem('rainbow.ui.theme', 'dark')`);
+    await prepareWorkbench(session, baseUrl, 'card');
+  } else if (state === 'dark-settings') {
+    await evaluate(session, `localStorage.setItem('rainbow.ui.theme', 'dark')`);
+    await navigate(session, `${baseUrl}/settings.html#app`);
+    await waitForExpression(session, `document.documentElement.dataset.theme === 'dark' && Boolean(document.querySelector('#settingsSectionAccount'))`);
+  } else if (state === 'main-headline' || state === 'main-moodboard') {
+    await prepareWorkbench(session, baseUrl, state.replace('main-', ''));
+  } else if (state === 'bulk' || state === 'ai-drawer' || state === 'bookmark-dialog' || state === 'sidebar') {
+    await prepareWorkbench(session, baseUrl, 'list');
+    if (state === 'bulk') {
+      await evaluate(session, `document.querySelector('#cards [data-select]')?.click()`);
+      await waitForExpression(session, `!document.querySelector('#bulkActionsBar')?.classList.contains('hidden')`);
+    }
+    if (state === 'ai-drawer') {
+      await evaluate(session, `document.querySelector('#askAiBtn')?.click()`);
+      await waitForExpression(session, `document.querySelector('#aiSideDrawer')?.getAttribute('aria-hidden') === 'false'`);
+    }
+    if (state === 'bookmark-dialog') {
+      await evaluate(session, `document.querySelector('#addBookmarkBtn')?.click()`);
+      await waitForExpression(session, `document.querySelector('#bookmarkDialog')?.open === true`);
+    }
+    if (state === 'sidebar' && viewport.width <= 920) {
+      await evaluate(session, `document.querySelector('#mobileSidebarBtn')?.click()`);
+      await waitForExpression(session, `document.querySelector('.shell')?.classList.contains('sidebar-open')`);
+    }
+  } else if (state === 'search-empty') {
+    await prepareWorkbench(session, baseUrl, 'list');
+    await evaluate(session, `const input = document.querySelector('#searchInput'); input.value='zzzz-no-matching-audit'; input.dispatchEvent(new Event('input', {bubbles:true}));`);
+    await waitForExpression(session, `!document.querySelector('#cards [data-id]') && document.querySelector('#cards').textContent.length > 0`);
   } else if (state === 'main-card') {
     await prepareWorkbench(session, baseUrl, 'card');
   } else if (state === 'detail') {
@@ -368,8 +415,8 @@ async function captureState(session, baseUrl, viewport, state, publicPath) {
     await waitForExpression(session, `!document.querySelector('#headerMoreMenu')?.classList.contains('hidden')`);
     await evaluate(session, `document.querySelector('[data-header-more-action="notifications"]')?.click()`);
     await waitForExpression(session, `!document.querySelector('#realtimeNotificationsMenu')?.classList.contains('hidden')`);
-  } else if (state === 'settings') {
-    await navigate(session, `${baseUrl}/settings.html#app`);
+  } else if (state === 'settings' || state.startsWith('settings-')) {
+    await navigate(session, `${baseUrl}/settings.html#${state === 'settings' ? 'app' : state.replace('settings-', '')}`);
     await waitForExpression(session, `Boolean(document.querySelector('#settingsSectionAccount'))`);
   } else if (state === 'plugin') {
     await navigate(session, `${baseUrl}/plugin.html`);
@@ -382,7 +429,7 @@ async function captureState(session, baseUrl, viewport, state, publicPath) {
   const overflow = await evaluate(session, `(() => {
     const de = document.documentElement;
     const offenders = [...document.querySelectorAll('body *')]
-      .filter((el) => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX === 'visible')
+      .filter((el) => el instanceof HTMLElement && el.clientWidth > 0 && el.getClientRects().length && el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX === 'visible')
       .slice(0, 8)
       .map((el) => ({
         tag: el.tagName.toLowerCase(),
@@ -395,12 +442,16 @@ async function captureState(session, baseUrl, viewport, state, publicPath) {
       path: location.pathname + location.hash,
       clientWidth: de.clientWidth,
       scrollWidth: de.scrollWidth,
-      ok: de.scrollWidth <= de.clientWidth,
+      ok: de.scrollWidth <= de.clientWidth && offenders.length === 0,
       offenders
     };
   })()`);
+  await evaluate(session, axeSource);
+  const accessibility = await evaluate(session, `axe.run(document, {runOnly: {type:'tag', values:['wcag2a','wcag2aa','wcag21aa']}}).then(r => r.violations.map(v => ({id:v.id, impact:v.impact, description:v.description, nodes:v.nodes.map(n => ({target:n.target, summary:n.failureSummary}))})))`);
   const file = await screenshot(session, name);
-  return { state, viewport, screenshot: path.relative(root, file), overflow };
+  if (state.startsWith('dark-')) await evaluate(session, `localStorage.setItem('rainbow.ui.theme', 'light')`);
+  if (loginCookies.length) await session.send('Network.setCookies', { cookies: loginCookies.map(({ name, value, domain, path, secure, httpOnly, sameSite, expires }) => ({ name, value, domain, path, secure, httpOnly, sameSite, ...(expires > 0 ? { expires } : {}) })) });
+  return { state, viewport, screenshot: path.relative(root, file), overflow, accessibility };
 }
 
 async function keyboardSmoke(session, baseUrl) {
@@ -427,16 +478,42 @@ async function keyboardSmoke(session, baseUrl) {
   await session.send('Input.insertText', { text: 'example' });
   await sleep(150);
   const searchValue = await evaluate(session, `document.querySelector('#searchInput')?.value || ''`);
+  await key(session, 'Escape');
+  await evaluate(session, `(() => { const input = document.querySelector('#searchInput'); input.value = ''; input.dispatchEvent(new Event('input', {bubbles:true})); input.blur(); })()`);
+  await waitForExpression(session, `Boolean(document.querySelector('#cards [data-id]'))`);
   await evaluate(session, `document.querySelector('#cards [data-id]')?.focus()`);
   await key(session, 'Enter');
-  await sleep(300);
-  const detailFocused = await evaluate(session, `document.activeElement?.id === 'detailCloseBtn' || Boolean(document.querySelector('.detail [data-detail-section-key]'))`);
+  await waitForExpression(session, `!document.querySelector('#detailForm')?.classList.contains('hidden') && document.querySelector('#detailForm')?.classList.contains('detail-readonly')`, 5000);
+  const detailFocused = await evaluate(session, `Boolean(document.querySelector('#detailSummaryTitle')?.textContent.trim())`);
+  await evaluate(session, `document.querySelector('#detailPanelViewModeBtn')?.focus()`);
+  await pressKey(session, 'ArrowRight');
+  await waitForExpression(session, `document.querySelector('#detailPanelEditModeBtn')?.getAttribute('aria-selected') === 'true' && document.activeElement?.id === 'detailPanelEditModeBtn'`, 5000);
+  const detailTabsRove = await evaluate(session, `document.activeElement?.id === 'detailPanelEditModeBtn' && document.querySelector('#detailPanelEditModeBtn')?.getAttribute('aria-selected') === 'true'`);
+  const detailTabsState = await evaluate(session, `({active:document.activeElement?.id,view:document.querySelector('#detailPanelViewModeBtn')?.getAttribute('aria-selected'),edit:document.querySelector('#detailPanelEditModeBtn')?.getAttribute('aria-selected'),detailClass:document.querySelector('#detailPanel')?.className})`);
+  await evaluate(session, `document.querySelector('#detailCloseBtn')?.click(); document.querySelector('#askAiBtn')?.focus(); document.querySelector('#askAiBtn')?.click()`);
+  await waitForExpression(session, `document.querySelector('#aiSideDrawer')?.getAttribute('aria-hidden') === 'false'`);
+  const drawerInert = await evaluate(session, `document.querySelector('.main')?.inert === true`);
+  await pressKey(session, 'Escape');
+  await sleep(120);
+  const drawerRestoredFocus = await evaluate(session, `document.activeElement?.id === 'askAiBtn' && document.querySelector('#aiSideDrawer')?.getAttribute('aria-hidden') === 'true'`);
+  await evaluate(session, `document.querySelector('#addBookmarkBtn')?.focus(); document.querySelector('#addBookmarkBtn')?.click()`);
+  await waitForExpression(session, `document.querySelector('#bookmarkDialog')?.open === true`);
+  const dialogFocused = await evaluate(session, `document.querySelector('#bookmarkDialog')?.contains(document.activeElement) === true`);
+  await pressKey(session, 'Escape');
+  await sleep(120);
+  const dialogRestoredFocus = await evaluate(session, `document.activeElement?.id === 'addBookmarkBtn' && document.querySelector('#bookmarkDialog')?.open === false`);
   return {
     hasVisibleFocus,
     menuOpened,
     menuClosed,
     searchValue,
     detailFocused,
+    detailTabsRove,
+    detailTabsState,
+    drawerInert,
+    drawerRestoredFocus,
+    dialogFocused,
+    dialogRestoredFocus,
     focusTrail
   };
 }
@@ -483,13 +560,36 @@ async function largeSampleSmoke(session, baseUrl) {
 }
 
 async function zoomAndMotionSmoke(session, baseUrl) {
-  await setViewport(session, { width: 390, height: 844 });
+  // A browser at 200% desktop zoom exposes roughly half the CSS viewport.
+  // Use that effective layout width so this checks reflow and reachability.
+  await setViewport(session, { width: 640, height: 900 });
   await session.send('Emulation.setEmulatedMedia', {
     features: [{ name: 'prefers-reduced-motion', value: 'reduce' }]
   });
+  await session.send('Performance.enable');
   await navigate(session, `${baseUrl}/settings.html#ai`);
-  await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 2 });
-  await sleep(300);
+  await session.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `(() => {
+      const sample = { lcp: 0, cls: 0, inp: 0 };
+      const observe = (type, callback) => { try { new PerformanceObserver((list) => callback(list.getEntries())).observe({ type, buffered: true }); } catch (_) {} };
+      observe('largest-contentful-paint', entries => { sample.lcp = Math.round(entries.at(-1)?.startTime || sample.lcp); });
+      observe('layout-shift', entries => { sample.cls += entries.filter(entry => !entry.hadRecentInput).reduce((sum, entry) => sum + entry.value, 0); });
+      observe('event', entries => { sample.inp = Math.max(sample.inp, ...entries.filter(entry => entry.interactionId).map(entry => Math.round(entry.duration))); });
+      globalThis.__rainbowWebVitals = sample;
+    })();`
+  });
+  await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  await session.send('Network.emulateNetworkConditions', {
+    offline: false,
+    latency: 150,
+    downloadThroughput: 1_600_000 / 8,
+    uploadThroughput: 750_000 / 8,
+    connectionType: 'cellular3g'
+  });
+  const previousTimeOrigin = await evaluate(session, 'performance.timeOrigin');
+  await session.send('Page.reload');
+  await waitForExpression(session, `performance.timeOrigin > ${Number(previousTimeOrigin)} && document.readyState === 'complete' && location.pathname === '/settings.html' && location.hash === '#ai'`, 20000);
+  await sleep(1200);
   const reducedMotion = await evaluate(session, `matchMedia('(prefers-reduced-motion: reduce)').matches`);
   const access = await evaluate(session, `(() => {
     const de = document.documentElement;
@@ -502,10 +602,33 @@ async function zoomAndMotionSmoke(session, baseUrl) {
       reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
       scrollOk: de.scrollWidth <= de.clientWidth,
       reachable: buttons.length > 0,
-      visibleControlCount: buttons.length
+      visibleControlCount: buttons.length,
+      effectiveLayoutViewportWidth: de.clientWidth,
+      focusTargetCount: buttons.filter((el) => el.tabIndex >= 0).length,
+      navigationMs: Math.round(performance.getEntriesByType('navigation')[0]?.duration || 0),
+      firstContentfulPaintMs: performance.getEntriesByType('paint').find((x) => x.name === 'first-contentful-paint')?.startTime
+        ? Math.round(performance.getEntriesByType('paint').find((x) => x.name === 'first-contentful-paint').startTime)
+        : null,
+      webVitals: globalThis.__rainbowWebVitals
+        ? {
+            lcp: globalThis.__rainbowWebVitals.lcp || null,
+            cls: globalThis.__rainbowWebVitals.cls,
+            inp: globalThis.__rainbowWebVitals.inp || null
+          }
+        : null
     };
   })()`);
-  await session.send('Emulation.setPageScaleFactor', { pageScaleFactor: 1 });
+  const metrics = await session.send('Performance.getMetrics');
+  const metricMap = Object.fromEntries((metrics.metrics || []).map((item) => [item.name, item.value]));
+  access.performance = {
+    jsHeapUsedMb: Number((Number(metricMap.JSHeapUsedSize || 0) / 1024 / 1024).toFixed(1)),
+    taskDurationSeconds: Number(Number(metricMap.TaskDuration || 0).toFixed(3)),
+    layoutDurationSeconds: Number(Number(metricMap.LayoutDuration || 0).toFixed(3)),
+    scriptDurationSeconds: Number(Number(metricMap.ScriptDuration || 0).toFixed(3)),
+    throttle: 'CPU 4x; network 3G profile (150ms, 1.6Mbps down)'
+  };
+  await session.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+  await session.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   await session.send('Emulation.setEmulatedMedia', { features: [] });
   return access;
 }
@@ -534,7 +657,7 @@ async function main() {
     session.on('Log.entryAdded', (params) => {
       const entry = params.entry || {};
       if (['error', 'warning'].includes(String(entry.level || ''))) {
-        report.console.push({ type: entry.level, source: entry.source, text: entry.text || '' });
+        report.console.push({ type: entry.level, source: entry.source, text: entry.text || '', url: entry.url || '' });
       }
     });
     session.on('Network.responseReceived', (params) => {
@@ -547,7 +670,7 @@ async function main() {
     await navigate(session, `${server.baseUrl}/login.html`);
     report.screenshots.push(await captureState(session, server.baseUrl, viewports[0], 'login', ''));
     const seed = await seedSession(session, server.baseUrl);
-    const states = ['login', 'main-list', 'main-card', 'detail', 'settings', 'plugin', 'public'];
+    const states = ['login', 'main-list', 'main-card', 'main-headline', 'main-moodboard', 'detail', 'detail-edit', 'bulk', 'ai-drawer', 'bookmark-dialog', 'sidebar', 'search-empty', 'settings', 'settings-account', 'settings-import', 'settings-collab', 'settings-product', 'settings-ai', 'settings-operations', 'settings-security', 'plugin', 'public', 'dark-main', 'dark-settings'];
     for (const state of states) {
       for (const viewport of viewports) {
         if (state === 'login' && viewport.name === 'mobile') continue;
@@ -569,12 +692,16 @@ async function main() {
     chrome.stop();
     server.stop();
   }
+  const a11yFailures = report.screenshots.flatMap(item => (item.accessibility || []).filter(v => ['critical','serious'].includes(v.impact)).map(v => ({state:item.state, width:item.viewport.width, ...v})));
   const overflowFailures = report.overflow.filter((item) => !item.ok);
   const keyboardFailures = [];
   if (!report.keyboard?.hasVisibleFocus) keyboardFailures.push('focus did not move with Tab');
   if (!report.keyboard?.menuOpened || !report.keyboard?.menuClosed) keyboardFailures.push('add menu did not open/close via keyboard');
   if (report.keyboard?.searchValue !== 'example') keyboardFailures.push('search input did not accept keyboard text');
   if (!report.keyboard?.detailFocused) keyboardFailures.push('list item did not open detail via keyboard');
+  if (!report.keyboard?.detailTabsRove) keyboardFailures.push('detail tabs did not support arrow-key roving focus');
+  if (!report.keyboard?.drawerInert || !report.keyboard?.drawerRestoredFocus) keyboardFailures.push('AI drawer did not isolate or restore focus');
+  if (!report.keyboard?.dialogFocused || !report.keyboard?.dialogRestoredFocus) keyboardFailures.push('bookmark dialog did not trap or restore focus');
   const largeSampleFailures = [];
   if (!report.largeSample?.initial?.treeVirtualized || Number(report.largeSample?.initial?.folderCount || 0) < 140) {
     largeSampleFailures.push('large collection tree did not virtualize');
@@ -596,14 +723,17 @@ async function main() {
   }
   const zoomMotionFailures = [];
   if (!report.zoomAndMotion?.reducedMotion) zoomMotionFailures.push('reduced-motion media emulation did not apply');
-  if (!report.zoomAndMotion?.scrollOk) zoomMotionFailures.push('200% zoom introduced horizontal overflow');
-  if (!report.zoomAndMotion?.reachable) zoomMotionFailures.push('200% zoom controls were not reachable');
+  if (!report.zoomAndMotion?.scrollOk) zoomMotionFailures.push('200% effective layout viewport introduced horizontal overflow');
+  if (!report.zoomAndMotion?.reachable || Number(report.zoomAndMotion?.focusTargetCount || 0) < 10) zoomMotionFailures.push('200% effective layout viewport controls were not keyboard reachable');
+  if (Number(report.zoomAndMotion?.effectiveLayoutViewportWidth || 0) !== 640) zoomMotionFailures.push('200% zoom layout viewport was not sampled at 640 CSS pixels');
+  if (!report.zoomAndMotion?.performance?.jsHeapUsedMb) zoomMotionFailures.push('low-performance browser metrics were not sampled');
   const consoleFailures = report.console.filter((item) => !/favicon|PHONE_REGISTRATION_ERROR|google_apis/i.test(String(item.text || '')));
   const networkFailures = report.networkErrors.filter((item) => !/favicon/i.test(String(item.url || '')));
   fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
-  if (overflowFailures.length || keyboardFailures.length || largeSampleFailures.length || zoomMotionFailures.length || consoleFailures.length || networkFailures.length) {
+  if (a11yFailures.length || overflowFailures.length || keyboardFailures.length || largeSampleFailures.length || zoomMotionFailures.length || consoleFailures.length || networkFailures.length) {
     console.error('ui-browser-audit: failed');
-    for (const failure of overflowFailures) console.error(`- overflow ${failure.path} ${failure.clientWidth}/${failure.scrollWidth}`);
+    for (const failure of a11yFailures) console.error(`- accessibility ${failure.state} ${failure.width}: ${failure.id} (${failure.nodes.length})`);
+    for (const failure of overflowFailures) console.error(`- overflow ${failure.path} ${failure.clientWidth}/${failure.scrollWidth}: ${JSON.stringify(failure.offenders)}`);
     for (const failure of keyboardFailures) console.error(`- ${failure}`);
     for (const failure of largeSampleFailures) console.error(`- ${failure}`);
     for (const failure of zoomMotionFailures) console.error(`- ${failure}`);
@@ -616,7 +746,9 @@ async function main() {
   console.log(`- report: ${path.relative(root, reportPath)}`);
 }
 
-main().catch((err) => {
+export { main, axeSource, startServer, startChrome, setViewport, navigate, evaluate, seedSession, prepareWorkbench, waitForExpression, screenshot, key, pressKey, captureState, keyboardSmoke, zoomAndMotionSmoke };
+
+if (process.argv[1] && fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url))) main().catch((err) => {
   console.error(err);
   process.exit(1);
 });

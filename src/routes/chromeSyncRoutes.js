@@ -21,6 +21,7 @@ const UNCATEGORIZED_FOLDER = '待归档';
 function normalizeUrl(input) {
     try {
         const url = new URL(String(input || '').trim());
+        if (!['http:', 'https:'].includes(url.protocol)) return null;
         url.hash = '';
         const pathname =
             url.pathname.endsWith('/') && url.pathname !== '/'
@@ -225,7 +226,7 @@ function registerChromeSyncRoutes(app, deps) {
             const toDeleteInChrome = [];
             let nextMirrorIndex = {};
 
-            await dbRepo.update((db) => {
+            const applySnapshot = (db) => {
                 // Build DB alive-bookmark index and deleted index
                 const dbByUrl = new Map();
                 const dbById = new Map();
@@ -255,6 +256,7 @@ function registerChromeSyncRoutes(app, deps) {
                     const oldNorm = normalizeUrl(dbBm.url);
 
                     if (!chromeBm) {
+                        if (!deleteSync) continue;
                         dbBm.deletedAt = now;
                         dbBm.updatedAt = now;
                         if (oldNorm) {
@@ -404,24 +406,7 @@ function registerChromeSyncRoutes(app, deps) {
                     }
                 }
 
-                const aliveFolderIds = new Set();
-                for (const bm of db.bookmarks) {
-                    if (hasOwner(bm, userId) && !bm.deletedAt && bm.folderId) {
-                        aliveFolderIds.add(String(bm.folderId));
-                    }
-                }
-                const removedFolderIds = new Set();
-                db.folders = (db.folders || []).filter((folder) => {
-                    if (!hasOwner(folder, userId)) return true;
-                    if (String(folder.id) === 'root') return true;
-                    const name = String(folder.name || '').trim();
-                    const pathKey = folderPathForId(db.folders, folder.id).join('\u001f');
-                    if (!name || chromeFolderPaths.has(pathKey)) return true;
-                    if (aliveFolderIds.has(String(folder.id))) return true;
-                    removedFolderIds.add(String(folder.id));
-                    return false;
-                });
-                stats.deletedFoldersInDb += removedFolderIds.size;
+                // A missing browser folder is not evidence that a cloud folder was deleted.
 
                 nextMirrorIndex = {};
                 for (const bm of db.bookmarks) {
@@ -444,9 +429,12 @@ function registerChromeSyncRoutes(app, deps) {
                 }
 
                 return db;
-            });
+            };
+            if (body.preview === true) applySnapshot(structuredClone(await dbRepo.read()));
+            else await dbRepo.update(applySnapshot);
 
             res.json({
+                preview: body.preview === true,
                 ok: true,
                 toAddInChrome,
                 toDeleteInChrome,

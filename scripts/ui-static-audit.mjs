@@ -58,6 +58,8 @@ if (legacyAppEntryLines > 8 || !legacyAppEntry.includes('moved to /app.mjs')) {
 
 const indexHtml = read('public/index.html');
 const appSource = read('public/app.mjs');
+const aiDrawerHistorySource = read('public/js/app/aiDrawerHistory.mjs');
+const aiDrawerSource = read('public/js/app/aiDrawer.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -101,6 +103,8 @@ if (!appSource.includes('new EventSource') || !appSource.includes('/api/events')
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
 const aiProviderSource = read('src/services/aiProviderService.js');
+const aiGovernanceSource = read('src/services/aiGovernance.js');
+const aiGovernanceRoutesSource = read('src/routes/productAiGovernanceRoutes.js');
 if (!systemRoutesSource.includes('/api/events') || !systemRoutesSource.includes('text/event-stream') || !systemRoutesSource.includes('buildRealtimeSnapshot')) {
   failures.push('RA-FE-005 Node API must expose realtime SSE snapshots');
 }
@@ -113,7 +117,7 @@ if (!componentsCss.includes('.realtime-notifications-menu') || !componentsCss.in
 for (const id of ['aiSideDrawer', 'aiDrawerQuestion', 'aiDrawerHistory', 'aiDrawerSuggestions']) {
   if (!indexHtml.includes(`id="${id}"`)) failures.push(`RA-FE-006 AI side drawer missing #${id}`);
 }
-if (!appSource.includes('rainbow.aiDrawerHistory') || !appSource.includes('runAiSideDrawerAsk') || !appSource.includes('setAiSideDrawerOpen') || !appSource.includes('data-ai-drawer-action')) {
+if (!aiDrawerHistorySource.includes('rainbow.aiDrawerHistory') || !aiDrawerSource.includes('runAiSideDrawerAsk') || !aiDrawerSource.includes('setAiSideDrawerOpen') || !aiDrawerSource.includes('data-ai-drawer-action')) {
   failures.push('RA-FE-006 workbench must provide AI side drawer history, ask flow, suggestions, and shortcuts');
 }
 if (!componentsCss.includes('.ai-side-drawer') || !componentsCss.includes('.ai-drawer-history') || !componentsCss.includes('.ai-drawer-shortcuts')) {
@@ -133,7 +137,8 @@ const collabRoutesSource = read('src/routes/collabRoutes.js');
 if (!productRoutesSource.includes('aiCallsPerDay') || !productRoutesSource.includes('aiBatchItemsPerTask') || !productRoutesSource.includes('AI_QUOTA_EXCEEDED') || !productRoutesSource.includes('AI_BATCH_LIMIT_EXCEEDED')) {
   failures.push('AI-404 AI quota guardrails must enforce daily calls and batch-size limits');
 }
-if (!productRoutesSource.includes('DEFAULT_AI_PROMPT_TEMPLATES') || !productRoutesSource.includes('/api/product/ai/prompts') || !productRoutesSource.includes('version = Number(item.version || 0) + 1')) {
+const productAiSettingsSource = read('src/routes/productAiSettingsRoutes.js');
+if (!productAiSettingsSource.includes('DEFAULT_AI_PROMPT_TEMPLATES') || !productAiSettingsSource.includes('/api/product/ai/prompts') || !productAiSettingsSource.includes('version = Number(item.version || 0) + 1')) {
   failures.push('AI-405 prompt templates must be configurable and versioned through product routes');
 }
 const settingsSource = read('public/settings.mjs');
@@ -143,7 +148,7 @@ if (!settingsSource.includes('renderAiAuditPanel') || !settingsSource.includes('
 if (!collabRoutesSource.includes('aiGuide') || !collabRoutesSource.includes('renderAiGuide') || !read('public/css/public.css').includes('.public-ai-guide')) {
   failures.push('AI-501 public collection page must expose AI guide summary, tags, FAQ, and recommendations');
 }
-if (!read('public/public-share.mjs').includes('renderAiGuide') || !collabRoutesSource.includes('src="/public-share.mjs"') || !workerSource.includes('src="/public-share.mjs"')) {
+if (!read('public/public-share.mjs').includes('renderAiGuide') || !collabRoutesSource.includes('src="/public-share.mjs"') || !read('src/worker/publicShareHtml.mjs').includes('src="/public-share.mjs"')) {
   failures.push('public collection pages must use the external public-share.mjs module for CSP-safe behavior');
 }
 if (/<script>\s*\(async function|<script>\s*\(function/.test(collabRoutesSource) || /<script>\s*\(async function|<script>\s*\(function/.test(workerSource)) {
@@ -152,31 +157,31 @@ if (/<script>\s*\(async function|<script>\s*\(function/.test(collabRoutesSource)
 for (const marker of ['/api/collab/ai/change-summary', '/api/collab/ai/tag-guidance/:folderId', '/api/collab/ai/comment-assist']) {
   if (!collabRoutesSource.includes(marker)) failures.push(`AI collaboration route missing ${marker}`);
 }
-if (!productRoutesSource.includes('DEFAULT_AI_EVAL_SAMPLES') || !productRoutesSource.includes('/api/product/ai/evals/run') || !settingsSource.includes('aiEvalRunBtn')) {
+if (!aiGovernanceSource.includes('DEFAULT_AI_EVAL_SAMPLES') || !aiGovernanceRoutesSource.includes('/api/product/ai/evals/run') || !settingsSource.includes('aiEvalRunBtn')) {
   failures.push('AI-601 prompt/eval baseline must expose samples, eval run API, and settings action');
 }
 if (!workerSource.includes('DEFAULT_AI_EVAL_SAMPLES') || !workerSource.includes('/api/product/ai/evals/run')) {
   failures.push('AI-601 Worker path must expose prompt/eval baseline APIs');
 }
-if (!productRoutesSource.includes('aiFeedbackItems') || !productRoutesSource.includes('/api/product/ai/feedback') || !settingsSource.includes('aiFeedbackSendBtn')) {
+if (!aiGovernanceSource.includes('aiFeedbackItems') || !aiGovernanceRoutesSource.includes('/api/product/ai/feedback') || !settingsSource.includes('aiFeedbackSendBtn')) {
   failures.push('AI-602 AI output quality feedback must persist accepted/rejected/edited/rated feedback');
 }
 if (!workerSource.includes('ai_feedback_items') || !workerSource.includes('/api/product/ai/feedback')) {
   failures.push('AI-602 Worker path must persist AI output quality feedback');
 }
-if (!aiProviderSource.includes('sanitizeAiModelInput') || !productRoutesSource.includes('aiPrivacyPolicies') || !settingsSource.includes('aiPrivacyAnonymizeSelect')) {
+if (!aiProviderSource.includes('sanitizeAiModelInput') || !aiGovernanceSource.includes('aiPrivacyPolicies') || !settingsSource.includes('aiPrivacyAnonymizeSelect')) {
   failures.push('AI-603 AI privacy policy must sanitize model input and expose anonymization policy controls');
 }
 if (!workerSource.includes('sanitizeAiModelInput') || !workerSource.includes('/api/product/ai/privacy-policy')) {
   failures.push('AI-603 Worker path must expose AI privacy policy and sanitization');
 }
-if (!productRoutesSource.includes('aiProviderHealthChecks') || !productRoutesSource.includes('/api/product/ai/health/probe') || !settingsSource.includes('aiHealthProbeBtn')) {
+if (!aiGovernanceSource.includes('aiProviderHealthChecks') || !aiGovernanceRoutesSource.includes('/api/product/ai/health/probe') || !settingsSource.includes('aiHealthProbeBtn')) {
   failures.push('AI-604 provider health checks must record probes and expose a settings health panel');
 }
 if (!workerSource.includes('ai_provider_health_checks') || !workerSource.includes('/api/product/ai/health/probe')) {
   failures.push('AI-604 Worker path must record provider health checks');
 }
-if (!productRoutesSource.includes('aiFeaturePolicies') || !productRoutesSource.includes('AI_FEATURE_DISABLED') || !settingsSource.includes('aiFeatureEnabledSelect')) {
+if (!aiGovernanceSource.includes('aiFeaturePolicies') || !aiGovernanceSource.includes('AI_FEATURE_DISABLED') || !settingsSource.includes('aiFeatureEnabledSelect')) {
   failures.push('AI-605 AI feature switches and permissions must gate write APIs and expose settings controls');
 }
 if (!workerSource.includes('ai_feature_policy') || !workerSource.includes('AI_FEATURE_DISABLED')) {

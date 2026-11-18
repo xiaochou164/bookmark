@@ -775,42 +775,10 @@ class PluginManager {
     const plugin = this.get(scope.pluginId);
     const savedConfig = await this.getConfig(scope.pluginId, { userId: scope.userId });
     const effectiveConfig = { ...(plugin.defaultConfig ? plugin.defaultConfig() : {}), ...savedConfig, ...(inputConfig || {}) };
-    const startedAt = Date.now();
-    const runId = `prun_${crypto.randomUUID()}`;
-    try {
-      const db = await this.store.read();
-      const { pluginDb } = this._buildPluginRunDb(db, { pluginId: scope.pluginId, userId: scope.userId });
-      const result = await plugin.run({ mode: 'preview', config: effectiveConfig, db: pluginDb, now: Date.now() });
-      const finishedAt = Date.now();
-      await this.appendRunRecord({
-        id: runId,
-        pluginId: scope.pluginId,
-        userId: scope.userId || '',
-        type: 'preview',
-        status: 'succeeded',
-        startedAt,
-        finishedAt,
-        durationMs: finishedAt - startedAt,
-        configKeys: Object.keys(inputConfig || {}),
-        resultSummary: summarizePluginResult(result)
-      });
-      return { ...result, task: { id: runId, type: 'preview', status: 'succeeded', startedAt, finishedAt } };
-    } catch (err) {
-      const finishedAt = Date.now();
-      await this.appendRunRecord({
-        id: runId,
-        pluginId: scope.pluginId,
-        userId: scope.userId || '',
-        type: 'preview',
-        status: 'failed',
-        startedAt,
-        finishedAt,
-        durationMs: finishedAt - startedAt,
-        configKeys: Object.keys(inputConfig || {}),
-        error: safeErrorInfo(err)
-      });
-      throw err;
-    }
+    const db = structuredClone(await this.store.read());
+    const { pluginDb } = this._buildPluginRunDb(db, { pluginId: scope.pluginId, userId: scope.userId });
+    // Preview must not append run records, mutate leases, or persist plugin state.
+    return plugin.run({ mode: 'preview', config: effectiveConfig, db: pluginDb, now: Date.now() });
   }
 
   async run(id, inputConfig, ctx = {}) {

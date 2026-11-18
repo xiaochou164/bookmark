@@ -213,7 +213,7 @@ class AuthService {
     const authz = String(req.headers?.authorization || '');
     const bearer = authz.toLowerCase().startsWith('bearer ') ? authz.slice(7).trim() : '';
     if (bearer) {
-      const tokenAuth = await this.resolveApiToken(bearer);
+      const tokenAuth = await this.resolveApiToken(bearer, { readOnly: req.method === 'POST' && (req.path === '/api/chrome-sync' && req.body?.preview === true || /^\/api\/plugins\/[^/]+\/preview$/.test(req.path)) });
       if (tokenAuth) return tokenAuth;
     }
 
@@ -248,13 +248,13 @@ class AuthService {
     };
   }
 
-  async resolveApiToken(rawToken) {
+  async resolveApiToken(rawToken, { readOnly = false } = {}) {
     const parsed = parseOpaqueToken(rawToken);
     if (!parsed || parsed.prefix !== API_TOKEN_PREFIX) return null;
     const now = Date.now();
     let found = null;
     let user = null;
-    await this.dbRepo.update((db) => {
+    const resolve = (db) => {
       db.apiTokens = Array.isArray(db.apiTokens) ? db.apiTokens : [];
       db.users = Array.isArray(db.users) ? db.users : [];
       const rec = db.apiTokens.find((t) => String(t.id) === parsed.id);
@@ -263,12 +263,13 @@ class AuthService {
       if (String(rec.secretHash || '') !== sha256Hex(parsed.secret)) return db;
       const u = db.users.find((x) => String(x.id) === String(rec.userId) && !x.disabledAt);
       if (!u) return db;
-      rec.lastUsedAt = now;
-      rec.updatedAt = now;
+      if (!readOnly) { rec.lastUsedAt = now; rec.updatedAt = now; }
       found = sanitizeApiToken(rec);
       user = sanitizeUser(u);
       return db;
-    });
+    };
+    if (readOnly) resolve(await this.dbRepo.read());
+    else await this.dbRepo.update(resolve);
     if (!found || !user) return null;
     return {
       authenticated: true,

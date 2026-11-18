@@ -16,7 +16,7 @@
     "cf:smoke": "node scripts/cf-worker-smoke.mjs",
     "docs:check": "node scripts/docs-audit.mjs",
     "ui:check": "node scripts/ui-static-audit.mjs && node scripts/ui-performance-budget.mjs",
-    "ui:browser": "node scripts/ui-browser-audit.mjs",
+    "ui:browser": "node scripts/ui-browser-audit.mjs && node scripts/ui-e2e-audit.mjs && node scripts/extension-ui-audit.mjs",
     "cf:smoke:remote": "bash scripts/cf-remote-smoke.sh",
     "cf:d1:migrate:local": "bash scripts/cf-apply-d1-migration.sh local",
     "cf:d1:migrate:remote": "bash scripts/cf-apply-d1-migration.sh remote",
@@ -24,9 +24,10 @@
     "cf:d1:create": "node scripts/cf-ensure-d1-binding.mjs",
     "cf:migrate:data": "node scripts/cf-migrate-data.mjs",
     "extension:safari:build": "node scripts/build-safari-extension.mjs",
-    "extension:check": "node --check chrome-extension/background.js chrome-extension/options.js chrome-extension/popup.js scripts/build-safari-extension.mjs && npm run extension:safari:build",
+    "extension:check": "node scripts/check-extension.mjs && npm run extension:safari:build",
     "extension:smoke:remote": "node scripts/extension-server-smoke.mjs",
-    "ops:drill": "node scripts/ops-backup-restore-drill.mjs"
+    "ops:drill": "node scripts/ops-backup-restore-drill.mjs",
+    "start:node": "node src/server.js"
   },
   "keywords": [],
   "author": "",
@@ -36,9 +37,11 @@
     "bullmq": "^5.70.1",
     "express": "^5.2.1",
     "ioredis": "^5.9.3",
-    "jsdom": "^28.1.0"
+    "jsdom": "^28.1.0",
+    "undici": "^7.30.2"
   },
   "devDependencies": {
+    "axe-core": "^4.14.0",
     "wrangler": "^4.5.0"
   }
 }

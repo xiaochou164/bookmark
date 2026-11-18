@@ -42,6 +42,8 @@ function showStatus(msg, type = 'info') {
   statusBox.className = 'state-box status-box visible';
   statusBox.dataset.state = state;
   statusBox.textContent = msg;
+  const badge = document.querySelector('.footer .badge');
+  if (badge) badge.textContent = state === 'success' ? '操作成功' : state === 'error' ? '需要处理' : '正在处理';
 }
 
 // ── Format Rainbow (cloud DB) sync result ────────────────────────────────
@@ -141,7 +143,12 @@ openOptions.addEventListener('click', (e) => {
 // Load last sync status on open
 async function loadLastStatus() {
   const { lastSyncStatus } = await chrome.storage.local.get({ lastSyncStatus: null });
-  if (!lastSyncStatus) return;
+  if (!lastSyncStatus) {
+    showStatus('尚无同步记录。请先检查设置中的服务地址和 Token，再预览变更。', 'info');
+    const badge = document.querySelector('.footer .badge');
+    if (badge) badge.textContent = '尚未验证';
+    return;
+  }
   if (lastSyncStatus.ok) {
     if (lastSyncStatus.rainbowSync) {
       showStatus(formatRainbowResult(lastSyncStatus.rainbowSync, '上次云书签同步成功'), 'ok');

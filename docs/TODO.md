@@ -364,20 +364,25 @@
 - [x] `AI-904` Phase 4：`AI-601~AI-605` 评估治理与成本/健康体系
 
 
-## 2026-11-16 全项目代码与前端复核整改（新增，待执行）
+## 2026-11-16 全项目代码与前端复核整改（本轮已执行；BK-AUD-201 继续分阶段）
 
 具体证据、验收标准与实施边界见 [CODE_AUDIT_2026-11-16.md](./CODE_AUDIT_2026-11-16.md)。以下为与专项清单一一对应的工作项，旧条目 [x] 不代表本轮已验收。
 
-- [ ] **P0** `BK-AUD-001` 修复 Docker 启动与依赖/健康检查分歧
-- [ ] **P0** `BK-AUD-002` 核对扩展同步预览零写入契约及文档
-- [ ] **P0** `BK-AUD-003` 安全、权限、数据隔离专项复核
-- [ ] **P1** `BK-AUD-101` 列表操作区局部溢出
-- [ ] **P1** `BK-AUD-102` 详情栏/表单局部溢出
-- [ ] **P1** `BK-AUD-103` 主工作台布局、操作与响应式
-- [ ] **P1** `BK-AUD-104` 登录/设置/插件/公开页体验
-- [ ] **P1** `BK-AUD-105` 键盘、触控与无障碍
-- [ ] **P1** `BK-AUD-106` CSS legacy 样式治理
-- [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护
-- [ ] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁
-- [ ] **P2** `BK-AUD-203` 文档实现漂移治理
-- [ ] **P2** `BK-AUD-204` 设计系统细节收口
+- [x] **P0** `BK-AUD-001` 修复 Docker 启动与依赖/健康检查分歧
+- [x] **P0** `BK-AUD-002` 核对扩展同步预览零写入契约及文档
+- [x] **P0** `BK-AUD-003` 安全、权限、数据隔离专项复核
+- [x] **P1** `BK-AUD-101` 列表操作区局部溢出
+- [x] **P1** `BK-AUD-102` 详情栏/表单局部溢出
+- [x] **P1** `BK-AUD-103` 主工作台布局、操作与响应式
+- [x] **P1** `BK-AUD-104` 登录/设置/插件/公开页体验
+- [x] **P1** `BK-AUD-105` 键盘、触控与无障碍
+- [x] **P1** `BK-AUD-106` CSS legacy 样式治理
+- [x] **P1** `BK-AUD-107` CSV 导入导出 round-trip 字段损坏及 HTML 导出转义不足（CSV 导入按逗号无视引号拆分，导致自带逗号/引号/换行的标题和备注被切坏；HTML 导出对标题、URL、标签转义不完整。本轮已实现 quote-aware CSV codec 和完整 HTML escaping，并新增 3 项 codec 回归；本机 codec 测试 3/3、全套 `npm test` 39/39、Worker smoke、浏览器回归和 Docker 健康检查通过；最终 hosted CI run `44300423004` 16/16 通过，Docker run `44300423001` 通过且无 warning annotations）
+- [x] **P1** `BK-AUD-108` 搜索标签条件解析（“标签 AI”原正则先命中无捕获组的中文关键字，未设置标签过滤；解析逻辑已修复并抽取，新增 3 项回归；目标测试 3/3、全套本地门禁和 Docker 健康检查通过；hosted CI run `44302676562`（16/16）和 Docker PR build run `44302676439` 通过）
+- [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护（本轮将产品路由共享检索/语义索引及 Worker 导入导出 codecs 分别抽到 `src/services/bookmarkSearch.js`、`src/worker/bookmarkTransfer.mjs`、`src/worker/bookmarkIntelligence.mjs`、`src/worker/bookmarkPresentation.mjs`、`src/worker/publicShareHtml.mjs`、`src/worker/aiGovernance.mjs`；HTML/预览 helper 与 XSS 模板新增 3 项回归；Worker 主入口降至 6,514 行；Worker 搜索条件中文标签解析新增修复及 3 项回归。Node entitlement/subscription/quota、saved-search CRUD、backup CRUD、broken-link scan/task、duplicate scan 和 semantic dedupe handlers 分别迁出 `src/routes/productSubscriptionRoutes.js`、`src/routes/productSavedSearchRoutes.js`、`src/routes/productBackupRoutes.js`、`src/routes/productBrokenLinkRoutes.js`、`src/routes/productDuplicateScanRoutes.js`、`src/routes/productSemanticDedupeRoutes.js`、`src/routes/productDigestRoutes.js`、`src/routes/productAiSettingsRoutes.js`、`src/routes/productAiActionRoutes.js`；新增 Alice/Bob 隔离测试，覆盖 saved-search CRUD、备份列表/恢复、broken-link 历史、重复扫描和语义索引及 AI digest 成功/失败任务；`productRoutes.js` 当前 3,444 行。当前 `npm test` 53/53、`docs:check`、`ui:check`、CF smoke、扩展构建、UI 浏览器 101/8/16、Docker 镜像及健康检查通过；代码 head `6f18c51` 的 GitHub CI run `44310585890` 与 Docker PR build run `44310585793` 均通过。duplicate scan 代码 head `e2af39e` 的 GitHub CI run `44316388306`（16 步）和 Docker PR build run `44316388326` 均通过。语义去重代码 head `0c19c37` 的 GitHub CI run `44318376574`（16 步）和 Docker PR build run `44318376449` 均通过；文档 head `81d3640` 的 CI `44319013236` 与 Docker `44319013295` 均通过。AI digest 路由新增两项成功/失败租户隔离回归，`npm test` 53/53、`npm ci` 0 漏洞、docs/UI/CF/扩展门禁、浏览器 101/8/16 与 Docker healthy 检查通过；hosted CI run `44320680576`（16 步）与 Docker PR build run `44320680529` 均通过。AI settings 又新增两项配置/提示词/规则隔离及 secret masking 回归，当前 `npm test` 55/55，docs/UI/Worker/扩展门禁、Docker healthy 检查通过；`ui:check` 初次因旧静态断言定位到新模块后复跑成功。hosted CI run `44322630733`（16 步，含浏览器矩阵/扩展 parity）与 Docker PR build run `44322630665` 均通过。AI action routes 增加 15 路由默认参数/错误映射覆盖，目标 2/2、全套 npm test 57/57，docs/UI/Worker/扩展门禁和 Docker healthy 通过；hosted CI run `44324485032`（16 步，含浏览器矩阵/扩展/operations drill）与 Docker PR build run `44324485034` 均通过。Worker AI governance 又拆出 10 个纯 helper，新增 4 项策略/评估/公开指南回归，当前 npm test 61/61，docs/UI/CF/扩展及 Docker healthy 通过；hosted 验收待推送复验。`src/worker.mjs` 路由、`public/app.mjs` 其余渲染域和其他产品路由 handlers 仍需拆分，故保持未完成）
+- [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
+- [x] **P2** `BK-AUD-203` 文档实现漂移治理
+- [x] **P2** `BK-AUD-204` 设计系统细节收口
+- [x] **P2** `BK-AUD-205` Node/Worker AI 默认评估样本漂移（Worker 原 fixture 缺 3 条 URL/note，已补齐并加入 parity test；本地 4/4、npm test 61/61、GitHub CI `44327200479`（16 步）与 Docker PR build `44327200197` 通过）
+
+BK-AUD-201 最新增量（2026-11-18）：Worker task health/realtime snapshot helper 已抽到 `src/worker/taskSummaries.mjs`，Worker 主入口降至 6,433 行；新增两项租户边界、DLQ 与提醒过滤测试。目标 2/2、全套 `npm test` 63/63，docs/UI/CF/extension 本地门禁通过；Docker 镜像启动后 `/api/health` 返回 200；GitHub CI run `44328101550`（16 步）与 Docker PR build run `44328102056` 均通过，BK-AUD-201 仍未完成。

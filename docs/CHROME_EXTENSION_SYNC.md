@@ -70,6 +70,7 @@ Content-Type: application/json
   ],
   "deviceId": "dev_xxx",
   "mirrorIndex": {},
+  "preview": false,
   "deleteSync": true
 }
 ```
@@ -92,17 +93,21 @@ Content-Type: application/json
 5. 根据 `toDeleteInChrome` 删除 Chrome 条目。
 6. 保存新的 `rainbowMirrorIndex` 和最近同步状态。
 
-## 4. 预览限制
+## 4. 预览零写入契约（2026-11-16 复测修复）
 
-当前 `PREVIEW_RAINBOW_SYNC` 会调用与正式同步相同的 `/api/chrome-sync`。`preview=true` 只阻止扩展执行第 4、5、6 步，不会阻止服务端执行第 1、2、3 步。
+Popup/Options 的 `PREVIEW_RAINBOW_SYNC` 调用 `/api/chrome-sync` 并显式发送 `preview: true`。
+服务端复用同步计算逻辑，在内存副本上生成差异；不写书签、集合、同步索引、设备、任务记录或认证使用时间。
+预览不注册 deviceId、不保存本地状态、不创建/移动/删除浏览器书签。
 
-因此当前行为是：
+另一条 `/api/plugins/raindropSync/preview` 是服务端 provider 配置预览，不能代替 Chrome 快照预览。
+Node 该入口已取消预览运行日志落盘；Worker 返回配置能力摘要，不宣称完成了远端 provider 差异计算。
+首次使用前须初始化数据库，预览不会隐式执行 schema migration。
 
-- 不会新增或删除 Chrome 本地书签。
-- 可能把 Chrome 新书签、改名、移动或删除状态写入 Rainbow。
-- Popup/Options 中“未写入”的文案不准确。
+删除保护：`deleteSync: false` 不允许根据本地缺失删除云端书签；缺失文件夹不授权删除云端集合。
+时间戳缺失的旧书签不会复活云端墓碑。正式同步仍写入；预览结果中的临时 ID 不得用于正式写入。
 
-正确修复方向是为 `/api/chrome-sync` 增加服务端 dry-run 语义，或提供独立 preview endpoint，并让预览请求显式携带 `preview: true`。
+验证：`npm test` 在真实 SQLite 的 D1 adapter 上断言 SQL 写次数不增加，在 Node 上逐字比较数据库文件，
+并在 Chrome/Safari service worker VM 上断言本地 storage/bookmark 写次数为零。VM 不替代 Safari 原生签名安装测试。
 
 ## 5. 自动同步
 
@@ -135,7 +140,7 @@ npm run extension:smoke:remote -- https://bookmark.sundays.ink
 - 重复同步去重
 - Rainbow → Chrome 差异返回
 - 设备状态上报
-- `previewMutatedServer` 已知限制探测
+- `preview: true` 严格断言 `previewMutatedServer === false`
 
 浏览器安全策略可能阻止自动检查 `chrome://extensions`。发布扩展后仍需人工确认：
 

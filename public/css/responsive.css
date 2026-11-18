@@ -85,7 +85,42 @@
   }
 
   .detail-panel-head-tools {
-    grid-template-columns: auto minmax(96px, 1fr) auto auto;
+    grid-template-columns: auto minmax(108px, 1fr) 44px;
+    align-items: center;
+  }
+
+  .detail-panel-nav {
+    grid-column: 1;
+  }
+
+  .detail-panel-mode-switch {
+    grid-column: 2;
+  }
+
+  #detailCloseBtn {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .detail-panel-more-wrap {
+    grid-column: 3;
+    grid-row: 2;
+  }
+
+  .detail-panel-more-wrap:has(> button.hidden) {
+    display: none;
+  }
+
+  .detail-panel-nav,
+  .detail-panel-mode-switch {
+    height: auto;
+    min-height: 44px;
+  }
+
+  .detail-panel-nav .icon-action-btn,
+  .detail-panel-mode-switch > button {
+    min-height: 44px;
+    height: 44px;
   }
 
   .detail-panel-preview-shortcuts {

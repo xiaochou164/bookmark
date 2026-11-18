@@ -10,3 +10,10 @@ scripts
 __pycache__
 sync_bookmarks.py
 wrangler.toml
+
+safari-extension
+.env
+.env.*
+.wrangler
+data
+output

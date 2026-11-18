@@ -1,3 +1,38 @@
+import objectAccess from './utils/objectAccess.js';
+import publicFetch from './utils/publicFetch.js';
+const { fetchPublicResource } = publicFetch;
+import { createSyncPreviewRepo } from './services/syncPreviewRepo.mjs';
+import {
+  CHROME_SYNC_UNCATEGORIZED_FOLDER,
+  normalizeChromeSyncUrl,
+  chromeSyncFolderPath,
+  chromeSyncFolderPathKey,
+  folderPathForId,
+  ensureChromeSyncFolderPath,
+  buildChromeFolderIndex,
+  buildChromeFolderNameSet,
+  buildChromeIdIndex,
+  normalizeChromeSyncMirrorIndex
+} from './worker/chromeSync.mjs';
+import { exportCsvPayload, exportHtmlPayload, exportJsonPayload, parseImportCsv, parseImportHtml, parseImportJson } from './worker/bookmarkTransfer.mjs';
+import {
+  wordsFromText, uniqueByLower, inferSuggestedTags, summarizeText, createReaderSummary,
+  createHighlightCandidates, createHighlightDigest, relatedBookmarksFor, recommendFolder,
+  folderPathOf, normalizeUrlLoose, duplicateBookmarkQuality, duplicateGroupSuggestion,
+  cosineSimilarity, buildQaAnswer, parseSearchToFilters, groupTagsForStandardize, groupTagsForLocalize
+} from './worker/bookmarkIntelligence.mjs';
+import {
+  decodeEntities, stripTags, extractTitle, extractMetaContent, extractLinkHref, toAbsoluteUrl,
+  extractArticleTextFromHtml, inferPreviewKind, youtubeEmbedUrl
+} from './worker/bookmarkPresentation.mjs';
+import { renderPublicCollectionHtml } from './worker/publicShareHtml.mjs';
+import {
+  aiProviderLooksConfigured, makeAiJobRecord, DEFAULT_AI_EVAL_SAMPLES,
+  DEFAULT_AI_PRIVACY_POLICY, DEFAULT_AI_FEATURE_POLICY, buildAiEvalRun,
+  normalizeAiFeaturePolicy, aiFeedbackSummary, buildAiProviderHealth,
+  aiCapabilityForPath, isAiGovernancePath, buildPublicAiGuide
+} from './worker/aiGovernance.mjs';
+import { summarizeTaskHealth, buildRealtimeSnapshot } from './worker/taskSummaries.mjs';
 import crypto from 'node:crypto';
 import openapiSpec from '../docs/openapi.json' with { type: 'json' };
 import {
@@ -36,7 +71,7 @@ const ROOT_FOLDER_ID = 'root';
 const DEFAULT_PLUGIN_ID = 'raindropSync';
 const SCHEMA_VERSION = 2;
 
-let schemaReadyPromise = null;
+const schemaReadyPromises = new WeakMap();
 
 function sha256Hex(input) {
   return crypto.createHash('sha256').update(String(input || ''), 'utf8').digest('hex');
@@ -219,208 +254,6 @@ function mergeBookmarkTags(existing = [], incoming = [], applyMode = 'merge') {
   return normalizeTags([...(Array.isArray(existing) ? existing : []), ...(Array.isArray(incoming) ? incoming : [])]);
 }
 
-function aiProviderLooksConfigured(config = {}) {
-  const normalized = normalizeAiProviderConfigInput({}, config);
-  if (!normalized.enabled) return false;
-  if (normalized.providerType === 'cloudflare_ai') {
-    return Boolean(
-      String(normalized.cloudflareAI?.accountId || '').trim() &&
-      String(normalized.cloudflareAI?.apiToken || '').trim() &&
-      String(normalized.cloudflareAI?.model || '').trim()
-    );
-  }
-  return Boolean(
-    String(normalized.openaiCompatible?.baseUrl || '').trim() &&
-    String(normalized.openaiCompatible?.apiKey || '').trim() &&
-    String(normalized.openaiCompatible?.model || '').trim()
-  );
-}
-
-function makeAiJobRecord({
-  userId,
-  bookmarkId = '',
-  type = 'bookmark_auto_tag',
-  status = 'succeeded',
-  provider = {},
-  request = {},
-  result = null,
-  error = null,
-  startedAt = Date.now(),
-  finishedAt = Date.now()
-} = {}) {
-  return {
-    id: `ai_${crypto.randomUUID()}`,
-    userId: String(userId || ''),
-    bookmarkId: String(bookmarkId || ''),
-    type: String(type || 'bookmark_auto_tag'),
-    status: String(status || 'succeeded'),
-    createdAt: Number(startedAt || Date.now()),
-    finishedAt: Number(finishedAt || Date.now()),
-    providerType: String(provider.providerType || ''),
-    model: String(provider.model || ''),
-    attemptCount: Number(request?.attemptCount || 0) || 0,
-    maxAttempts: Number(request?.maxAttempts || 3) || 3,
-    lastAttemptAt: Number(request?.lastAttemptAt || 0) || 0,
-    request: request && typeof request === 'object' ? request : {},
-    result,
-    error: error ? { message: String(error.message || error) } : null
-  };
-}
-
-const DEFAULT_AI_EVAL_SAMPLES = Object.freeze([
-  {
-    id: 'eval_autotag_ai_article',
-    task: 'bookmark.autotag',
-    input: { title: 'OpenAI API structured outputs guide', url: 'https://platform.openai.com/docs/guides/structured-outputs' },
-    expected: { tags: ['AI', 'OpenAI', 'API'], keywords: ['structured', 'json'] }
-  },
-  {
-    id: 'eval_summary_product',
-    task: 'bookmark.summary',
-    input: { title: 'Rainbow product roadmap', note: 'product planning and release priorities' },
-    expected: { tags: ['产品', '路线图'], keywords: ['规划', '优先级', '发布'] }
-  },
-  {
-    id: 'eval_classify_design',
-    task: 'bookmark.classify',
-    input: { title: 'Design system accessibility checklist', note: 'contrast, focus, keyboard navigation' },
-    expected: { tags: ['设计系统', '可访问性'], keywords: ['contrast', 'keyboard', 'focus'] }
-  }
-]);
-
-const DEFAULT_AI_PRIVACY_POLICY = Object.freeze({
-  anonymize: true,
-  stripFields: ['apiKey', 'apiToken', 'password', 'rawHtml', 'cookies'],
-  maxPromptChars: 12_000,
-  redactPatterns: ['email', 'phone', 'token']
-});
-
-const DEFAULT_AI_FEATURE_POLICY = Object.freeze({
-  enabled: true,
-  role: 'owner',
-  capabilities: {
-    autoTag: true,
-    summarize: true,
-    qa: true,
-    search: true,
-    rules: true,
-    bulkTasks: true
-  }
-});
-
-function aiEvalScore(expected = {}, actual = {}) {
-  const expectedTokens = wordsFromText([
-    ...(Array.isArray(expected.tags) ? expected.tags : []),
-    ...(Array.isArray(expected.keywords) ? expected.keywords : [])
-  ].join(' '));
-  const actualTokens = new Set(wordsFromText(JSON.stringify(actual || {})));
-  if (!expectedTokens.length) return 1;
-  const matched = expectedTokens.filter((token) => actualTokens.has(token)).length;
-  return Number((matched / expectedTokens.length).toFixed(4));
-}
-
-function buildAiEvalRun(userId, candidates = []) {
-  const candidateBySampleId = new Map((Array.isArray(candidates) ? candidates : []).map((item) => [String(item.sampleId || item.id || ''), item]));
-  const rows = DEFAULT_AI_EVAL_SAMPLES.map((sample) => {
-    const candidate = candidateBySampleId.get(sample.id) || {};
-    const actual = candidate.output || candidate.result || inferSuggestedTags(sample.input || {});
-    const score = aiEvalScore(sample.expected, actual);
-    return { sampleId: sample.id, task: sample.task, score, passed: score >= 0.5, expected: sample.expected, actual };
-  });
-  const avgScore = rows.length ? rows.reduce((sum, row) => sum + Number(row.score || 0), 0) / rows.length : 0;
-  return {
-    id: `ai_eval_${crypto.randomUUID()}`,
-    userId: String(userId || ''),
-    createdAt: Date.now(),
-    sampleCount: rows.length,
-    passed: rows.filter((row) => row.passed).length,
-    failed: rows.filter((row) => !row.passed).length,
-    avgScore: Number(avgScore.toFixed(4)),
-    rows
-  };
-}
-
-function normalizeAiFeaturePolicy(raw = {}) {
-  return {
-    ...DEFAULT_AI_FEATURE_POLICY,
-    ...(raw && typeof raw === 'object' ? raw : {}),
-    capabilities: {
-      ...DEFAULT_AI_FEATURE_POLICY.capabilities,
-      ...(raw?.capabilities && typeof raw.capabilities === 'object' ? raw.capabilities : {})
-    }
-  };
-}
-
-function aiFeedbackSummary(items = []) {
-  const counts = {};
-  for (const item of items) {
-    const action = String(item.action || 'unknown');
-    counts[action] = (counts[action] || 0) + 1;
-  }
-  const ratings = items.map((item) => Number(item.rating || 0)).filter((n) => Number.isFinite(n) && n > 0);
-  return {
-    total: items.length,
-    counts,
-    avgRating: ratings.length ? Number((ratings.reduce((sum, n) => sum + n, 0) / ratings.length).toFixed(2)) : 0
-  };
-}
-
-function buildAiProviderHealth(jobs = [], checks = []) {
-  const failures = jobs.filter((job) => String(job.status || '') === 'failed');
-  const durations = jobs
-    .map((job) => Number(job.finishedAt || 0) - Number(job.createdAt || job.startedAt || 0))
-    .filter((n) => Number.isFinite(n) && n >= 0);
-  const lastCheck = checks[0] || null;
-  return {
-    availability: jobs.length ? Number(((jobs.length - failures.length) / jobs.length).toFixed(4)) : (lastCheck?.ok ? 1 : 0),
-    avgLatencyMs: durations.length ? Math.round(durations.reduce((sum, n) => sum + n, 0) / durations.length) : Number(lastCheck?.latencyMs || 0) || 0,
-    recentFailures: failures.slice(0, 5).map((job) => ({ id: job.id, type: job.type, message: job.error?.message || '', createdAt: job.createdAt })),
-    lastCheck,
-    checks: checks.slice(0, 20),
-    jobsSampled: jobs.length
-  };
-}
-
-function aiCapabilityForPath(path = '') {
-  const p = String(path || '');
-  if (/\/(?:batch|backfill)\//.test(p)) return 'bulkTasks';
-  if (/\/rules\//.test(p)) return 'rules';
-  if (/\/qa(?:[/?]|$)/.test(p)) return 'qa';
-  if (/\/(?:search-to-filters|dedupe|related|reading-priority)/.test(p)) return 'search';
-  if (/\/(?:summary|reader-summary|folder-summary|digest|highlight)/.test(p)) return 'summarize';
-  if (/\/(?:suggest|autotag|title-clean|folder-recommend|tags\/)/.test(p)) return 'autoTag';
-  return '';
-}
-
-function isAiGovernancePath(path = '') {
-  return /\/api\/product\/ai\/(?:config|evals|feedback|privacy-policy|feature-policy|health)(?:[/?]|$)/.test(String(path || ''));
-}
-
-function buildPublicAiGuide(link = {}, folder = {}, bookmarks = []) {
-  const counts = new Map();
-  for (const item of bookmarks) {
-    for (const tag of Array.isArray(item.tags) ? item.tags : []) {
-      const key = String(tag || '').trim();
-      if (!key) continue;
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-  }
-  const tags = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 10)
-    .map(([tag, count]) => ({ tag, count }));
-  const sample = bookmarks.slice(0, 5).map((item) => item.title).filter(Boolean);
-  return {
-    summary: link.description || (sample.length ? `这个集合收录了 ${sample.join('、')} 等内容。` : '这个集合还在整理中。'),
-    tags,
-    faq: [
-      { q: '这个集合适合先看什么？', a: sample[0] ? `可以先从「${sample[0]}」开始。` : '暂无推荐入口。' },
-      { q: '主要主题是什么？', a: tags.length ? tags.slice(0, 5).map((x) => `#${x.tag}`).join('、') : '暂无明显主题标签。' }
-    ],
-    recommendations: bookmarks.slice(0, 3).map((item) => ({ id: item.id, title: item.title, url: item.url }))
-  };
-}
-
 function toFolderTree(items) {
   const byId = new Map();
   for (const item of items) {
@@ -546,7 +379,32 @@ function applyBookmarkFilters(items, db, query) {
 async function parseJsonBody(request) {
   const contentType = String(request.headers.get('content-type') || '').toLowerCase();
   if (!contentType.includes('application/json')) return {};
-  return request.json().catch(() => ({}));
+  const reader = request.body?.getReader();
+  const chunks = [];
+  let size = 0;
+  if (reader) {
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 10 * 1024 * 1024) {
+          await reader.cancel();
+          throw Object.assign(new Error('Request body too large'), { status: 413, code: 'BODY_TOO_LARGE' });
+        }
+        chunks.push(value);
+      }
+    } finally { reader.releaseLock(); }
+  }
+  if (size === 0) return {};
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  try {
+    const body = JSON.parse(new TextDecoder().decode(bytes));
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error();
+    return body;
+  } catch { throw Object.assign(new Error('Invalid JSON object'), { status: 400, code: 'INVALID_JSON' }); }
 }
 
 function buildSqlPlaceholders(count) {
@@ -870,8 +728,8 @@ const SCHEMA_SQL = `
 
 function ensureSchema(env) {
   ensureD1(env);
-  if (schemaReadyPromise) return schemaReadyPromise;
-  schemaReadyPromise = (async () => {
+  if (schemaReadyPromises.has(env.DB)) return schemaReadyPromises.get(env.DB);
+  const ready = (async () => {
     const statements = SCHEMA_SQL
       .split(/;\s*\n/g)
       .map((statement) => statement.trim())
@@ -880,7 +738,9 @@ function ensureSchema(env) {
       await env.DB.prepare(`${statement};`).run();
     }
   })();
-  return schemaReadyPromise;
+  schemaReadyPromises.set(env.DB, ready);
+  ready.catch(() => schemaReadyPromises.delete(env.DB));
+  return ready;
 }
 
 async function allResults(statement, ...binds) {
@@ -897,7 +757,7 @@ async function runStatement(statement, ...binds) {
   return statement.bind(...binds).run();
 }
 
-function createRepo(env) {
+function createRepo(env, { readOnly = false } = {}) {
   const db = env.DB;
   const repo = {
     async ensureUserRootFolder(userId) {
@@ -929,7 +789,7 @@ function createRepo(env) {
     },
 
     async listFolders(userId) {
-      await repo.ensureUserRootFolder(userId);
+      if (!readOnly) await repo.ensureUserRootFolder(userId);
       const rows = await allResults(
         db.prepare(`
           SELECT id, user_id as userId, name, parent_id as parentId, color, icon, ai_suggestions_json as aiSuggestionsJson, position, created_at as createdAt, updated_at as updatedAt
@@ -939,7 +799,9 @@ function createRepo(env) {
         `),
         userId
       );
-      return rows.map((row) => repo.sanitizeFolderRow(row));
+      const folders = rows.map((row) => repo.sanitizeFolderRow(row));
+      if (!folders.some((folder) => folder.id === ROOT_FOLDER_ID)) folders.unshift({ id: ROOT_FOLDER_ID, userId, name: 'Root', parentId: null });
+      return folders;
     },
 
     async createFolder(userId, input) {
@@ -1414,7 +1276,7 @@ function createRepo(env) {
       };
     },
 
-    async resolveSession(rawToken) {
+    async resolveSession(rawToken, { readOnly = false } = {}) {
       const parsed = parseOpaqueToken(rawToken);
       if (!parsed || parsed.prefix !== SESSION_TOKEN_PREFIX) return null;
       const row = await firstResult(
@@ -1433,7 +1295,7 @@ function createRepo(env) {
       if (Number(row.expiresAt || 0) <= Date.now()) return null;
       if (String(row.secretHash || '') !== sha256Hex(parsed.secret)) return null;
       const now = Date.now();
-      await runStatement(db.prepare(`UPDATE auth_sessions SET last_seen_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
+      if (!readOnly) await runStatement(db.prepare(`UPDATE auth_sessions SET last_seen_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
       return {
         authenticated: true,
         method: 'session',
@@ -1460,7 +1322,7 @@ function createRepo(env) {
       };
     },
 
-    async resolveApiToken(rawToken) {
+    async resolveApiToken(rawToken, { readOnly = false } = {}) {
       const parsed = parseOpaqueToken(rawToken);
       if (!parsed || parsed.prefix !== API_TOKEN_PREFIX) return null;
       const row = await firstResult(
@@ -1479,7 +1341,7 @@ function createRepo(env) {
       if (!row || row.revokedAt || row.userDisabledAt) return null;
       if (String(row.secretHash || '') !== sha256Hex(parsed.secret)) return null;
       const now = Date.now();
-      await runStatement(db.prepare(`UPDATE api_tokens SET last_used_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
+      if (!readOnly) await runStatement(db.prepare(`UPDATE api_tokens SET last_used_at = ?2, updated_at = ?2 WHERE id = ?1`), row.id, now);
       return {
         authenticated: true,
         method: 'api_token',
@@ -1966,6 +1828,17 @@ function createRepo(env) {
 
     async restoreBackupState(userId, payload, { mode = 'merge' } = {}) {
       const data = normalizeBackupPayload(payload);
+      // Validate the complete snapshot before replace mode deletes any tenant data.
+      for (const [table, items] of [['folders', data.folders], ['bookmarks', data.bookmarks]]) {
+        for (const item of items) {
+          const id = String(item?.id || '');
+          if (!id || table === 'folders' && id === ROOT_FOLDER_ID) continue;
+          const existing = await firstResult(db.prepare(`SELECT user_id as userId FROM ${table} WHERE id = ?1`), id);
+          if (existing && String(existing.userId) !== String(userId)) {
+            throw Object.assign(new Error('Backup contains an ID owned by another account'), { status: 409, code: 'BACKUP_ID_CONFLICT' });
+          }
+        }
+      }
       const now = Date.now();
       await repo.ensureUserRootFolder(userId);
       if (mode === 'replace') {
@@ -2001,6 +1874,7 @@ function createRepo(env) {
               ai_suggestions_json = excluded.ai_suggestions_json,
               position = excluded.position,
               updated_at = excluded.updated_at
+            WHERE folders.user_id = excluded.user_id
           `),
           folder.id,
           folder.userId,
@@ -2070,6 +1944,7 @@ function createRepo(env) {
               article_json = excluded.article_json,
               ai_suggestions_json = excluded.ai_suggestions_json,
               preview_json = excluded.preview_json
+            WHERE bookmarks.user_id = excluded.user_id
           `),
           next.id,
           next.userId,
@@ -2907,17 +2782,17 @@ function clientIp(request) {
   return xff || '';
 }
 
-async function resolveAuth(env, request) {
+async function resolveAuth(env, request, { readOnly = false } = {}) {
   const repo = createRepo(env);
   const authz = String(request.headers.get('authorization') || '');
   const bearer = authz.toLowerCase().startsWith('bearer ') ? authz.slice(7).trim() : '';
   if (bearer) {
-    const tokenAuth = await repo.resolveApiToken(bearer);
+    const tokenAuth = await repo.resolveApiToken(bearer, { readOnly });
     if (tokenAuth) return tokenAuth;
   }
   const cookies = parseCookies(request.headers.get('cookie') || '');
   if (cookies[SESSION_COOKIE_NAME]) {
-    const sessionAuth = await repo.resolveSession(cookies[SESSION_COOKIE_NAME]);
+    const sessionAuth = await repo.resolveSession(cookies[SESSION_COOKIE_NAME], { readOnly });
     if (sessionAuth) return sessionAuth;
   }
   return { authenticated: false, user: null, method: null, session: null, apiToken: null };
@@ -2945,119 +2820,6 @@ async function writeR2Text(env, bucketName, key, text, contentType) {
     contentType,
     size: new TextEncoder().encode(text).byteLength
   };
-}
-
-function exportJsonPayload(state) {
-  return {
-    version: 1,
-    exportedAt: Date.now(),
-    folders: state.folders,
-    bookmarks: state.bookmarks,
-    tags: state.tags
-  };
-}
-
-function csvEscape(value) {
-  const s = String(value ?? '');
-  if (/["\n,]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function exportCsvPayload(state) {
-  const header = ['title', 'url', 'note', 'tags', 'folderId', 'favorite', 'archived', 'read', 'createdAt', 'updatedAt'];
-  const lines = [header.join(',')];
-  for (const bookmark of state.bookmarks) {
-    lines.push([
-      csvEscape(bookmark.title),
-      csvEscape(bookmark.url),
-      csvEscape(bookmark.note),
-      csvEscape((bookmark.tags || []).join('|')),
-      csvEscape(bookmark.folderId),
-      csvEscape(bookmark.favorite),
-      csvEscape(bookmark.archived),
-      csvEscape(bookmark.read),
-      csvEscape(bookmark.createdAt),
-      csvEscape(bookmark.updatedAt)
-    ].join(','));
-  }
-  return lines.join('\n');
-}
-
-function exportHtmlPayload(state) {
-  const folders = new Map(state.folders.map((folder) => [folder.id, folder]));
-  const lines = ['<!DOCTYPE NETSCAPE-Bookmark-file-1>', '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">', '<TITLE>Bookmarks</TITLE>', '<H1>Bookmarks</H1>', '<DL><p>'];
-  for (const bookmark of state.bookmarks.filter((item) => !item.deletedAt)) {
-    const folder = folders.get(bookmark.folderId);
-    const title = String(bookmark.title || '(untitled)').replace(/</g, '&lt;');
-    const url = String(bookmark.url || '').replace(/"/g, '&quot;');
-    const note = String(folder?.name || 'Root').replace(/</g, '&lt;');
-    lines.push(`<DT><A HREF="${url}" TAGS="${(bookmark.tags || []).join(',')}">${title}</A>`);
-    lines.push(`<DD>${note}`);
-  }
-  lines.push('</DL><p>');
-  return lines.join('\n');
-}
-
-function decodeEntities(input = '') {
-  return String(input)
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x27;/gi, "'");
-}
-
-function stripTags(input = '') {
-  return String(input).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-function extractTitle(html) {
-  const match = String(html).match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return match ? decodeEntities(stripTags(match[1])) : '';
-}
-
-function extractMetaContent(html, attrs = {}) {
-  const tags = String(html).match(/<meta\b[^>]*>/gi) || [];
-  const wanted = Object.entries(attrs).map(([key, value]) => [key.toLowerCase(), String(value).toLowerCase()]);
-  for (const tag of tags) {
-    const attrsMap = {};
-    const attrMatches = tag.match(/([a-zA-Z_:.-]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/g) || [];
-    for (const raw of attrMatches) {
-      const match = raw.match(/([a-zA-Z_:.-]+)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/);
-      if (!match) continue;
-      attrsMap[String(match[1] || '').toLowerCase()] = String(match[3] ?? match[4] ?? match[5] ?? '');
-    }
-    const matched = wanted.every(([key, value]) => String(attrsMap[key] || '').toLowerCase() === value);
-    if (!matched) continue;
-    if (typeof attrsMap.content === 'undefined') continue;
-    return decodeEntities(stripTags(attrsMap.content));
-  }
-  return '';
-}
-
-function extractLinkHref(html, relNeedles = []) {
-  const tags = String(html).match(/<link\b[^>]*>/gi) || [];
-  for (const tag of tags) {
-    const relMatch = tag.match(/\brel\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const hrefMatch = tag.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
-    const relRaw = relMatch ? String(relMatch[2] ?? relMatch[3] ?? relMatch[4] ?? '') : '';
-    const hrefRaw = hrefMatch ? String(hrefMatch[2] ?? hrefMatch[3] ?? hrefMatch[4] ?? '') : '';
-    if (!relRaw || !hrefRaw) continue;
-    const rel = relRaw.toLowerCase();
-    if (!relNeedles.some((needle) => rel.includes(String(needle).toLowerCase()))) continue;
-    return hrefRaw;
-  }
-  return '';
-}
-
-function toAbsoluteUrl(baseUrl, maybeUrl) {
-  try {
-    if (!maybeUrl) return '';
-    return new URL(String(maybeUrl), String(baseUrl)).toString();
-  } catch {
-    return '';
-  }
 }
 
 function workerError(message, { code = 'WORKER_ERROR', category = 'internal', retryable = false, httpStatus = 0 } = {}) {
@@ -3109,35 +2871,10 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
   if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
     throw workerError('metadata url protocol is unsupported', { code: 'METADATA_URL_PROTOCOL', category: 'validation' });
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-  let res;
-  try {
-    res = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RainbowBot/worker (+metadata-fetcher)',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-      }
-    });
-  } catch (error) {
-    const failure = classifyExternalError(error, { prefix: 'METADATA_FETCH' });
-    throw workerError(failure.message, failure);
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) {
-    throw workerError(`metadata fetch failed: HTTP ${res.status}`, {
-      code: `METADATA_FETCH_HTTP_${res.status}`,
-      category: Number(res.status) >= 500 ? 'http_5xx' : 'http_4xx',
-      retryable: Number(res.status) >= 500,
-      httpStatus: Number(res.status || 0)
-    });
-  }
-  const html = await res.text();
-  const finalUrl = res.url || url;
+  const fetched = await fetchPublicResource(url, { timeoutMs, maxBytes: 524288 });
+  const res = fetched.response;
+  const html = fetched.text();
+  const finalUrl = fetched.finalUrl;
   const ogTitle = extractMetaContent(html, { property: 'og:title' });
   const ogDescription = extractMetaContent(html, { property: 'og:description' });
   const ogImage = extractMetaContent(html, { property: 'og:image' });
@@ -3168,48 +2905,11 @@ async function fetchBookmarkMetadata(targetUrl, { timeoutMs = 10_000 } = {}) {
   };
 }
 
-function extractArticleTextFromHtml(html) {
-  const source = String(html || '')
-    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ');
-  const articleMatch = source.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
-  const mainMatch = source.match(/<main\b[^>]*>([\s\S]*?)<\/main>/i);
-  const bodyMatch = source.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
-  const picked = articleMatch?.[1] || mainMatch?.[1] || bodyMatch?.[1] || source;
-  return decodeEntities(stripTags(picked)).replace(/\s+/g, ' ').trim();
-}
-
 async function fetchBookmarkArticle(targetUrl, { timeoutMs = 10_000 } = {}) {
   const metadata = await fetchBookmarkMetadata(targetUrl, { timeoutMs });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-  let res;
-  try {
-    res = await fetch(metadata.finalUrl || targetUrl, {
-      method: 'GET',
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'RainbowBot/worker (+article-extractor)',
-        Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8'
-      }
-    });
-  } catch (error) {
-    const failure = classifyExternalError(error, { prefix: 'ARTICLE_FETCH' });
-    throw workerError(failure.message, failure);
-  } finally {
-    clearTimeout(timer);
-  }
-  if (!res.ok) {
-    throw workerError(`article fetch failed: HTTP ${res.status}`, {
-      code: `ARTICLE_FETCH_HTTP_${res.status}`,
-      category: Number(res.status) >= 500 ? 'http_5xx' : 'http_4xx',
-      retryable: Number(res.status) >= 500,
-      httpStatus: Number(res.status || 0)
-    });
-  }
-  const html = await res.text();
+  const fetched = await fetchPublicResource(metadata.finalUrl || targetUrl, { timeoutMs, maxBytes: 1048576 });
+  const res = fetched.response;
+  const html = fetched.text();
   const textContent = extractArticleTextFromHtml(html);
   return {
     status: 'success',
@@ -3226,94 +2926,6 @@ async function fetchBookmarkArticle(targetUrl, { timeoutMs = 10_000 } = {}) {
     provider: { providerType: 'cloudflare-worker', model: 'article-html-v1' },
     metadata
   };
-}
-
-function inferPreviewKind(item) {
-  const url = String(item?.url || '').toLowerCase();
-  const contentType = String(item?.metadata?.contentType || item?.article?.contentType || '').toLowerCase();
-  if (/youtube\.com|youtu\.be|vimeo\.com/.test(url)) return 'video';
-  if (contentType.includes('pdf') || /\.pdf([?#]|$)/.test(url)) return 'pdf';
-  if (contentType.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)([?#]|$)/.test(url)) return 'image';
-  if (contentType.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v)([?#]|$)/.test(url)) return 'video';
-  if (/\.(txt|md|json|csv)([?#]|$)/.test(url)) return 'file';
-  return 'web';
-}
-
-function youtubeEmbedUrl(url) {
-  try {
-    const u = new URL(String(url || ''));
-    const host = u.hostname.replace(/^www\./, '');
-    if (host === 'youtu.be') {
-      const id = u.pathname.replace(/^\/+/, '').split('/')[0];
-      if (id) return `https://www.youtube.com/embed/${id}`;
-    }
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
-      const id = u.searchParams.get('v');
-      if (id) return `https://www.youtube.com/embed/${id}`;
-    }
-  } catch {}
-  return '';
-}
-
-function sanitizePublicUrl(url) {
-  const value = String(url || '').trim();
-  if (!value) return 'about:blank';
-  if (value.startsWith('/') || value.startsWith('#')) return value;
-  if (/^https?:\/\//i.test(value)) return value;
-  if (/^mailto:/i.test(value)) return value;
-  if (/^tel:/i.test(value)) return value;
-  return 'unsafe:' + value;
-}
-
-function esc(input = '') {
-  return String(input)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function parseImportJson(text) {
-  const parsed = safeJsonParse(text, null);
-  if (!parsed || !Array.isArray(parsed.bookmarks)) {
-    throw new Error('invalid JSON import payload');
-  }
-  return parsed.bookmarks.map((item) => ({
-    title: String(item.title || '').trim() || '(untitled)',
-    url: String(item.url || '').trim(),
-    note: String(item.note || ''),
-    tags: normalizeTags(item.tags || []),
-    folderId: String(item.folderId || ROOT_FOLDER_ID)
-  })).filter((item) => item.url);
-}
-
-function parseImportCsv(text) {
-  const rows = String(text || '').split(/\r?\n/).filter(Boolean);
-  if (!rows.length) return [];
-  const header = rows.shift().split(',').map((cell) => String(cell || '').trim());
-  const byName = new Map(header.map((name, index) => [name.toLowerCase(), index]));
-  return rows.map((line) => {
-    const cells = line.split(',');
-    return {
-      title: String(cells[byName.get('title')] || '').trim() || '(untitled)',
-      url: String(cells[byName.get('url')] || '').trim(),
-      note: String(cells[byName.get('note')] || ''),
-      tags: normalizeTags(String(cells[byName.get('tags')] || '').split('|')),
-      folderId: String(cells[byName.get('folderid')] || ROOT_FOLDER_ID)
-    };
-  }).filter((item) => item.url);
-}
-
-function parseImportHtml(text) {
-  const matches = [...String(text || '').matchAll(/<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gi)];
-  return matches.map((match) => ({
-    title: String(match[2] || '').replace(/<[^>]+>/g, '').trim() || '(untitled)',
-    url: String(match[1] || '').trim(),
-    note: '',
-    tags: [],
-    folderId: ROOT_FOLDER_ID
-  })).filter((item) => item.url);
 }
 
 async function readR2Text(env, key) {
@@ -3342,438 +2954,6 @@ async function buildStateForUser(env, userId) {
     stats: bookmarkStats(bookmarks),
     tags: tagsSummary(bookmarks)
   };
-}
-
-const CHROME_SYNC_UNCATEGORIZED_FOLDER = '待归档';
-
-function normalizeChromeSyncUrl(input) {
-  try {
-    const url = new URL(String(input || '').trim());
-    url.hash = '';
-    const pathname = url.pathname.endsWith('/') && url.pathname !== '/' ? url.pathname.slice(0, -1) : url.pathname;
-    const params = [...url.searchParams.entries()].sort(([a], [b]) => a.localeCompare(b));
-    const search = new URLSearchParams(params).toString();
-    return `${url.protocol.toLowerCase()}//${url.hostname.toLowerCase()}${url.port ? `:${url.port}` : ''}${pathname || '/'}${search ? `?${search}` : ''}`;
-  } catch {
-    return null;
-  }
-}
-
-function chromeSyncFolderPath(input, fallbackName = '') {
-  const raw = Array.isArray(input) ? input : [];
-  const path = raw.map((part) => String(part || '').trim()).filter(Boolean);
-  if (path.length) return path;
-  const name = String(fallbackName || '').trim();
-  return name ? [name] : [CHROME_SYNC_UNCATEGORIZED_FOLDER];
-}
-
-function chromeSyncFolderPathKey(pathParts = []) {
-  return chromeSyncFolderPath(pathParts).join('\u001f');
-}
-
-function folderPathForId(folders = [], folderId = ROOT_FOLDER_ID) {
-  const byId = new Map((folders || []).map((folder) => [String(folder.id), folder]));
-  const out = [];
-  const seen = new Set();
-  let current = byId.get(String(folderId || ''));
-  while (current && !seen.has(String(current.id))) {
-    seen.add(String(current.id));
-    if (String(current.id) === ROOT_FOLDER_ID) break;
-    out.unshift(String(current.name || '').trim() || 'Untitled');
-    const parentId = String(current.parentId || ROOT_FOLDER_ID);
-    if (!parentId || parentId === ROOT_FOLDER_ID) break;
-    current = byId.get(parentId);
-  }
-  return out;
-}
-
-async function ensureChromeSyncFolderPath(repo, userId, folderPath, folderCache = null) {
-  const path = chromeSyncFolderPath(folderPath);
-  const key = chromeSyncFolderPathKey(path);
-  if (folderCache?.has(key)) return folderCache.get(key);
-
-  let parentId = ROOT_FOLDER_ID;
-  let folder = null;
-  for (const name of path) {
-    const cacheKey = `${parentId}\u001f${name}`;
-    if (folderCache?.has(cacheKey)) {
-      folder = folderCache.get(cacheKey);
-      parentId = folder.id;
-      continue;
-    }
-    const folders = await repo.listFolders(userId);
-    folder = folders.find((item) => String(item.parentId || ROOT_FOLDER_ID) === parentId && String(item.name || '').trim() === name);
-    if (!folder) {
-      folder = await repo.createFolder(userId, { name, parentId });
-    }
-    folderCache?.set(cacheKey, folder);
-    parentId = folder.id;
-  }
-  if (folder) folderCache?.set(key, folder);
-  return folder;
-}
-
-function buildChromeFolderIndex(rawFolders = []) {
-  const chromeByUrl = new Map();
-  for (const folder of Array.isArray(rawFolders) ? rawFolders : []) {
-    const folderPath = chromeSyncFolderPath(folder?.path, folder?.name);
-    const folderName = folderPath[folderPath.length - 1] || CHROME_SYNC_UNCATEGORIZED_FOLDER;
-    for (const bookmark of Array.isArray(folder?.bookmarks) ? folder.bookmarks : []) {
-      const normed = normalizeChromeSyncUrl(bookmark?.url);
-      if (!normed || chromeByUrl.has(normed)) continue;
-      const bookmarkFolderPath = chromeSyncFolderPath(bookmark?.folderPath || folderPath, folderName);
-      chromeByUrl.set(normed, {
-        url: String(bookmark?.url || '').trim(),
-        title: String(bookmark?.title || '').trim() || '(untitled)',
-        folderName: bookmarkFolderPath[bookmarkFolderPath.length - 1] || folderName,
-        folderPath: bookmarkFolderPath,
-        chromeId: String(bookmark?.chromeId || ''),
-        createdAt: Number(bookmark?.createdAt || 0)
-      });
-    }
-  }
-  return chromeByUrl;
-}
-
-function buildChromeFolderNameSet(rawFolders = []) {
-  const names = new Set();
-  for (const folder of Array.isArray(rawFolders) ? rawFolders : []) {
-    names.add(chromeSyncFolderPathKey(chromeSyncFolderPath(folder?.path, folder?.name)));
-  }
-  return names;
-}
-
-function buildChromeIdIndex(chromeByUrl) {
-  const chromeById = new Map();
-  for (const item of chromeByUrl.values()) {
-    if (item.chromeId) chromeById.set(String(item.chromeId), item);
-  }
-  return chromeById;
-}
-
-function normalizeChromeSyncMirrorIndex(input = {}) {
-  const out = {};
-  if (!input || typeof input !== 'object') return out;
-  for (const [key, raw] of Object.entries(input)) {
-    const rainbowId = String(raw?.rainbowId || key || '').trim();
-    if (!rainbowId) continue;
-    out[rainbowId] = {
-      rainbowId,
-      chromeId: String(raw?.chromeId || ''),
-      url: String(raw?.url || ''),
-      normalizedUrl: String(raw?.normalizedUrl || normalizeChromeSyncUrl(raw?.url) || ''),
-      title: String(raw?.title || ''),
-      folderName: String(raw?.folderName || ''),
-      folderPath: chromeSyncFolderPath(raw?.folderPath, raw?.folderName),
-      syncedAt: Number(raw?.syncedAt || 0)
-    };
-  }
-  return out;
-}
-
-function wordsFromText(input = '') {
-  return String(input || '')
-    .toLowerCase()
-    .replace(/https?:\/\/\S+/g, ' ')
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/gi, ' ')
-    .split(/\s+/)
-    .map((word) => word.trim())
-    .filter((word) => word && word.length > 1);
-}
-
-function uniqueByLower(values = []) {
-  const out = [];
-  const seen = new Set();
-  for (const value of values) {
-    const text = String(value || '').trim();
-    if (!text) continue;
-    const key = text.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(text);
-  }
-  return out;
-}
-
-function inferSuggestedTags(bookmark) {
-  const host = (() => {
-    try {
-      return new URL(String(bookmark?.url || '')).hostname.replace(/^www\./, '');
-    } catch {
-      return '';
-    }
-  })();
-  const hostParts = host ? host.split('.').filter(Boolean) : [];
-  const tokens = wordsFromText([
-    bookmark?.title,
-    bookmark?.note,
-    bookmark?.metadata?.description,
-    bookmark?.article?.excerpt
-  ].join(' '));
-  const counts = new Map();
-  for (const token of tokens) counts.set(token, (counts.get(token) || 0) + 1);
-  const top = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 5)
-    .map(([token]) => token);
-  return uniqueByLower([...(bookmark?.tags || []), ...top, hostParts[0] || '']).slice(0, 6);
-}
-
-function summarizeText(text = '', maxLength = 160) {
-  const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!cleaned) return '';
-  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength - 1)}…` : cleaned;
-}
-
-function createReaderSummary(bookmark) {
-  const text = [
-    bookmark?.article?.excerpt,
-    bookmark?.metadata?.description,
-    bookmark?.note,
-    bookmark?.title
-  ].filter(Boolean).join(' ');
-  const shortSummary = summarizeText(text || bookmark?.title || '', 120);
-  const bullets = uniqueByLower(wordsFromText(text)).slice(0, 4).map((word) => `围绕 ${word} 的内容`);
-  return {
-    shortSummary,
-    bullets,
-    generatedAt: Date.now(),
-    provider: { providerType: 'cloudflare-worker', model: 'heuristic-v1' }
-  };
-}
-
-function createHighlightCandidates(bookmark) {
-  const baseText = String(bookmark?.article?.textContent || bookmark?.metadata?.description || bookmark?.note || bookmark?.title || '').trim();
-  const segments = baseText.split(/[.!?。\n]/).map((segment) => segment.trim()).filter((segment) => segment.length >= 16);
-  return segments.slice(0, 5).map((quote, index) => ({
-    quote,
-    reason: index === 0 ? '开篇信息密度较高' : '包含可独立复用的信息片段',
-    score: Math.max(0.4, 0.92 - index * 0.12)
-  }));
-}
-
-function createHighlightDigest(bookmark) {
-  const highlights = Array.isArray(bookmark?.highlights) ? bookmark.highlights : [];
-  const summary = summarizeText(highlights.map((item) => item.quote || item.text || '').join('；'), 180) || '暂无高亮摘要';
-  return {
-    summary,
-    count: highlights.length,
-    generatedAt: Date.now(),
-    provider: { providerType: 'cloudflare-worker', model: 'heuristic-v1' }
-  };
-}
-
-function relatedBookmarksFor(state, bookmark, limit = 8) {
-  const currentWords = new Set(wordsFromText([bookmark?.title, bookmark?.note, bookmark?.metadata?.description].join(' ')));
-  const items = [];
-  for (const candidate of state.bookmarks) {
-    if (candidate.id === bookmark.id || candidate.deletedAt) continue;
-    const words = new Set(wordsFromText([candidate.title, candidate.note, candidate.metadata?.description].join(' ')));
-    const overlap = [...currentWords].filter((word) => words.has(word));
-    if (!overlap.length) continue;
-    items.push({
-      id: candidate.id,
-      title: candidate.title,
-      url: candidate.url,
-      host: (() => { try { return new URL(candidate.url).hostname; } catch { return ''; } })(),
-      folderPath: candidate.folderId,
-      score: Math.min(0.98, 0.3 + overlap.length * 0.18),
-      reason: `共同关键词：${overlap.slice(0, 4).join('、')}`,
-      excerpt: summarizeText(candidate.note || candidate.metadata?.description || '', 90)
-    });
-  }
-  return items.sort((a, b) => b.score - a.score).slice(0, limit);
-}
-
-function recommendFolder(state, bookmark) {
-  const currentFolderId = String(bookmark?.folderId || ROOT_FOLDER_ID);
-  const currentWords = new Set(wordsFromText([bookmark?.title, bookmark?.note, bookmark?.metadata?.description].join(' ')));
-  let best = null;
-  for (const folder of state.folders) {
-    if (String(folder.id) === currentFolderId) continue;
-    const bookmarks = state.bookmarks.filter((item) => String(item.folderId) === String(folder.id) && !item.deletedAt);
-    if (!bookmarks.length) continue;
-    const words = new Set(wordsFromText(bookmarks.map((item) => [item.title, item.note, item.metadata?.description].join(' ')).join(' ')));
-    const overlap = [...currentWords].filter((word) => words.has(word));
-    const score = overlap.length;
-    if (!score) continue;
-    if (!best || score > best.score) {
-      best = {
-        folderId: folder.id,
-        folderName: folder.name,
-        folderPath: folder.name,
-        reason: `与该集合中的主题词更接近：${overlap.slice(0, 4).join('、')}`,
-        score
-      };
-    }
-  }
-  return best || {
-    folderId: currentFolderId,
-    folderName: state.folders.find((item) => item.id === currentFolderId)?.name || 'Root',
-    folderPath: state.folders.find((item) => item.id === currentFolderId)?.name || 'Root',
-    reason: '当前集合已经最匹配',
-    score: 0
-  };
-}
-
-function folderPathOf(folders = [], folderId = ROOT_FOLDER_ID) {
-  const byId = new Map((Array.isArray(folders) ? folders : []).map((folder) => [String(folder.id || ''), folder]));
-  const parts = [];
-  let currentId = String(folderId || ROOT_FOLDER_ID);
-  let guard = 0;
-  while (currentId && byId.has(currentId) && guard < 50) {
-    const folder = byId.get(currentId);
-    if (!folder) break;
-    parts.unshift(String(folder.name || ''));
-    const nextId = String(folder.parentId || '');
-    if (!nextId || nextId === currentId || nextId === ROOT_FOLDER_ID) break;
-    currentId = nextId;
-    guard += 1;
-  }
-  return parts.filter(Boolean).join(' / ') || (byId.get(String(folderId || ROOT_FOLDER_ID))?.name || 'Root');
-}
-
-function normalizeUrlLoose(url = '') {
-  const raw = String(url || '').trim();
-  if (!raw) return '';
-  try {
-    const parsed = new URL(raw);
-    parsed.hash = '';
-    let pathname = parsed.pathname || '/';
-    if (pathname !== '/' && pathname.endsWith('/')) pathname = pathname.slice(0, -1);
-    return `${parsed.origin}${pathname}${parsed.search || ''}`;
-  } catch {
-    return raw;
-  }
-}
-
-function duplicateBookmarkQuality(bookmark = {}) {
-  const tags = Array.isArray(bookmark.tags) ? bookmark.tags : [];
-  const highlights = Array.isArray(bookmark.highlights) ? bookmark.highlights : [];
-  let score = 0;
-  if (String(bookmark.title || '').trim() && bookmark.title !== '(untitled)') score += 1;
-  if (String(bookmark.note || '').trim()) score += 2;
-  score += Math.min(3, tags.length);
-  if (bookmark.favorite) score += 2;
-  if (String(bookmark.cover || '').trim()) score += 1;
-  if (highlights.length) score += 2;
-  if (bookmark.metadata && Object.keys(bookmark.metadata).length) score += 1;
-  return score;
-}
-
-function duplicateGroupSuggestion(items = []) {
-  const ranked = [...items].sort((a, b) => {
-    const qualityDelta = duplicateBookmarkQuality(b) - duplicateBookmarkQuality(a);
-    return qualityDelta || Number(b.updatedAt || 0) - Number(a.updatedAt || 0);
-  });
-  const keeper = ranked[0] || null;
-  return {
-    strategy: 'merge_and_trash',
-    keepId: keeper?.id || '',
-    removeIds: ranked.slice(1).map((item) => item.id),
-    reason: keeper
-      ? `建议保留“${keeper.title || keeper.url}”：其备注、标签、收藏状态或更新时间更完整；合并信息后将其余副本移入废纸篓。`
-      : ''
-  };
-}
-
-function cosineSimilarity(a = [], b = []) {
-  const len = Math.min(Array.isArray(a) ? a.length : 0, Array.isArray(b) ? b.length : 0);
-  if (!len) return 0;
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-  for (let i = 0; i < len; i += 1) {
-    const av = Number(a[i] || 0);
-    const bv = Number(b[i] || 0);
-    dot += av * bv;
-    normA += av * av;
-    normB += bv * bv;
-  }
-  if (!normA || !normB) return 0;
-  return dot / Math.sqrt(normA * normB);
-}
-
-function buildQaAnswer(state, question, scopeBookmarkId = '', limit = 6) {
-  const scopeItems = scopeBookmarkId
-    ? state.bookmarks.filter((item) => String(item.id) === String(scopeBookmarkId))
-    : state.bookmarks.filter((item) => !item.deletedAt);
-  const qWords = new Set(wordsFromText(question));
-  const scored = scopeItems.map((item) => {
-    const text = [item.title, item.note, item.metadata?.description, item.article?.excerpt].join(' ');
-    const words = new Set(wordsFromText(text));
-    const overlap = [...qWords].filter((word) => words.has(word));
-    return { item, overlap };
-  }).filter((row) => row.overlap.length > 0)
-    .sort((a, b) => b.overlap.length - a.overlap.length)
-    .slice(0, limit);
-  const answer = scored.length
-    ? `根据现有书签，最相关的是：${scored.map((row) => row.item.title).join('；')}。`
-    : '当前书签数据里没有找到足够明确的依据，只能给出有限结论。';
-  return {
-    answer,
-    insufficient: !scored.length,
-    confidence: scored.length ? Math.min(0.92, 0.45 + scored[0].overlap.length * 0.1) : 0.18,
-    sources: scored.map((row) => ({
-      id: row.item.id,
-      title: row.item.title,
-      url: row.item.url,
-      host: (() => { try { return new URL(row.item.url).hostname; } catch { return ''; } })(),
-      folderPath: row.item.folderId,
-      score: Math.min(0.95, 0.35 + row.overlap.length * 0.1),
-      reason: `命中关键词：${row.overlap.join('、')}`,
-      excerpt: summarizeText(row.item.note || row.item.metadata?.description || '', 100)
-    }))
-  };
-}
-
-function parseSearchToFilters(text = '') {
-  const raw = String(text || '').trim();
-  const filters = { q: raw };
-  const unsupported = [];
-  const tagMatch = raw.match(/标签|tag[:：]?\s*([^\s]+)/i);
-  if (tagMatch) filters.tags = tagMatch[1];
-  const linkMatch = raw.match(/(域名|site|link)[:：]?\s*([^\s]+)/i);
-  if (linkMatch) filters.domain = linkMatch[2];
-  if (/未读/.test(raw)) filters.view = 'all', filters.read = 'false';
-  if (/收藏/.test(raw)) filters.view = 'favorites';
-  if (/归档/.test(raw)) filters.view = 'archive';
-  if (/语义/.test(raw)) filters.semantic = 'true';
-  if (/图片|image/i.test(raw)) filters.type = 'image';
-  if (/视频|video/i.test(raw)) filters.type = 'video';
-  if (/pdf/i.test(raw)) filters.type = 'pdf';
-  if (/最近|最新/.test(raw)) filters.sort = 'newest';
-  return { filters, unsupported, confidence: raw ? 0.72 : 0.2 };
-}
-
-function groupTagsForStandardize(tags = []) {
-  const byStem = new Map();
-  for (const tag of tags) {
-    const raw = String(tag.name || tag || '').trim();
-    if (!raw) continue;
-    const stem = raw.toLowerCase().replace(/[-_\s]+/g, '');
-    if (!byStem.has(stem)) byStem.set(stem, []);
-    byStem.get(stem).push(raw);
-  }
-  return [...byStem.values()]
-    .map((group) => uniqueByLower(group))
-    .filter((group) => group.length > 1)
-    .map((group) => ({ sources: group, target: group.slice().sort((a, b) => a.length - b.length || a.localeCompare(b))[0] }));
-}
-
-function groupTagsForLocalize(tags = []) {
-  const items = uniqueByLower(tags.map((tag) => String(tag.name || tag || '').trim()));
-  const suggestions = [];
-  for (const item of items) {
-    const lower = item.toLowerCase();
-    if (lower === 'ai') suggestions.push({ sources: ['AI', 'A.I.'].filter((v) => items.includes(v)), target: 'AI' });
-    if (lower === 'javascript') suggestions.push({ sources: ['javascript', 'js', 'JavaScript'].filter((v) => items.includes(v) || items.includes(v.toLowerCase())), target: 'JavaScript' });
-    if (lower === 'css') suggestions.push({ sources: ['css', 'CSS'].filter((v) => items.includes(v) || items.includes(v.toLowerCase())), target: 'CSS' });
-  }
-  return suggestions.filter((group) => uniqueByLower(group.sources).length > 1).map((group) => ({
-    sources: uniqueByLower(group.sources),
-    target: group.target
-  }));
 }
 
 async function applyTagSuggestions(repo, userId, suggestions = []) {
@@ -3830,8 +3010,10 @@ async function processPluginTask(env, message) {
 async function processIoTask(env, message) {
   const repo = createRepo(env);
   const task = await repo.getIoTask(message.userId, message.taskId);
-  if (!task) return;
+  if (!task || task.status !== 'queued') return;
   const startAt = Date.now();
+  const claim = await runStatement(env.DB.prepare(`UPDATE io_tasks SET status = 'running', started_at = ?3 WHERE user_id = ?1 AND id = ?2 AND status = 'queued'`), message.userId, task.id, startAt);
+  if (claim.meta?.changes === 0) return;
   await repo.updateIoTask(task.id, {
     status: 'running',
     progress: { percent: 20, step: 'starting' },
@@ -3856,9 +3038,9 @@ async function processIoTask(env, message) {
       result = { format: 'html', bookmarks: state.bookmarks.length };
     } else if (task.type.startsWith('import_')) {
       let entries = [];
-      if (task.type === 'import_json') entries = parseImportJson(task.input.content || '');
-      if (task.type === 'import_csv') entries = parseImportCsv(task.input.content || '');
-      if (task.type === 'import_html') entries = parseImportHtml(task.input.content || '');
+      if (task.type === 'import_json') entries = parseImportJson(task.input.content || '', { rootFolderId: ROOT_FOLDER_ID, normalizeTags, parseJson: (input) => safeJsonParse(input, null) });
+      if (task.type === 'import_csv') entries = parseImportCsv(task.input.content || '', { rootFolderId: ROOT_FOLDER_ID, normalizeTags });
+      if (task.type === 'import_html') entries = parseImportHtml(task.input.content || '', { rootFolderId: ROOT_FOLDER_ID, normalizeTags });
       let created = 0;
       for (const entry of entries) {
         await repo.createBookmark(message.userId, {
@@ -3869,6 +3051,10 @@ async function processIoTask(env, message) {
       }
       result = { imported: created, total: entries.length };
     } else if (task.type === 'restore_backup') {
+      const sourceKey = String(task.input?.backupFile?.key || '');
+      if (sourceKey && !(await repo.listBackups(message.userId)).some((backup) => backup.file?.key === sourceKey)) {
+        throw Object.assign(new Error('Backup object not found'), { status: 404, code: 'NOT_FOUND' });
+      }
       const source = task.input?.backupFile?.key
         ? await readR2Text(env, String(task.input.backupFile.key || ''))
         : String(task.input?.content || '');
@@ -3931,88 +3117,6 @@ async function processMetadataTask(env, message) {
       result: { failure }
     });
   }
-}
-
-function summarizeTaskHealth(tasks = []) {
-  const counts = {};
-  for (const task of tasks) {
-    const status = String(task?.status || 'unknown');
-    counts[status] = (counts[status] || 0) + 1;
-  }
-  const failures = tasks
-    .filter((task) => ['failed', 'partial'].includes(String(task?.status || '')))
-    .map((task) => {
-      const failure = task?.error?.failure || task?.result?.failure || task?.failure || null;
-      return {
-        id: String(task?.id || ''),
-        status: String(task?.status || ''),
-        type: String(task?.type || task?.kind || ''),
-        bookmarkId: String(task?.bookmarkId || ''),
-        updatedAt: Number(task?.updatedAt || task?.finishedAt || task?.createdAt || 0) || 0,
-        error: String(task?.error?.message || task?.error || failure?.message || ''),
-        failure,
-        retryable: failure ? Boolean(failure.retryable) : true
-      };
-    })
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-  return {
-    counts,
-    failures: failures.slice(0, 10),
-    dlqCandidates: failures.filter((item) => item.retryable === false).slice(0, 10),
-    retryableFailures: failures.filter((item) => item.retryable !== false).length
-  };
-}
-
-function summarizeRealtimeTasks(tasks = []) {
-  const list = Array.isArray(tasks) ? tasks : [];
-  const counts = {};
-  let latestUpdatedAt = 0;
-  let active = 0;
-  for (const task of list) {
-    const status = String(task?.status || 'unknown');
-    counts[status] = (counts[status] || 0) + 1;
-    if (['queued', 'running', 'processing'].includes(status)) active += 1;
-    latestUpdatedAt = Math.max(
-      latestUpdatedAt,
-      Number(task?.updatedAt || task?.finishedAt || task?.completedAt || task?.startedAt || task?.createdAt || 0) || 0
-    );
-  }
-  return { total: list.length, counts, active, latestUpdatedAt };
-}
-
-async function buildRealtimeSnapshot(repo, userId) {
-  const limit = 100;
-  const [metadataTasks, ioTasks, pluginTasks, aiJobs, aiBackfillTasks, bookmarks] = await Promise.all([
-    repo.listMetadataTasksForUser(userId, limit),
-    repo.listIoTasks(userId, limit),
-    repo.listPluginTasks(userId, DEFAULT_PLUGIN_ID, limit),
-    repo.listAiJobs(userId, limit),
-    repo.listAiBackfillTasks(userId, limit),
-    repo.listBookmarks(userId)
-  ]);
-  const now = Date.now();
-  const dueReminders = (bookmarks || []).filter((bookmark) => {
-    if (bookmark.deletedAt) return false;
-    const reminderAt = Number(bookmark.reminderAt || 0);
-    if (!reminderAt || reminderAt > now) return false;
-    const status = String(bookmark.reminderState?.status || '');
-    return !['dismissed', 'done', 'none'].includes(status);
-  });
-  const snapshot = {
-    generatedAt: now,
-    tasks: {
-      metadata: summarizeRealtimeTasks(metadataTasks),
-      io: summarizeRealtimeTasks(ioTasks),
-      plugin: summarizeRealtimeTasks(pluginTasks),
-      ai: summarizeRealtimeTasks([...(aiJobs || []), ...(aiBackfillTasks || [])])
-    },
-    reminders: {
-      due: dueReminders.length,
-      latestUpdatedAt: dueReminders.reduce((max, item) => Math.max(max, Number(item.updatedAt || item.reminderAt || 0) || 0), 0)
-    }
-  };
-  snapshot.signature = JSON.stringify({ tasks: snapshot.tasks, reminders: snapshot.reminders });
-  return snapshot;
 }
 
 function eventStreamResponse(event, payload, { requestId } = {}) {
@@ -4751,107 +3855,7 @@ async function handleApi(request, env, url, requestId) {
       aiGuide: buildPublicAiGuide(link, folder, bookmarks)
     };
     if (isJson) return jsonResponse(payload, { requestId });
-    const html = `<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>${esc(payload.link.title || '共享集合')}</title>
-  <meta name="theme-color" content="#1194ff" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="shortcut icon" href="/favicon.svg" />
-  <link rel="stylesheet" href="/styles.css" />
-</head>
-<body class="auth-page">
-  <main class="public-share-shell">
-    <section class="public-share-hero">
-      <div class="brand"><div class="brand-dot"></div><div><strong>Rainbow</strong><small>公开收藏页</small></div></div>
-      <h1>${esc(payload.link.title || '共享集合')}</h1>
-      <p class="muted">${esc(payload.link.description || '')}</p>
-      <div class="public-share-meta">
-        <span class="meta-chip type">${esc(payload.folder.name || '集合')}</span>
-        <span class="meta-chip">${bookmarks.length} 条</span>
-      </div>
-      <div class="public-ai-guide">
-        <div class="public-ai-guide-summary">${esc(payload.aiGuide.summary || '')}</div>
-        ${payload.aiGuide.tags.length ? `<div class="public-ai-guide-tags">${payload.aiGuide.tags.slice(0, 8).map((tag) => `<span class="meta-chip">#${esc(tag.tag)}</span>`).join('')}</div>` : ''}
-        ${payload.aiGuide.faq.length ? `<div class="public-ai-guide-faq">${payload.aiGuide.faq.slice(0, 2).map((row) => `<details><summary>${esc(row.q)}</summary><p>${esc(row.a)}</p></details>`).join('')}</div>` : ''}
-      </div>
-    </section>
-    <section class="public-share-content">
-      <div class="public-share-toolbar">
-        <input id="pubSearch" type="search" placeholder="搜索公开书签" aria-label="搜索公开书签" />
-        <select id="pubSort" aria-label="公开书签排序">
-          <option value="newest">最新收藏</option>
-          <option value="title">标题 A-Z</option>
-          <option value="host">域名 A-Z</option>
-        </select>
-      </div>
-      <div id="pubList" class="cards public-share-grid">
-        ${bookmarks.length ? bookmarks.map((item) => {
-          const cover = String(item.cover || item.metadata?.image || '').trim();
-          const tags = Array.isArray(item.tags) ? item.tags.slice(0, 4) : [];
-          const host = (() => { try { return new URL(item.url).hostname; } catch { return '网页'; } })();
-          const title = item.title || '(未命名)';
-          return `<article class="card public-share-card" data-title="${esc(title).toLowerCase()}" data-host="${esc(host).toLowerCase()}" data-tags="${esc(tags.join(' ')).toLowerCase()}" data-created="${esc(item.createdAt || 0)}">
-            ${cover ? `<div class="card-cover"><img src="${esc(sanitizePublicUrl(cover))}" alt="${esc(title)}" loading="lazy" /></div>` : `<div class="card-cover public-cover-fallback" aria-hidden="true">${esc((host || 'RB').slice(0, 2).toUpperCase())}</div>`}
-            <div class="card-top"><a class="host" href="${esc(sanitizePublicUrl(item.url))}" target="_blank" rel="noopener">${esc(host)}</a></div>
-            <div class="card-body">
-              <h2 class="card-title"><a class="card-title-link" href="${esc(sanitizePublicUrl(item.url))}" target="_blank" rel="noopener">${esc(title)}</a></h2>
-              ${item.note ? `<div class="card-note">${esc(item.note)}</div>` : ''}
-              ${tags.length ? `<div class="card-tags">${tags.map((tag) => `<span class="card-tag">#${esc(tag)}</span>`).join('')}</div>` : ''}
-              <div class="card-actions"><a class="ghost button-link" href="${esc(sanitizePublicUrl(item.url))}" target="_blank" rel="noopener">打开</a></div>
-            </div>
-          </article>`;
-        }).join('') : '<div class="state-block"><div class="state-block-title">这个公开集合暂无书签</div><div class="state-block-message muted">稍后再回来看看。</div></div>'}
-      </div>
-      <div id="pubEmptyFiltered" class="state-block state-block-compact hidden" data-state="empty">
-        <div class="state-block-title">没有匹配的书签</div>
-        <div class="state-block-message muted">换个关键词或排序方式再试试。</div>
-      </div>
-      <button type="button" id="pubBackTop" class="ghost public-share-backtop">返回顶部</button>
-    </section>
-  </main>
-  <script type="application/json" id="pubLegacyInlineDisabled">
-    (function(){
-      var list = document.getElementById('pubList');
-      var empty = document.getElementById('pubEmptyFiltered');
-      var search = document.getElementById('pubSearch');
-      var sort = document.getElementById('pubSort');
-      if (!list || !search || !sort) return;
-      list.querySelectorAll('img').forEach(function(img){
-        img.addEventListener('error', function(){
-          var cover = img.closest('.card-cover');
-          if (cover) {
-            cover.classList.add('image-error');
-            cover.textContent = '封面不可用';
-          }
-        }, { once: true });
-      });
-      function apply(){
-        var q = String(search.value || '').trim().toLowerCase();
-        var mode = sort.value || 'newest';
-        var cards = Array.prototype.slice.call(list.querySelectorAll('.public-share-card'));
-        cards.forEach(function(card){
-          var haystack = [card.dataset.title, card.dataset.host, card.dataset.tags].join(' ');
-          card.classList.toggle('hidden', q && haystack.indexOf(q) === -1);
-        });
-        var visible = cards.filter(function(card){ return !card.classList.contains('hidden'); });
-        visible.sort(function(a, b){
-          if (mode === 'title') return a.dataset.title.localeCompare(b.dataset.title);
-          if (mode === 'host') return a.dataset.host.localeCompare(b.dataset.host);
-          return Number(b.dataset.created || 0) - Number(a.dataset.created || 0);
-        }).forEach(function(card){ list.appendChild(card); });
-        if (empty) empty.classList.toggle('hidden', q && visible.length === 0);
-      }
-      search.addEventListener('input', apply);
-      sort.addEventListener('change', apply);
-      document.getElementById('pubBackTop')?.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
-    })();
-  </script>
-  <script type="module" src="/public-share.mjs"></script>
-</body>
-</html>`;
+    const html = renderPublicCollectionHtml(payload);
     return new Response(html, {
       status: 200,
       headers: {
@@ -4866,10 +3870,16 @@ async function handleApi(request, env, url, requestId) {
     return jsonResponse({ ok: true, runtime: 'cloudflare-workers', schemaVersion: SCHEMA_VERSION }, { requestId });
   }
 
-  await ensureSchema(env);
-  const repo = createRepo(env);
-  const auth = await resolveAuth(env, request);
   const body = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method) ? await parseJsonBody(request) : {};
+  const readOnly = method === 'POST' && (url.pathname === '/api/chrome-sync' && body.preview === true || url.pathname.endsWith('/preview'));
+  // Migrations are an explicit prerequisite for previews; never run DDL in a dry-run.
+  if (!readOnly) await ensureSchema(env);
+  const repo = createRepo(env, { readOnly });
+  const auth = await resolveAuth(env, request, { readOnly });
+  const origin = request.headers.get('origin');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && origin && origin !== url.origin && auth.method !== 'api_token') {
+    throw Object.assign(new Error('Cross-origin write request rejected'), { status: 403, code: 'CSRF_ORIGIN_REJECTED' });
+  }
   const requireAuth = () => {
     if (!auth.authenticated) {
       throw Object.assign(new Error('authentication required'), { status: 401, code: 'AUTH_REQUIRED' });
@@ -5008,6 +4018,27 @@ async function handleApi(request, env, url, requestId) {
   }
 
   if (url.pathname.startsWith('/api/')) requireAuth();
+
+  if (url.pathname.startsWith('/api/assets/') && ['GET', 'HEAD'].includes(method)) {
+    const [bucket, ...parts] = url.pathname.slice('/api/assets/'.length).split('/').map(decodeURIComponent);
+    const key = parts.join('/');
+    const ref = objectAccess.objectOwnerReference(bucket, key);
+    const owned = ref && (ref.kind === 'bookmark'
+      ? await repo.getBookmark(auth.user.id, ref.id)
+      : ref.kind === 'task'
+        ? await repo.getIoTask(auth.user.id, ref.id)
+        : (await repo.listBackups(auth.user.id)).some((item) => item.file?.key === key));
+    if (!owned) return errorResponse('object not found', { status: 404, code: 'NOT_FOUND', requestId });
+    const object = await env.OBJECTS?.get(key);
+    if (!object) return errorResponse('object not found', { status: 404, code: 'NOT_FOUND', requestId });
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set('cache-control', 'private, no-store');
+    headers.set('x-content-type-options', 'nosniff');
+    headers.set('content-security-policy', "sandbox allow-same-origin; default-src 'none'; img-src https: data:; style-src 'unsafe-inline'");
+    return new Response(method === 'HEAD' ? null : object.body, { headers });
+  }
+
   if (url.pathname.startsWith('/api/product/ai/') && !['GET', 'HEAD'].includes(method) && !isAiGovernancePath(url.pathname)) {
     const policy = normalizeAiFeaturePolicy(await repo.getUserMeta(auth.user.id, 'ai_feature_policy', DEFAULT_AI_FEATURE_POLICY));
     const capability = aiCapabilityForPath(url.pathname);
@@ -5112,6 +4143,7 @@ async function handleApi(request, env, url, requestId) {
   }
 
   if (url.pathname === '/api/chrome-sync' && method === 'POST') {
+    const syncRepo = body.preview === true ? await createSyncPreviewRepo(repo, auth.user.id) : repo;
     const chromeFolders = Array.isArray(body.folders) ? body.folders : [];
     const deleteSync = Boolean(body.deleteSync);
     const mirrorIndex = normalizeChromeSyncMirrorIndex(body.mirrorIndex || {});
@@ -5122,8 +4154,8 @@ async function handleApi(request, env, url, requestId) {
     const chromeByUrl = buildChromeFolderIndex(chromeFolders);
     const chromeFolderPaths = buildChromeFolderNameSet(chromeFolders);
     const chromeById = buildChromeIdIndex(chromeByUrl);
-    const folders = await repo.listFolders(auth.user.id);
-    const bookmarks = await repo.listBookmarks(auth.user.id);
+    const folders = await syncRepo.listFolders(auth.user.id);
+    const bookmarks = await syncRepo.listBookmarks(auth.user.id);
     const folderById = new Map(folders.map((folder) => [folder.id, folder]));
     const aliveByUrl = new Map();
     const byId = new Map();
@@ -5155,7 +4187,7 @@ async function handleApi(request, env, url, requestId) {
     const toDeleteInChrome = [];
     const folderPathCache = new Map();
     const ensureFolderCached = async (folderPath) => {
-      const folder = await ensureChromeSyncFolderPath(repo, auth.user.id, folderPath, folderPathCache);
+      const folder = await ensureChromeSyncFolderPath(syncRepo, auth.user.id, folderPath, folderPathCache);
       folderById.set(folder.id, folder);
       if (!folders.some((item) => String(item.id) === String(folder.id))) folders.push(folder);
       return folder;
@@ -5171,7 +4203,8 @@ async function handleApi(request, env, url, requestId) {
       const oldNorm = normalizeChromeSyncUrl(bookmark.url);
 
       if (!chromeBookmark) {
-        const deleted = await repo.updateBookmark(auth.user.id, bookmark.id, { deleted: true });
+        if (!deleteSync) continue;
+        const deleted = await syncRepo.updateBookmark(auth.user.id, bookmark.id, { deleted: true });
         if (deleted) {
           if (oldNorm) {
             aliveByUrl.delete(oldNorm);
@@ -5198,7 +4231,7 @@ async function handleApi(request, env, url, requestId) {
       if (nextNorm && oldNorm !== nextNorm) patch.url = nextUrl;
 
       if (Object.keys(patch).length > 0) {
-        const updated = await repo.updateBookmark(auth.user.id, bookmark.id, patch);
+        const updated = await syncRepo.updateBookmark(auth.user.id, bookmark.id, patch);
         if (updated) {
           if (oldNorm && oldNorm !== nextNorm) aliveByUrl.delete(oldNorm);
           if (nextNorm) aliveByUrl.set(nextNorm, updated);
@@ -5219,11 +4252,11 @@ async function handleApi(request, env, url, requestId) {
       if (deletedBookmark) {
         const chromeAge = Number(chromeBookmark.createdAt || 0);
         const deletedAt = Number(deletedBookmark.deletedAt || 0);
-        const looksLikeOldGhost = chromeAge > 0 && (chromeAge <= deletedAt || chromeAge < Date.now() - 365 * 24 * 60 * 60 * 1000);
+        const looksLikeOldGhost = chromeAge <= deletedAt || chromeAge < Date.now() - 365 * 24 * 60 * 60 * 1000;
         if (looksLikeOldGhost) continue;
 
         const folder = await ensureFolderCached(chromeBookmark.folderPath);
-        const revived = await repo.updateBookmark(auth.user.id, deletedBookmark.id, {
+        const revived = await syncRepo.updateBookmark(auth.user.id, deletedBookmark.id, {
           deleted: false,
           title: chromeBookmark.title,
           url: chromeBookmark.url,
@@ -5239,7 +4272,7 @@ async function handleApi(request, env, url, requestId) {
       }
 
       const folder = await ensureFolderCached(chromeBookmark.folderPath);
-      const created = await repo.createBookmark(auth.user.id, {
+      const created = await syncRepo.createBookmark(auth.user.id, {
         title: chromeBookmark.title,
         url: chromeBookmark.url,
         folderId: folder.id
@@ -5276,24 +4309,7 @@ async function handleApi(request, env, url, requestId) {
       }
     }
 
-    const aliveFolderIds = new Set();
-    for (const bookmark of byId.values()) {
-      if (bookmark && !bookmark.deletedAt && bookmark.folderId) {
-        aliveFolderIds.add(String(bookmark.folderId));
-      }
-    }
-    for (const folder of folders) {
-      if (!folder || String(folder.id) === ROOT_FOLDER_ID) continue;
-      const name = String(folder.name || '').trim();
-      const pathKey = folderPathForId(folders, folder.id).join('\u001f');
-      if (!name || chromeFolderPaths.has(pathKey)) continue;
-      if (aliveFolderIds.has(String(folder.id))) continue;
-      const deleted = await repo.deleteFolder(auth.user.id, folder.id);
-      if (deleted) {
-        folderById.delete(folder.id);
-        stats.deletedFoldersInDb += 1;
-      }
-    }
+    // Missing browser folders never authorize cloud folder deletion.
 
     const nextMirrorIndex = {};
     for (const bookmark of byId.values()) {
@@ -5317,6 +4333,7 @@ async function handleApi(request, env, url, requestId) {
 
     return jsonResponse({
       ok: true,
+      preview: body.preview === true,
       toAddInChrome,
       toDeleteInChrome,
       mirrorIndex: nextMirrorIndex,
@@ -7371,8 +6388,7 @@ async function handleApi(request, env, url, requestId) {
   });
 }
 
-export default {
-  async fetch(request, env) {
+async function fetchHandler(request, env) {
     const requestId = crypto.randomUUID();
     const url = new URL(request.url);
     try {
@@ -7388,12 +6404,25 @@ export default {
       if (authRedirect) return authRedirect;
       return await handleAssets(request, env, url);
     } catch (error) {
-      return errorResponse(error?.message || 'Unexpected worker error.', {
+      return errorResponse(Number(error?.status || 500) >= 500 ? 'Internal server error' : (error?.message || 'Request failed'), {
         status: Number(error?.status || 500),
         code: String(error?.code || 'INTERNAL_ERROR'),
         requestId
       });
     }
+
+}
+
+export default {
+  async fetch(request, env) {
+    const response = await fetchHandler(request, env);
+    const headers = new Headers(response.headers);
+    headers.set('x-content-type-options', 'nosniff');
+    headers.set('x-frame-options', new URL(request.url).pathname.startsWith('/api/assets/') ? 'SAMEORIGIN' : 'DENY');
+    headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+    if (!headers.has('content-security-policy')) headers.set('content-security-policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' https:; media-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+    if (new URL(request.url).pathname.startsWith('/api/') || new URL(request.url).pathname.startsWith('/public/')) headers.set('cache-control', 'private, no-store');
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },
   async queue(batch, env) {
     await handleQueue(batch, env);

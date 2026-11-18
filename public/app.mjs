@@ -4,6 +4,7 @@ import { api, queryString } from './js/api.mjs';
 import { createAppStore } from './js/stateStore.mjs';
 import { emptyStateHtml as uiEmptyStateHtml, statusBadgeHtml, taskProgressHtml, uiButtonHtml } from './js/uiComponents.mjs';
 import { focusableElementsWithin, handleMenuArrowNavigation, hasModalOpen } from './js/app/a11y.mjs';
+import { aiSideDrawerState, bindAiDrawerEvents, initializeAiDrawer, renderAiSideDrawer, setAiSideDrawerOpen } from './js/app/aiDrawer.mjs';
 import { currentAppPath, redirectToLoginPage } from './js/app/auth.mjs';
 import { inferItemKind, kindLabel } from './js/app/bookmarks.mjs';
 import { loadDetailSectionsUi, persistDetailSectionsUi } from './js/app/detail.mjs';
@@ -75,18 +76,7 @@ let aiQaDialogState = {
   scope: 'auto',
   limit: 6
 };
-const AI_DRAWER_HISTORY_STORAGE_KEY = 'rainbow.aiDrawerHistory';
-let aiSideDrawerState = {
-  open: false,
-  loading: false,
-  question: '',
-  answer: '',
-  sources: [],
-  scope: 'auto',
-  limit: 6,
-  error: '',
-  history: loadAiDrawerHistory()
-};
+
 let aiFolderSummaryDialogState = {
   loading: false,
   folderId: '',
@@ -238,23 +228,6 @@ function setSavedSearchesUiVisible(visible) {
 function normalizeBookmarkLayoutMode(value) {
   const mode = String(value || '').trim().toLowerCase();
   return BOOKMARK_LAYOUT_MODES.includes(mode) ? mode : 'list';
-}
-
-function loadAiDrawerHistory() {
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(AI_DRAWER_HISTORY_STORAGE_KEY) || '[]');
-    return Array.isArray(raw) ? raw.slice(0, 12) : [];
-  } catch (_err) {
-    return [];
-  }
-}
-
-function persistAiDrawerHistory(history) {
-  try {
-    window.localStorage.setItem(AI_DRAWER_HISTORY_STORAGE_KEY, JSON.stringify((Array.isArray(history) ? history : []).slice(0, 12)));
-  } catch (_err) {
-    // ignore localStorage failures
-  }
 }
 
 function loadBookmarkLayoutMode() {
@@ -1149,6 +1122,7 @@ function renderHeaderMenuControls() {
   byId('headerSortMenu')?.querySelectorAll('[data-sort-option]').forEach((el) => {
     const active = String(el.dataset.sortOption || '') === String(state.filters.sort || '');
     el.classList.toggle('active', active);
+    el.setAttribute('role', 'menuitemradio');
     el.setAttribute('aria-checked', String(active));
   });
 
@@ -1157,6 +1131,7 @@ function renderHeaderMenuControls() {
   byId('headerViewMenu')?.querySelectorAll('[data-layout-option]').forEach((el) => {
     const active = String(el.dataset.layoutOption || '') === String(bookmarkLayoutMode || '');
     el.classList.toggle('active', active);
+    el.setAttribute('role', 'menuitemradio');
     el.setAttribute('aria-checked', String(active));
   });
   byId('headerViewColumnsBtn')?.classList.toggle('hidden', bookmarkLayoutMode !== 'list');
@@ -3715,7 +3690,7 @@ function cardHtml(item) {
     ${cover}
     <div class="card-top">
       <div class="card-top-row">
-        <label class="card-select"><input type="checkbox" data-select="${item.id}" ${selected}/> <span class="sr-only">选择</span></label>
+        <label class="card-select"><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/> <span class="sr-only">选择</span></label>
         <span>${bookmarkFlagsText(item)}</span>
       </div>
       <div class="card-host-row-wrap">
@@ -3775,7 +3750,7 @@ function listRowHtml(item) {
          <img class="bookmark-row-thumb-favicon" alt="" src="${bookmarkFaviconUrl(item)}" width="16" height="16" loading="lazy" />
        </span>`;
   return `<article class="bookmark-row ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
-    <label class="bookmark-row-select"><input type="checkbox" data-select="${item.id}" ${selected}/> <span>选择</span></label>
+    <label class="bookmark-row-select"><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/> <span>选择</span></label>
     <button type="button" class="bookmark-row-thumb ${coverUrl ? 'has-cover is-loading' : 'no-cover'}" data-preview-card="${item.id}" title="打开预览" data-thumb-kind="${escapeHtml(inferItemKind(item))}">
       ${thumbInner}
     </button>
@@ -3807,7 +3782,7 @@ function headlineHtml(item) {
   const selected = state.selected.has(item.id) ? 'checked' : '';
   const selectedClass = state.selected.has(item.id) ? 'selected' : '';
   return `<article class="bookmark-headline ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
-    <label class="bookmark-headline-select"><input type="checkbox" data-select="${item.id}" ${selected}/></label>
+    <label class="bookmark-headline-select"><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/></label>
     <img alt="" src="${bookmarkFaviconUrl(item)}" width="16" height="16" />
     <button type="button" class="bookmark-headline-title" data-preview-card="${item.id}" title="打开预览">${escapeHtml(item.title)}</button>
     <div class="bookmark-headline-meta muted bookmark-meta">
@@ -3844,7 +3819,7 @@ function moodboardHtml(item) {
     <button type="button" class="bookmark-board-media" data-preview-card="${item.id}" title="打开预览">${bg}</button>
     <div class="bookmark-board-overlay">
       <div class="bookmark-board-top">
-        <label><input type="checkbox" data-select="${item.id}" ${selected}/> 选择</label>
+        <label><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/> 选择</label>
         <span>${escapeHtml(bookmarkFlagsText(item))}</span>
       </div>
       <button type="button" class="bookmark-board-title" data-preview-card="${item.id}">${title}</button>
@@ -3961,6 +3936,17 @@ function bindSplitResizeHandle(handle, {
   });
 }
 
+function syncOverlayAccessibility() {
+  const narrow = window.innerWidth <= 920;
+  const detailOpen = narrow && Boolean(state.activeId);
+  const main = document.querySelector('.shell .main');
+  const sidebar = document.querySelector('.shell .sidebar');
+  const detail = byId('detailPanel');
+  if (main) main.inert = mobileSidebarOpen || detailOpen || aiSideDrawerState.open;
+  if (sidebar) sidebar.inert = narrow && !mobileSidebarOpen || detailOpen || aiSideDrawerState.open;
+  if (detail) detail.inert = !state.activeId || mobileSidebarOpen || aiSideDrawerState.open;
+}
+
 function setMobileSidebarOpen(open, { restoreFocus = true } = {}) {
   mobileSidebarOpen = Boolean(open) && window.innerWidth <= 920;
   const shell = document.querySelector('.shell');
@@ -3974,6 +3960,7 @@ function setMobileSidebarOpen(open, { restoreFocus = true } = {}) {
   trigger?.setAttribute('aria-label', mobileSidebarOpen ? '关闭导航' : '打开导航');
   backdrop?.classList.toggle('hidden', !mobileSidebarOpen);
   sidebar?.setAttribute('aria-hidden', String(!mobileSidebarOpen && window.innerWidth <= 920));
+  syncOverlayAccessibility();
   if (mobileSidebarOpen) {
     requestAnimationFrame(() => focusableElementsWithin(sidebar)[0]?.focus());
   } else if (restoreFocus) {
@@ -4006,7 +3993,7 @@ function isDetailDrawerFocusTrapActive() {
   if (!state.activeId) return false;
   if (hasModalOpen()) return false;
   const shell = document.querySelector('.shell');
-  return Boolean(shell?.classList.contains('detail-panel-open'));
+  return window.innerWidth <= 920 && Boolean(shell?.classList.contains('detail-panel-open'));
 }
 
 function trapDetailDrawerTabFocus(e) {
@@ -4058,6 +4045,7 @@ function syncDetailDrawerShellState(item) {
   }
   closeBtn?.classList.toggle('hidden', !open);
   backdrop?.classList.toggle('hidden', !open);
+  syncOverlayAccessibility();
   if (!open) {
     document.body.classList.remove('detail-drawer-open');
     detailDrawerReturnFocus = null;
@@ -4793,13 +4781,13 @@ function updateDetailPanelHeadUi(item = null) {
   if (viewBtn) {
     viewBtn.disabled = !hasItem;
     viewBtn.classList.toggle('active', hasItem && !detailEditMode);
-    viewBtn.setAttribute('aria-pressed', String(Boolean(hasItem && !detailEditMode)));
+    viewBtn.setAttribute('tabindex', detailEditMode ? '-1' : '0');
     viewBtn.setAttribute('aria-selected', String(Boolean(hasItem && !detailEditMode)));
   }
   if (editBtn) {
     editBtn.disabled = !hasItem;
     editBtn.classList.toggle('active', hasItem && detailEditMode);
-    editBtn.setAttribute('aria-pressed', String(Boolean(hasItem && detailEditMode)));
+    editBtn.setAttribute('tabindex', detailEditMode ? '0' : '-1');
     editBtn.setAttribute('aria-selected', String(Boolean(hasItem && detailEditMode)));
   }
   if (prevBtn) prevBtn.disabled = !hasItem || idx <= 0;
@@ -6205,150 +6193,6 @@ function aiDrawerContextBookmark() {
     || null;
 }
 
-function setAiSideDrawerOpen(open) {
-  aiSideDrawerState.open = Boolean(open);
-  const drawer = byId('aiSideDrawer');
-  const backdrop = byId('aiSideDrawerBackdrop');
-  if (drawer) {
-    drawer.classList.toggle('hidden', !aiSideDrawerState.open);
-    drawer.setAttribute('aria-hidden', String(!aiSideDrawerState.open));
-  }
-  if (backdrop) backdrop.classList.toggle('hidden', !aiSideDrawerState.open);
-  document.body.classList.toggle('ai-side-drawer-open', aiSideDrawerState.open);
-  renderAiSideDrawer();
-}
-
-function renderAiDrawerSuggestions(item = aiDrawerContextBookmark()) {
-  const root = byId('aiDrawerSuggestions');
-  if (!root) return;
-  if (!item) {
-    root.innerHTML = '<div class="muted">选择书签后显示建议。</div>';
-    return;
-  }
-  const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean).slice(0, 8) : [];
-  const summary = String(item.aiSuggestions?.summary || item.note || item.excerpt || '').trim();
-  root.innerHTML = `
-    ${tags.length ? `<div class="ai-drawer-suggestion-tags">${tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>` : '<div class="muted">暂无标签建议。</div>'}
-    ${summary ? `<div>${escapeHtml(summary.slice(0, 220))}${summary.length > 220 ? '…' : ''}</div>` : '<div class="muted">暂无摘要建议。</div>'}
-  `;
-}
-
-function renderAiDrawerHistory() {
-  const root = byId('aiDrawerHistory');
-  if (!root) return;
-  const history = Array.isArray(aiSideDrawerState.history) ? aiSideDrawerState.history : [];
-  root.innerHTML = history.length
-    ? history.map((item, idx) => `<button type="button" class="ghost" data-ai-drawer-history="${idx}">${escapeHtml(String(item.question || '').slice(0, 80))}</button>`).join('')
-    : '<div class="muted">暂无历史提问。</div>';
-  root.querySelectorAll('[data-ai-drawer-history]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const item = history[Number(el.dataset.aiDrawerHistory || 0)] || null;
-      if (!item) return;
-      aiSideDrawerState = {
-        ...aiSideDrawerState,
-        question: String(item.question || ''),
-        answer: String(item.answer || ''),
-        sources: Array.isArray(item.sources) ? item.sources : [],
-        scope: String(item.scope || 'auto'),
-        limit: Math.max(1, Math.min(10, Number(item.limit || 6) || 6)),
-        error: ''
-      };
-      renderAiSideDrawer();
-    });
-  });
-}
-
-function renderAiSideDrawer() {
-  const drawer = byId('aiSideDrawer');
-  if (!drawer) return;
-  const questionEl = byId('aiDrawerQuestion');
-  const scopeEl = byId('aiDrawerScope');
-  const limitEl = byId('aiDrawerLimit');
-  const askBtn = byId('aiDrawerAskBtn');
-  const answerEl = byId('aiDrawerAnswer');
-  const sourcesEl = byId('aiDrawerSources');
-  const contextMeta = byId('aiDrawerContextMeta');
-  const item = aiDrawerContextBookmark();
-
-  if (questionEl && questionEl.value !== String(aiSideDrawerState.question || '')) questionEl.value = String(aiSideDrawerState.question || '');
-  if (scopeEl) scopeEl.value = ['auto', 'all', 'current_only'].includes(String(aiSideDrawerState.scope || 'auto')) ? String(aiSideDrawerState.scope || 'auto') : 'auto';
-  if (limitEl) limitEl.value = String(Math.max(1, Math.min(10, Number(aiSideDrawerState.limit || 6) || 6)));
-  if (askBtn) {
-    askBtn.disabled = Boolean(aiSideDrawerState.loading);
-    askBtn.textContent = aiSideDrawerState.loading ? '提问中…' : '提问';
-    askBtn.setAttribute('aria-busy', String(Boolean(aiSideDrawerState.loading)));
-  }
-  if (contextMeta) {
-    contextMeta.textContent = item ? `当前书签：${item.title || item.id}` : '当前视图';
-  }
-  renderAiDrawerSuggestions(item);
-
-  if (answerEl) {
-    const answer = String(aiSideDrawerState.answer || '');
-    answerEl.textContent = aiSideDrawerState.loading
-      ? 'AI 正在分析，请稍候…'
-      : (aiSideDrawerState.error ? `失败：${aiSideDrawerState.error}` : (answer || '暂无回答。'));
-    answerEl.classList.toggle('muted', !answer);
-  }
-  const sources = Array.isArray(aiSideDrawerState.sources) ? aiSideDrawerState.sources : [];
-  if (sourcesEl) {
-    sourcesEl.innerHTML = sources.length
-      ? sources.slice(0, 6).map((src, idx) => `<button type="button" class="ai-qa-source-item" data-ai-drawer-source="${escapeHtml(String(src.id || ''))}">
-          <div class="ai-qa-source-row"><span class="ai-qa-source-index">${idx + 1}</span><span class="ai-qa-source-title">${escapeHtml(String(src.title || src.id || '出处'))}</span></div>
-          <div class="ai-qa-source-meta muted">${escapeHtml([src.folderPath, src.host || hostFromUrl(src.url || '')].filter(Boolean).join(' · '))}</div>
-        </button>`).join('')
-      : '<div class="muted">暂无出处。</div>';
-    sourcesEl.querySelectorAll('[data-ai-drawer-source]').forEach((el) => {
-      el.addEventListener('click', () => {
-        const id = String(el.dataset.aiDrawerSource || '');
-        if (!id) return;
-        store.setActiveId(id);
-        renderCards();
-        renderDetail();
-        renderAiSideDrawer();
-      });
-    });
-  }
-  renderAiDrawerHistory();
-}
-
-async function runAiSideDrawerAsk() {
-  const question = String(byId('aiDrawerQuestion')?.value || aiSideDrawerState.question || '').trim();
-  if (!question) {
-    showToast('请输入问题', { timeoutMs: 2500 });
-    byId('aiDrawerQuestion')?.focus?.();
-    return;
-  }
-  const scope = String(byId('aiDrawerScope')?.value || 'auto');
-  const limit = Math.max(1, Math.min(10, Number(byId('aiDrawerLimit')?.value || 6) || 6));
-  const item = aiDrawerContextBookmark();
-  if (scope === 'current_only' && !item) {
-    showToast('仅当前书签需要先选择一条书签', { timeoutMs: 3000 });
-    return;
-  }
-  aiSideDrawerState = { ...aiSideDrawerState, loading: true, question, scope, limit, error: '', answer: '', sources: [] };
-  renderAiSideDrawer();
-  try {
-    const body = { question, scope, limit };
-    if (item && scope !== 'all') body.bookmarkId = item.id;
-    const out = await api('/api/product/ai/qa', {
-      method: 'POST',
-      body: JSON.stringify(body)
-    });
-    const answer = String(out?.answer || '');
-    const sources = Array.isArray(out?.sources) ? out.sources : [];
-    const nextHistory = [{ question, answer, sources, scope, limit, createdAt: Date.now() }, ...aiSideDrawerState.history].slice(0, 12);
-    aiSideDrawerState = { ...aiSideDrawerState, loading: false, answer, sources, error: '', history: nextHistory };
-    persistAiDrawerHistory(nextHistory);
-    renderAiSideDrawer();
-    showToast(sources.length ? `AI 已回答（${sources.length} 条出处）` : 'AI 已回答', { timeoutMs: 3200 });
-  } catch (err) {
-    aiSideDrawerState = { ...aiSideDrawerState, loading: false, error: String(err.message || err) };
-    renderAiSideDrawer();
-    showToast(err.message || 'AI 提问失败', { timeoutMs: 4200 });
-  }
-}
-
 function renderAiQaDialogUi() {
   const dialog = byId('aiQaDialog');
   if (!dialog) return;
@@ -7051,20 +6895,20 @@ function render预览Dialog() {
 
   if (mode === 'image') {
     const img = byId('previewImage');
-    img.src = url;
+    img.src = safeUrl(url);
     img.classList.remove('hidden');
     return;
   }
 
   if (mode === 'video') {
     const video = byId('previewVideo');
-    video.src = url;
+    video.src = safeUrl(url);
     video.classList.remove('hidden');
     return;
   }
 
   const frame = byId('previewFrame');
-  frame.src = url;
+  frame.src = safeUrl(url);
   frame.classList.remove('hidden');
 }
 
@@ -7771,9 +7615,19 @@ function bindActions() {
     scheduleSidebarAuxiliaryVirtualRender();
   }, { capture: true, passive: true });
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' && aiSideDrawerState.open && !hasModalOpen()) {
+      const items = focusableElementsWithin(byId('aiSideDrawer'));
+      const index = items.indexOf(document.activeElement);
+      if (index < 0 || e.shiftKey && index === 0 || !e.shiftKey && index === items.length - 1) {
+        e.preventDefault();
+        (e.shiftKey ? items.at(-1) : items[0])?.focus();
+        return;
+      }
+    }
     if (trapMobileSidebarTabFocus(e)) return;
     if (trapDetailDrawerTabFocus(e)) return;
     if (handleMenuArrowNavigation(e)) return;
+    if (e.target?.closest?.('.detail-panel-mode-switch')) return;
     if (e.key === 'Escape') {
       let closedTransient = false;
       if (mobileSidebarOpen) { setMobileSidebarOpen(false); closedTransient = true; }
@@ -8256,6 +8110,12 @@ function bindActions() {
   byId('authCloseBtn').addEventListener('click', () => {
     byId('authDialog').close();
   });
+  document.querySelectorAll('[data-auth-form]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      byId(form.dataset.authForm === 'login' ? 'authLoginBtn' : 'authRegisterBtn').click();
+    });
+  });
   byId('authLoginBtn').addEventListener('click', async () => {
     try {
       const out = await api('/api/auth/login', {
@@ -8382,42 +8242,31 @@ function bindActions() {
     window.open(window.location.href, '_blank', 'noopener');
   });
 
-  byId('askAiBtn')?.addEventListener('click', () => {
-    setAiSideDrawerOpen(true);
-    queueMicrotask(() => byId('aiDrawerQuestion')?.focus?.());
+  document.querySelector('.detail-panel-mode-switch')?.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+    const target = event.key === 'Home' ? buttons[0] : event.key === 'End' ? buttons.at(-1) : buttons.find(button => button !== document.activeElement);
+    const targetId = target?.id;
+    target?.click();
+    // Changing view/edit mode re-renders the detail panel. Restore focus to
+    // the replacement tab node instead of the detached pre-render element.
+    (targetId ? byId(targetId) : target)?.focus();
   });
-  byId('aiSideDrawerBackdrop')?.addEventListener('click', () => setAiSideDrawerOpen(false));
-  byId('aiDrawerCloseBtn')?.addEventListener('click', () => setAiSideDrawerOpen(false));
-  byId('aiDrawerAskBtn')?.addEventListener('click', async () => {
-    await runAiSideDrawerAsk();
+  initializeAiDrawer({
+    getContextBookmark: aiDrawerContextBookmark,
+    getActiveBookmarkId: () => state.activeId,
+    store,
+    renderCards,
+    renderDetail,
+    syncOverlayAccessibility,
+    showToast,
+    openAiQaDialog,
+    runAiAutoTagForActiveBookmark,
+    runAiSummaryForActiveBookmark,
+    openAiFolderSummaryDialog
   });
-  byId('aiDrawerOpenDialogBtn')?.addEventListener('click', () => {
-    openAiQaDialog({
-      bookmarkId: state.activeId || null,
-      question: String(byId('aiDrawerQuestion')?.value || aiSideDrawerState.question || ''),
-      scope: String(byId('aiDrawerScope')?.value || aiSideDrawerState.scope || 'auto')
-    });
-  });
-  byId('aiDrawerQuestion')?.addEventListener('input', (e) => {
-    aiSideDrawerState.question = String(e.target?.value || '');
-  });
-  byId('aiDrawerScope')?.addEventListener('change', (e) => {
-    aiSideDrawerState.scope = String(e.target?.value || 'auto');
-    renderAiSideDrawer();
-  });
-  byId('aiDrawerLimit')?.addEventListener('change', (e) => {
-    aiSideDrawerState.limit = Math.max(1, Math.min(10, Number(e.target?.value || 6) || 6));
-    renderAiSideDrawer();
-  });
-  document.querySelectorAll('[data-ai-drawer-action]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const action = String(el.dataset.aiDrawerAction || '');
-      if (action === 'autotag') await runAiAutoTagForActiveBookmark();
-      if (action === 'summary') await runAiSummaryForActiveBookmark();
-      if (action === 'folder-summary') openAiFolderSummaryDialog();
-      renderAiSideDrawer();
-    });
-  });
+  bindAiDrawerEvents();
   byId('aiQaAskBtn')?.addEventListener('click', async () => {
     await runAiQaFromDialog();
   });
