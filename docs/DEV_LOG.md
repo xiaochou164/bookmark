@@ -1164,6 +1164,8 @@
 - 内容：修复工作台溢出、详情模式/键盘焦点、CSP 登录提交、drawer 焦点限制、扩展 Popup 状态反馈和 legacy 样式覆盖；增加 Chrome headless UI/E2E/扩展回归与性能采样。AI drawer history 存取抽到独立模块并由两项单测保护。纠正 OpenAPI 中 preview 的旧描述，并区分本轮结果与历史 UI checklist 记录。
 - 变更文件：`.github/workflows/ci.yml`、`public/app.mjs`、`public/js/app/aiDrawerHistory.mjs`、`public/css/`、`public/index.html`、`chrome-extension/`、`safari-extension/`、`scripts/`、`tests/app-modules.test.js`、`docs/`
 - 验证：`npm ci`（0 vulnerabilities）；`npm test`（24/24）；`npm run docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`；Docker 镜像和隔离健康检查通过。
-- 遗留：`BK-AUD-201` 其余大入口拆分未完成；托管 GitHub Actions、Safari 原生宿主和远程 Cloudflare 未运行。无生产部署、真实数据访问或 PR 合并。
+- 遗留：`BK-AUD-201` 其余大入口拆分未完成；Safari 原生宿主和远程 Cloudflare 未运行。无生产部署、真实数据访问或 PR 合并。
 
 - **CI 浏览器启动复验**：首个 PR Actions 运行中，单测、文档、Worker 与静态 UI 门禁通过；浏览器步骤因 Ubuntu runner 限制 user namespaces 导致 Chrome 报 `No usable sandbox`。`scripts/ui-browser-audit.mjs` 现在只对 `CI` 环境追加 Chrome `--no-sandbox`，本机 `npm run ui:browser` 复验成功（主站 101 张、E2E 8 项、扩展 16 张）。CI run `44289283424` 随后全部 16 步通过，Docker run `44289283256` 构建通过且登录/推送步骤跳过。对应截图 artifact 已由 Actions 留存；本机截图未重新入库，避免平台渲染差异造成基线噪声。
+
+- **BK-AUD-201 增量解耦（P2）**：将 `src/routes/productRoutes.js` 中 AI entitlement、feature/privacy policy、eval baseline、feedback summary、provider health 等纯逻辑移至 `src/services/aiGovernance.js`，并将对应 governance API handlers 移至 `src/routes/productAiGovernanceRoutes.js`；共享 `tokenize` 移至 `src/services/textTokens.js`。将 Worker Chrome sync folder/index transformations 移至 `src/worker/chromeSync.mjs`。`productRoutes.js` 从 4,709 行降至 4,246 行，`worker.mjs` 从 7,432 行降至 7,316 行，API 行为保持不变。新增 `tests/ai-governance.test.js` 5 项和 `tests/worker-chrome-sync.test.js` 3 项；`npm test` 32/32，`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 `npm audit --audit-level=low`（0）通过。浏览器矩阵 101、E2E 8、扩展截图 16 全部通过（报告在 `/tmp/rainbow-ui-audit-final`）；Docker build 与隔离容器 `/api/health` 通过。风险：Worker 剩余路由和 app 渲染入口仍待拆分；回退可 revert P2 refactor commit，无数据/schema 变化。

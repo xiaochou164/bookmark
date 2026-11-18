@@ -18,7 +18,7 @@
 - [x] **BK-AUD-106 / P1 / 样式覆盖治理（已迁移并回归）**：以四档浏览器截图和计算样式为护栏，从三个 legacy 子表中删除已被稳定层同选择器/属性覆盖的声明（workbench 54、legacy 294、safety 约 60 处声明），保留实际生效兼容规则；重复选择器计数降至 14，CSS 总量从 192KiB 参考值降到 176.2KiB。对比图保留在本轮 before/after 目录，四档溢出与 axe 门禁全过。
 
 ## P2：工程质量、性能与交付
-- [ ] **BK-AUD-201 / P2 / 大模块解耦（结构性问题仍存在）**：`public/app.mjs`、`src/worker.mjs`、`src/routes/productRoutes.js` 仍是大型集中入口。本轮仅把 AI drawer history 存取抽到 `public/js/app/aiDrawerHistory.mjs` 并以单测保护；认证、侧栏、搜索、书签、详情、任务已有模块边界。其余渲染/路由尚未迁移，需逐域拆分并建立 Node/Worker 契约测试，因此本项保持未完成。
+- [ ] **BK-AUD-201 / P2 / 大模块解耦（分阶段进行，仍未完成）**：`public/app.mjs`、`src/worker.mjs`、`src/routes/productRoutes.js` 仍是大型集中入口。本轮将约 300 行 AI 权益、策略、评估和反馈状态逻辑抽至 `src/services/aiGovernance.js`，共享词元处理抽至 `src/services/textTokens.js`，AI governance API handlers 抽至 `src/routes/productAiGovernanceRoutes.js`；将 Chrome sync folder/index transformations 抽至 `src/worker/chromeSync.mjs`。新增单测覆盖用户隔离、能力门禁、策略上限、评估样本归属、API 路由挂载/租户策略以及 Worker sync URL、目录索引、镜像状态和幂等目录创建。`productRoutes.js` 从 4,709 行减至 4,246 行；`worker.mjs` 从 7,432 行减至 7,316 行。AI drawer history 之前已抽到 `public/js/app/aiDrawerHistory.mjs` 并有单测；认证、侧栏、搜索、书签、详情、任务也已有模块边界。Worker 剩余路由、app 渲染和其他大型业务域仍待迁移与 Node/Worker 契约覆盖，本项保持未完成。
 - [x] **BK-AUD-202 / P2 / 测试门禁和性能（托管验收通过）**：CI 加入 Chrome headless UI/E2E/扩展回归、Cloudflare 语法门禁、Docker 构建启动和截图 artifact；浏览器脚本采集 FCP/LCP/CLS、INP observer、heap、长任务、布局/脚本耗时，并运行低速网、CPU 限速和大样本检查。首次托管运行显示 runner 的 user namespace/AppArmor 限制导致 Chrome `No usable sandbox`；`scripts/ui-browser-audit.mjs` 现仅在 `CI` 环境传入 `--no-sandbox`，本机保持默认沙箱。GitHub Actions CI run `44289283424` 的全部步骤通过，Docker build run `44289283256` 通过且未推送镜像。INP 若未捕获用户交互则不作为性能结论。
 - [x] **BK-AUD-203 / P2 / 文档与实现漂移**：修正 OpenAPI 对 `/api/chrome-sync` preview 的写入描述与 schema，说明 `preview: true` 零持久化写入；更新架构、扩展同步、UI 审计和 UI 测试清单，区分本轮证据与历史状态，并补充隔离测试、部署边界和外部限制。
 - [x] **BK-AUD-204 / P2 / 设计系统视觉收口（浏览器矩阵验证）**：修正深色卡片/分页 surface、设置状态色、扩展状态反馈及窄窗宽度；核验控件、焦点、触屏目标和响应式动作区。具体截图、视口和 axe 结果列在 P1 执行记录。
@@ -56,7 +56,7 @@
 
 ### P2 增量与最终验证（2026-11-18）
 
-- **BK-AUD-201**：新增 `public/js/app/aiDrawerHistory.mjs`，隔离 AI 抽屉历史的 localStorage 存取和 12 条上限；`tests/app-modules.test.js` 覆盖错误 JSON、非数组、存储异常和截断。它只构成一次增量拆分，主入口仍然过大，保持未完成。
+- **BK-AUD-201**：新增 `public/js/app/aiDrawerHistory.mjs` 隔离 AI 抽屉历史存取，新增 `src/services/aiGovernance.js`、`src/services/textTokens.js` 与 `src/routes/productAiGovernanceRoutes.js` 拆出 Node AI 治理逻辑/handlers；新增 `src/worker/chromeSync.mjs` 将 Worker 扩展同步目录与镜像索引处理移出主入口。`tests/ai-governance.test.js` 的 5 项和 `tests/worker-chrome-sync.test.js` 的 3 项通过，当前 `npm test` 32/32；`productRoutes.js` 降至 4,246 行，`worker.mjs` 降至 7,316 行。Worker 剩余 routes 与 app 渲染域未拆分，保持未完成。
 - **BK-AUD-202**：`.github/workflows/ci.yml` 加入 Chrome 浏览器矩阵、8 项 E2E、扩展 fixture、Docker 健康检查与报告 artifact；首次 GitHub Actions 在 Chrome 启动阶段受 runner user namespaces/AppArmor 限制失败，后在脚本中加入 CI 专用 `--no-sandbox`。本机 `npm run ui:browser` 全套通过，随后托管 CI run `44289283424` 的所有 16 步（含浏览器矩阵、扩展检查、Docker 启动与运维演练）通过；Docker PR workflow run `44289283256` 构建成功，登录和推送按 PR 条件跳过。
 - **BK-AUD-203**：同步修正文档和 OpenAPI preview 契约；`npm run docs:check` 通过。未运行远程 Worker/扩展 smoke，避免连接生产服务或真实账号数据。
 - **BK-AUD-204**：与 P1 一起用四档截图、暗色/Reduced Motion、局部溢出、axe 和键盘场景回归；详细机器报告见 `docs/screenshots/audit-2026-11-16/after/`。

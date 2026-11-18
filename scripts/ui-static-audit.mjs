@@ -102,6 +102,8 @@ if (!appSource.includes('new EventSource') || !appSource.includes('/api/events')
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
 const aiProviderSource = read('src/services/aiProviderService.js');
+const aiGovernanceSource = read('src/services/aiGovernance.js');
+const aiGovernanceRoutesSource = read('src/routes/productAiGovernanceRoutes.js');
 if (!systemRoutesSource.includes('/api/events') || !systemRoutesSource.includes('text/event-stream') || !systemRoutesSource.includes('buildRealtimeSnapshot')) {
   failures.push('RA-FE-005 Node API must expose realtime SSE snapshots');
 }
@@ -153,31 +155,31 @@ if (/<script>\s*\(async function|<script>\s*\(function/.test(collabRoutesSource)
 for (const marker of ['/api/collab/ai/change-summary', '/api/collab/ai/tag-guidance/:folderId', '/api/collab/ai/comment-assist']) {
   if (!collabRoutesSource.includes(marker)) failures.push(`AI collaboration route missing ${marker}`);
 }
-if (!productRoutesSource.includes('DEFAULT_AI_EVAL_SAMPLES') || !productRoutesSource.includes('/api/product/ai/evals/run') || !settingsSource.includes('aiEvalRunBtn')) {
+if (!aiGovernanceSource.includes('DEFAULT_AI_EVAL_SAMPLES') || !aiGovernanceRoutesSource.includes('/api/product/ai/evals/run') || !settingsSource.includes('aiEvalRunBtn')) {
   failures.push('AI-601 prompt/eval baseline must expose samples, eval run API, and settings action');
 }
 if (!workerSource.includes('DEFAULT_AI_EVAL_SAMPLES') || !workerSource.includes('/api/product/ai/evals/run')) {
   failures.push('AI-601 Worker path must expose prompt/eval baseline APIs');
 }
-if (!productRoutesSource.includes('aiFeedbackItems') || !productRoutesSource.includes('/api/product/ai/feedback') || !settingsSource.includes('aiFeedbackSendBtn')) {
+if (!aiGovernanceSource.includes('aiFeedbackItems') || !aiGovernanceRoutesSource.includes('/api/product/ai/feedback') || !settingsSource.includes('aiFeedbackSendBtn')) {
   failures.push('AI-602 AI output quality feedback must persist accepted/rejected/edited/rated feedback');
 }
 if (!workerSource.includes('ai_feedback_items') || !workerSource.includes('/api/product/ai/feedback')) {
   failures.push('AI-602 Worker path must persist AI output quality feedback');
 }
-if (!aiProviderSource.includes('sanitizeAiModelInput') || !productRoutesSource.includes('aiPrivacyPolicies') || !settingsSource.includes('aiPrivacyAnonymizeSelect')) {
+if (!aiProviderSource.includes('sanitizeAiModelInput') || !aiGovernanceSource.includes('aiPrivacyPolicies') || !settingsSource.includes('aiPrivacyAnonymizeSelect')) {
   failures.push('AI-603 AI privacy policy must sanitize model input and expose anonymization policy controls');
 }
 if (!workerSource.includes('sanitizeAiModelInput') || !workerSource.includes('/api/product/ai/privacy-policy')) {
   failures.push('AI-603 Worker path must expose AI privacy policy and sanitization');
 }
-if (!productRoutesSource.includes('aiProviderHealthChecks') || !productRoutesSource.includes('/api/product/ai/health/probe') || !settingsSource.includes('aiHealthProbeBtn')) {
+if (!aiGovernanceSource.includes('aiProviderHealthChecks') || !aiGovernanceRoutesSource.includes('/api/product/ai/health/probe') || !settingsSource.includes('aiHealthProbeBtn')) {
   failures.push('AI-604 provider health checks must record probes and expose a settings health panel');
 }
 if (!workerSource.includes('ai_provider_health_checks') || !workerSource.includes('/api/product/ai/health/probe')) {
   failures.push('AI-604 Worker path must record provider health checks');
 }
-if (!productRoutesSource.includes('aiFeaturePolicies') || !productRoutesSource.includes('AI_FEATURE_DISABLED') || !settingsSource.includes('aiFeatureEnabledSelect')) {
+if (!aiGovernanceSource.includes('aiFeaturePolicies') || !aiGovernanceSource.includes('AI_FEATURE_DISABLED') || !settingsSource.includes('aiFeatureEnabledSelect')) {
   failures.push('AI-605 AI feature switches and permissions must gate write APIs and expose settings controls');
 }
 if (!workerSource.includes('ai_feature_policy') || !workerSource.includes('AI_FEATURE_DISABLED')) {
