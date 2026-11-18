@@ -59,6 +59,7 @@ if (legacyAppEntryLines > 8 || !legacyAppEntry.includes('moved to /app.mjs')) {
 const indexHtml = read('public/index.html');
 const appSource = read('public/app.mjs');
 const aiDrawerHistorySource = read('public/js/app/aiDrawerHistory.mjs');
+const aiDrawerSource = read('public/js/app/aiDrawer.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -116,7 +117,7 @@ if (!componentsCss.includes('.realtime-notifications-menu') || !componentsCss.in
 for (const id of ['aiSideDrawer', 'aiDrawerQuestion', 'aiDrawerHistory', 'aiDrawerSuggestions']) {
   if (!indexHtml.includes(`id="${id}"`)) failures.push(`RA-FE-006 AI side drawer missing #${id}`);
 }
-if (!aiDrawerHistorySource.includes('rainbow.aiDrawerHistory') || !appSource.includes('runAiSideDrawerAsk') || !appSource.includes('setAiSideDrawerOpen') || !appSource.includes('data-ai-drawer-action')) {
+if (!aiDrawerHistorySource.includes('rainbow.aiDrawerHistory') || !aiDrawerSource.includes('runAiSideDrawerAsk') || !aiDrawerSource.includes('setAiSideDrawerOpen') || !aiDrawerSource.includes('data-ai-drawer-action')) {
   failures.push('RA-FE-006 workbench must provide AI side drawer history, ask flow, suggestions, and shortcuts');
 }
 if (!componentsCss.includes('.ai-side-drawer') || !componentsCss.includes('.ai-drawer-history') || !componentsCss.includes('.ai-drawer-shortcuts')) {
