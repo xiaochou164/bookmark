@@ -1284,3 +1284,5 @@
 - 修改：迁至 `src/routes/productAiSettingsRoutes.js`，依赖通过注册参数注入；新增 `tests/product-ai-settings-routes.test.js`，验证 provider config 与 prompt override 用户隔离、API key 只返回 masked 字段、provider test 对嵌套配置做 merge 且不保存修改、规则 endpoints 使用认证用户 ID。入口从 3,444 行降至 3,292 行。
 - 验证：目标测试 2/2；全套 `npm test` 55/55；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；Docker build 成功，隔离容器 `/api/health` 返回 `ok:true` 且 health status 为 `healthy`。`ui:check` 初次因静态规则仍检查旧路由文件而失败，规则已更新为检查 `productAiSettingsRoutes.js` 后复跑通过。UI 浏览器矩阵此前在本轮 AI digest 同一审计周期执行通过，当前改动仅在 API 路由，无 UI 源变更。hosted CI/Docker 待提交后验收。
 - 风险/回退：接口与配置持久化格式保持不变；BK-AUD-201 未关闭，可单独回滚本次模块、入口注册和测试。
+
+- Hosted 验收：AI settings 代码 head `4e9f848` 的 GitHub CI run `44322630733` 全部 16 步成功（含 browser/extension 回归、Docker 启动及 operations drill）；Docker PR build run `44322630665` 成功。
