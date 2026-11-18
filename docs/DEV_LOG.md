@@ -1223,3 +1223,5 @@
 - 影响：`productRoutes.js` 从 3,993 行降至 3,918 行；无 API/schema/持久化格式变化。
 - 验证：目标测试 1/1；`npm test` 47/47；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 报告 101 张截图、8 项 E2E、16 个扩展状态通过。Docker 镜像启动后健康状态为 healthy，临时映射端口访问 `/api/health` 返回 `200`；仅由浏览器脚本重生成的审阅截图已恢复。
 - 风险：其余产品路由、Worker 与前端大入口还需拆分，BK-AUD-201 仍未完成；本地验证完成，hosted CI/Docker checks 待推送后核验。
+
+- **BK-AUD-201 saved-search 托管验收**：代码 head `6f18c51` 的 GitHub Actions CI run `44310585890` 全部 16 步成功，包含浏览器矩阵、扩展 parity、Docker 启动与 operations drill；Docker PR build run `44310585793` 成功。BK-AUD-201 仍保持未完成。
