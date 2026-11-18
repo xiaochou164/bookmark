@@ -1165,3 +1165,5 @@
 - 变更文件：`.github/workflows/ci.yml`、`public/app.mjs`、`public/js/app/aiDrawerHistory.mjs`、`public/css/`、`public/index.html`、`chrome-extension/`、`safari-extension/`、`scripts/`、`tests/app-modules.test.js`、`docs/`
 - 验证：`npm ci`（0 vulnerabilities）；`npm test`（24/24）；`npm run docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`；Docker 镜像和隔离健康检查通过。
 - 遗留：`BK-AUD-201` 其余大入口拆分未完成；托管 GitHub Actions、Safari 原生宿主和远程 Cloudflare 未运行。无生产部署、真实数据访问或 PR 合并。
+
+- **CI 浏览器启动复验**：首个 PR Actions 运行中，单测、文档、Worker 与静态 UI 门禁通过；浏览器步骤因 Ubuntu runner 限制 user namespaces 导致 Chrome 报 `No usable sandbox`。`scripts/ui-browser-audit.mjs` 现在只对 `CI` 环境追加 Chrome `--no-sandbox`，本机 `npm run ui:browser` 复验成功（主站 101 张、E2E 8 项、扩展 16 张）。对应截图未重新入库，避免平台渲染差异造成基线噪声。托管复验待后续推送。

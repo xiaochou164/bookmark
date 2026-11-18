@@ -139,6 +139,7 @@ async function startChrome() {
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rainbow-chrome-'));
   const child = spawn(chromePath, [
     '--headless=new',
+    ...(process.env.CI ? ['--no-sandbox'] : []),
     '--no-first-run',
     '--no-default-browser-check',
     '--disable-dev-shm-usage',
