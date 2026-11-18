@@ -61,6 +61,7 @@ Raindrop UI 对齐证据位于：
 ## 4. 后端结构
 
 - `src/worker.mjs`：Cloudflare 生产主入口。
+- `src/worker/bookmarkTransfer.mjs`：JSON/CSV/书签 HTML 导入导出 codecs；保持无存储副作用，导入字段映射由 Worker 显式传入。
 - `src/routes/`：Express 兼容路由与业务拆分版本。
 - `src/services/`：同步、AI、书签检索/语义索引、鉴权、任务、对象存储和内容提取服务；`bookmarkSearch.js` 提供产品路由共享的 URL/文本/目录 helpers 与租户作用域语义索引维护。
 - `src/repositories/`：数据访问抽象。

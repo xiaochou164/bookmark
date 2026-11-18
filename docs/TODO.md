@@ -377,7 +377,8 @@
 - [x] **P1** `BK-AUD-104` 登录/设置/插件/公开页体验
 - [x] **P1** `BK-AUD-105` 键盘、触控与无障碍
 - [x] **P1** `BK-AUD-106` CSS legacy 样式治理
-- [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护（本轮将产品路由共享检索、语义索引及目录工具抽到 `src/services/bookmarkSearch.js`，`productRoutes.js` 降至 4,052 行；新增 4 项语义索引/租户隔离回归，当前 `npm test` 36/36、UI 浏览器 101/8/16 通过。`src/worker.mjs` 路由、`public/app.mjs` 其余渲染域和产品路由 handlers 仍需拆分，故保持未完成）
+- [ ] **P1** `BK-AUD-107` CSV 导入导出 round-trip 字段损坏及 HTML 导出转义不足（CSV 导入按逗号无视引号拆分，导致自带逗号/引号/换行的标题和备注被切坏；HTML 导出对标题、URL、标签转义不完整。本轮已实现 quote-aware CSV codec 和完整 HTML escaping，并新增 3 项 codec 回归；待本轮 CI/Worker smoke 验收后勾选）
+- [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护（本轮将产品路由共享检索/语义索引及 Worker 导入导出 codecs 分别抽到 `src/services/bookmarkSearch.js`、`src/worker/bookmarkTransfer.mjs`；`productRoutes.js` 降至 4,052 行，Worker 主入口降至 7,224 行；新增 4 项语义索引/租户隔离回归，当前 `npm test` 39/39、UI 浏览器 101/8/16 通过。`src/worker.mjs` 路由、`public/app.mjs` 其余渲染域和产品路由 handlers 仍需拆分，故保持未完成）
 - [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44298730651` 与 Docker run `44298730581` 成功，无 warning annotations）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理
 - [x] **P2** `BK-AUD-204` 设计系统细节收口

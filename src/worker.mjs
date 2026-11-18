@@ -14,6 +14,7 @@ import {
   buildChromeIdIndex,
   normalizeChromeSyncMirrorIndex
 } from './worker/chromeSync.mjs';
+import { exportCsvPayload, exportHtmlPayload, exportJsonPayload, parseImportCsv, parseImportHtml, parseImportJson } from './worker/bookmarkTransfer.mjs';
 import crypto from 'node:crypto';
 import openapiSpec from '../docs/openapi.json' with { type: 'json' };
 import {
@@ -3005,57 +3006,6 @@ async function writeR2Text(env, bucketName, key, text, contentType) {
   };
 }
 
-function exportJsonPayload(state) {
-  return {
-    version: 1,
-    exportedAt: Date.now(),
-    folders: state.folders,
-    bookmarks: state.bookmarks,
-    tags: state.tags
-  };
-}
-
-function csvEscape(value) {
-  const s = String(value ?? '');
-  if (/["\n,]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
-
-function exportCsvPayload(state) {
-  const header = ['title', 'url', 'note', 'tags', 'folderId', 'favorite', 'archived', 'read', 'createdAt', 'updatedAt'];
-  const lines = [header.join(',')];
-  for (const bookmark of state.bookmarks) {
-    lines.push([
-      csvEscape(bookmark.title),
-      csvEscape(bookmark.url),
-      csvEscape(bookmark.note),
-      csvEscape((bookmark.tags || []).join('|')),
-      csvEscape(bookmark.folderId),
-      csvEscape(bookmark.favorite),
-      csvEscape(bookmark.archived),
-      csvEscape(bookmark.read),
-      csvEscape(bookmark.createdAt),
-      csvEscape(bookmark.updatedAt)
-    ].join(','));
-  }
-  return lines.join('\n');
-}
-
-function exportHtmlPayload(state) {
-  const folders = new Map(state.folders.map((folder) => [folder.id, folder]));
-  const lines = ['<!DOCTYPE NETSCAPE-Bookmark-file-1>', '<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">', '<TITLE>Bookmarks</TITLE>', '<H1>Bookmarks</H1>', '<DL><p>'];
-  for (const bookmark of state.bookmarks.filter((item) => !item.deletedAt)) {
-    const folder = folders.get(bookmark.folderId);
-    const title = String(bookmark.title || '(untitled)').replace(/</g, '&lt;');
-    const url = String(bookmark.url || '').replace(/"/g, '&quot;');
-    const note = String(folder?.name || 'Root').replace(/</g, '&lt;');
-    lines.push(`<DT><A HREF="${url}" TAGS="${(bookmark.tags || []).join(',')}">${title}</A>`);
-    lines.push(`<DD>${note}`);
-  }
-  lines.push('</DL><p>');
-  return lines.join('\n');
-}
-
 function decodeEntities(input = '') {
   return String(input)
     .replace(/&amp;/gi, '&')
@@ -3280,48 +3230,6 @@ function esc(input = '') {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-function parseImportJson(text) {
-  const parsed = safeJsonParse(text, null);
-  if (!parsed || !Array.isArray(parsed.bookmarks)) {
-    throw new Error('invalid JSON import payload');
-  }
-  return parsed.bookmarks.map((item) => ({
-    title: String(item.title || '').trim() || '(untitled)',
-    url: String(item.url || '').trim(),
-    note: String(item.note || ''),
-    tags: normalizeTags(item.tags || []),
-    folderId: String(item.folderId || ROOT_FOLDER_ID)
-  })).filter((item) => item.url);
-}
-
-function parseImportCsv(text) {
-  const rows = String(text || '').split(/\r?\n/).filter(Boolean);
-  if (!rows.length) return [];
-  const header = rows.shift().split(',').map((cell) => String(cell || '').trim());
-  const byName = new Map(header.map((name, index) => [name.toLowerCase(), index]));
-  return rows.map((line) => {
-    const cells = line.split(',');
-    return {
-      title: String(cells[byName.get('title')] || '').trim() || '(untitled)',
-      url: String(cells[byName.get('url')] || '').trim(),
-      note: String(cells[byName.get('note')] || ''),
-      tags: normalizeTags(String(cells[byName.get('tags')] || '').split('|')),
-      folderId: String(cells[byName.get('folderid')] || ROOT_FOLDER_ID)
-    };
-  }).filter((item) => item.url);
-}
-
-function parseImportHtml(text) {
-  const matches = [...String(text || '').matchAll(/<a[^>]+href="([^"]+)"[^>]*>(.*?)<\/a>/gi)];
-  return matches.map((match) => ({
-    title: String(match[2] || '').replace(/<[^>]+>/g, '').trim() || '(untitled)',
-    url: String(match[1] || '').trim(),
-    note: '',
-    tags: [],
-    folderId: ROOT_FOLDER_ID
-  })).filter((item) => item.url);
 }
 
 async function readR2Text(env, key) {
@@ -3739,9 +3647,9 @@ async function processIoTask(env, message) {
       result = { format: 'html', bookmarks: state.bookmarks.length };
     } else if (task.type.startsWith('import_')) {
       let entries = [];
-      if (task.type === 'import_json') entries = parseImportJson(task.input.content || '');
-      if (task.type === 'import_csv') entries = parseImportCsv(task.input.content || '');
-      if (task.type === 'import_html') entries = parseImportHtml(task.input.content || '');
+      if (task.type === 'import_json') entries = parseImportJson(task.input.content || '', { rootFolderId: ROOT_FOLDER_ID, normalizeTags, parseJson: (input) => safeJsonParse(input, null) });
+      if (task.type === 'import_csv') entries = parseImportCsv(task.input.content || '', { rootFolderId: ROOT_FOLDER_ID, normalizeTags });
+      if (task.type === 'import_html') entries = parseImportHtml(task.input.content || '', { rootFolderId: ROOT_FOLDER_ID, normalizeTags });
       let created = 0;
       for (const entry of entries) {
         await repo.createBookmark(message.userId, {
