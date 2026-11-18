@@ -1245,3 +1245,13 @@
 - 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44314512969` 全部 16 步成功，Docker PR build run `44314512956` 成功；BK-AUD-201 仍未完成。
 
 - **BK-AUD-201 broken-link routes 托管验收**：代码 head `f80672d` 的 GitHub Actions CI run `44314512969` 16/16 步成功，Docker PR build run `44314512956` 成功。BK-AUD-201 仍保持未完成。
+
+
+## 2026-11-18 — BK-AUD-201 Node duplicate scan route 拆分
+
+- 待办：继续减小产品路由入口，并保护重复项扫描的租户范围和套餐门禁。
+- 修改：将 `/api/product/dedupe/scan` handler 移至 `src/routes/productDuplicateScanRoutes.js`；`productRoutes.js` 从 3,796 行降至 3,775 行。新增 `tests/product-duplicate-scan-routes.test.js`，验证只聚合同一用户的有效书签，过滤软删除项，并继续要求 `dedupeScan` feature。
+- 验证：目标测试 1/1、`npm test` 50/50、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 张扩展截图）和 Docker build/start/healthy `/api/health` 通过；浏览器生成的基线报告已还原。
+- 风险：无 API/schema/持久化格式变化；hosted GitHub CI run `44316388306` 全部 16 步成功，Docker PR build run `44316388326` 成功；BK-AUD-201 仍未完成。
+
+- **BK-AUD-201 duplicate scan routes 托管验收**：代码 head `e2af39e` 的 GitHub Actions CI run `44316388306` 16/16 步成功，Docker PR build run `44316388326` 成功。BK-AUD-201 仍保持未完成。
