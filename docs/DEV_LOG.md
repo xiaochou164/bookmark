@@ -1297,3 +1297,12 @@
 - 风险/回退：无 API/schema/persistence 变化；BK-AUD-201 未关闭，可独立回滚路由模块、入口注册和测试。
 
 - Hosted 验收：AI action route code head `2874fbf` 的 GitHub Actions CI run `44324485032` 全部 16 步成功（含 browser matrix、extension parity、Docker startup 和 operations drill）；Docker PR build run `44324485034` 成功。
+
+
+## 2026-11-18 — BK-AUD-201 Worker AI governance helpers 解耦
+
+- 待办：拆出 Worker AI capability、eval、feedback/provider health 和公开集合 AI guide 纯逻辑，以 Node policy 作兼容对照。
+- 根因/边界：上述 10 个 helpers 与 Worker crypto/schema/repository/HTTP handler 同处入口，难以单独回归；Node 已有对应 AI governance defaults，Worker 默认值存在双实现漂移风险。
+- 修改：新增 `src/worker/aiGovernance.mjs`，迁出 readiness、job record、feature policy、eval、feedback/health、capability/path mapping 和 public guide；`src/worker.mjs` 从 6,710 行降至 6,514 行。新增 `tests/worker-ai-governance.test.js` 四项测试，其中显式比较 Node/Worker `DEFAULT_AI_FEATURE_POLICY`。
+- 验证：目标测试 4/4；全套 `npm test` 61/61；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 均通过；Docker build 成功，临时容器 `/api/health` 为 ok 且 health status 为 healthy。未在此纯 Worker 增量重复本地浏览器截图矩阵，hosted CI 将覆盖浏览器步骤。
+- 风险/回退：无 API/schema/data-format 变化；Node 与 Worker 仍保留独立实现，但新增默认值 parity test；BK-AUD-201 未关闭，可单独回滚新 helper、import 和测试。
