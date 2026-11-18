@@ -62,7 +62,7 @@ Raindrop UI 对齐证据位于：
 
 - `src/worker.mjs`：Cloudflare 生产主入口。
 - `src/routes/`：Express 兼容路由与业务拆分版本。
-- `src/services/`：同步、AI、鉴权、任务、对象存储和内容提取服务。
+- `src/services/`：同步、AI、书签检索/语义索引、鉴权、任务、对象存储和内容提取服务；`bookmarkSearch.js` 提供产品路由共享的 URL/文本/目录 helpers 与租户作用域语义索引维护。
 - `src/repositories/`：数据访问抽象。
 - `src/infra/`：队列、日志和指标。
 - `migrations/`：D1 schema migration。
