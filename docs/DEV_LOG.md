@@ -1171,3 +1171,5 @@
 - **BK-AUD-201 增量解耦（P2）**：将 AI 抽屉状态、DOM 渲染、问答、历史和事件绑定移入 `public/js/app/aiDrawer.mjs`，主入口 `public/app.mjs` 从 9,748 行/383.6KiB 降至 9,552 行/374.9KiB；静态 UI 门禁调整为检查新的功能模块边界。Node 产品路由的 AI entitlement/feature/privacy policy/eval/feedback 逻辑和 handlers 分别移入 `src/services/aiGovernance.js`、`src/services/textTokens.js`、`src/routes/productAiGovernanceRoutes.js`；Worker Chrome sync helpers 移入 `src/worker/chromeSync.mjs`。`productRoutes.js` 从 4,709 行降至 4,246 行，`worker.mjs` 从 7,432 行降至 7,316 行。治理 5 项和 Worker helper 3 项测试通过；`npm test` 32/32、`npm run ui:check` 通过；AI drawer 拆分后 `npm run ui:browser` 101 状态/8 项 E2E/16 扩展状态全部通过，截图报告写入 `/tmp/rainbow-ui-audit-ai-drawer`。风险：Worker 剩余路由和 app 其他渲染入口仍待拆分；回退可 revert P2 模块提交，无数据/schema 变化。
 
 - **审计文档状态校准**：将首轮清单中 P0-001/002/003 的“待验证/需复测”改为本轮实际修复证据与回归结果；修正 `docs/TODO.md` 阶段标题；明确本轮自动化验证不等同第三方渗透测试，保留 BK-AUD-201、Safari 原生宿主和远端网络边界。验证：`npm run docs:check` 与 `git diff --check` 通过。
+
+- **CI 运行时告警收敛**：GitHub hosted checks 提示旧 Action 将被强制迁移到 Node 24。根据上游发布说明，将 checkout/setup-node/setup-chrome/upload-artifact 更新到 v5/v5/v2/v6，Docker workflow 同步更新 checkout；未改变 PR 构建不登录、不推送镜像的条件。等待本提交的 GitHub Actions 验证其兼容性。
