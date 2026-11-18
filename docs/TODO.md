@@ -378,7 +378,7 @@
 - [x] **P1** `BK-AUD-105` 键盘、触控与无障碍
 - [x] **P1** `BK-AUD-106` CSS legacy 样式治理
 - [x] **P1** `BK-AUD-107` CSV 导入导出 round-trip 字段损坏及 HTML 导出转义不足（CSV 导入按逗号无视引号拆分，导致自带逗号/引号/换行的标题和备注被切坏；HTML 导出对标题、URL、标签转义不完整。本轮已实现 quote-aware CSV codec 和完整 HTML escaping，并新增 3 项 codec 回归；本机 codec 测试 3/3、全套 `npm test` 39/39、Worker smoke、浏览器回归和 Docker 健康检查通过；最终 hosted CI run `44300423004` 16/16 通过，Docker run `44300423001` 通过且无 warning annotations）
-- [ ] **P1** `BK-AUD-108` 搜索标签条件解析（“标签 AI”原正则先命中无捕获组的中文关键字，未设置标签过滤；解析逻辑已修复并抽取，新增 3 项回归；目标测试 3/3、全套本地门禁和 Docker 健康检查通过；等待 hosted CI 验收）
+- [x] **P1** `BK-AUD-108` 搜索标签条件解析（“标签 AI”原正则先命中无捕获组的中文关键字，未设置标签过滤；解析逻辑已修复并抽取，新增 3 项回归；目标测试 3/3、全套本地门禁和 Docker 健康检查通过；hosted CI run `44302676562`（16/16）和 Docker PR build run `44302676439` 通过）
 - [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护（本轮将产品路由共享检索/语义索引及 Worker 导入导出 codecs 分别抽到 `src/services/bookmarkSearch.js`、`src/worker/bookmarkTransfer.mjs`、`src/worker/bookmarkIntelligence.mjs`；Worker 搜索条件中文标签解析新增修复及 3 项回归，`productRoutes.js` 降至 4,052 行，Worker 主入口净降至 6,925 行；新增 4 项语义索引和 3 项智能搜索回归，当前 `npm test` 42/42、UI 浏览器 101/8/16 通过。`src/worker.mjs` 路由、`public/app.mjs` 其余渲染域和产品路由 handlers 仍需拆分，故保持未完成）
 - [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理

@@ -1186,5 +1186,5 @@
 - 待办：继续拆分 `src/worker.mjs`，修复搜索标签条件无法正确解析的问题。
 - 根因：Worker 的智能书签文本/推荐函数都位于主入口；`parseSearchToFilters` 的 `/标签|tag.../` alternation 先匹配“标签”，其匹配结果没有标签值捕获组。
 - 修改：新增 `src/worker/bookmarkIntelligence.mjs` 并迁出摘要、关键词、标签、目录、重复项、相似度、问答及搜索条件纯函数；修正中英文标签条件分组；新增 `tests/bookmark-intelligence.test.js` 覆盖搜索解析和推荐逻辑。
-- 验证：目标测试 `node --test tests/bookmark-intelligence.test.js`（3/3）；`npm run cf:check`；全套 `npm test` 42/42、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 扩展截图）及 Docker 镜像健康检查通过；hosted CI 待提交后运行。`npm audit --audit-level=low` 因 npm registry audit endpoint 返回 HTTP 400 未完成；本轮 `npm ci` 输出 0 vulnerabilities。
-- 风险：无接口、schema 或数据格式变化；`BK-AUD-201` 仍未完成，回退可单独 revert 本次 P2 拆分修复提交。
+- 验证：目标测试 `node --test tests/bookmark-intelligence.test.js`（3/3）；`npm run cf:check`；全套 `npm test` 42/42、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101 张/8 项 E2E/16 扩展截图）及 Docker 镜像健康检查通过；hosted CI run `44302676562` 全部 16 步成功，Docker PR build run `44302676439` 成功且无 warning annotations。`npm audit --audit-level=low` 因 npm registry audit endpoint 返回 HTTP 400 未完成；本轮 `npm ci` 输出 0 vulnerabilities。
+- 风险：无接口、schema 或数据格式变化；`BK-AUD-201` 仍未完成，回退可单独 revert 本次标签解析/Worker 拆分提交。
