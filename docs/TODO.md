@@ -378,6 +378,6 @@
 - [x] **P1** `BK-AUD-105` 键盘、触控与无障碍
 - [x] **P1** `BK-AUD-106` CSS legacy 样式治理
 - [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护
-- [ ] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机浏览器矩阵通过；首次 GitHub Actions 因 runner 禁止 Chrome user namespaces 失败，已为 CI headless Chrome 增加专用 `--no-sandbox` 参数，等待重新运行通过）
+- [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复，CI run `44289283424` 成功）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理
 - [x] **P2** `BK-AUD-204` 设计系统细节收口

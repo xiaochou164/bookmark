@@ -1,6 +1,6 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：P0/P1 和 P2-203/204 已在隔离本地环境完成实现及验收；P2-201 的大入口逐域拆分尚未完成。P2-202 本机浏览器矩阵通过；首次 GitHub Actions 因 runner 的 user namespace/AppArmor 限制无法启动 Chrome，已加 CI 专用启动参数，托管复验待完成。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
+> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。GitHub Actions run `44289283424` 全部通过；首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
@@ -19,7 +19,7 @@
 
 ## P2：工程质量、性能与交付
 - [ ] **BK-AUD-201 / P2 / 大模块解耦（结构性问题仍存在）**：`public/app.mjs`、`src/worker.mjs`、`src/routes/productRoutes.js` 仍是大型集中入口。本轮仅把 AI drawer history 存取抽到 `public/js/app/aiDrawerHistory.mjs` 并以单测保护；认证、侧栏、搜索、书签、详情、任务已有模块边界。其余渲染/路由尚未迁移，需逐域拆分并建立 Node/Worker 契约测试，因此本项保持未完成。
-- [ ] **BK-AUD-202 / P2 / 测试门禁和性能（托管复验中）**：CI 加入 Chrome headless UI/E2E/扩展回归、Cloudflare 语法门禁、Docker 构建启动和截图 artifact；浏览器脚本采集 FCP/LCP/CLS、INP observer、heap、长任务、布局/脚本耗时，并运行低速网、CPU 限速和大样本检查。首次托管运行显示 runner 的 user namespace/AppArmor 限制导致 Chrome `No usable sandbox`；`scripts/ui-browser-audit.mjs` 现仅在 `CI` 环境传入 `--no-sandbox`，本机保持默认沙箱，等待托管复验。INP 若未捕获用户交互则不作为性能结论。
+- [x] **BK-AUD-202 / P2 / 测试门禁和性能（托管验收通过）**：CI 加入 Chrome headless UI/E2E/扩展回归、Cloudflare 语法门禁、Docker 构建启动和截图 artifact；浏览器脚本采集 FCP/LCP/CLS、INP observer、heap、长任务、布局/脚本耗时，并运行低速网、CPU 限速和大样本检查。首次托管运行显示 runner 的 user namespace/AppArmor 限制导致 Chrome `No usable sandbox`；`scripts/ui-browser-audit.mjs` 现仅在 `CI` 环境传入 `--no-sandbox`，本机保持默认沙箱。GitHub Actions CI run `44289283424` 的全部步骤通过，Docker build run `44289283256` 通过且未推送镜像。INP 若未捕获用户交互则不作为性能结论。
 - [x] **BK-AUD-203 / P2 / 文档与实现漂移**：修正 OpenAPI 对 `/api/chrome-sync` preview 的写入描述与 schema，说明 `preview: true` 零持久化写入；更新架构、扩展同步、UI 审计和 UI 测试清单，区分本轮证据与历史状态，并补充隔离测试、部署边界和外部限制。
 - [x] **BK-AUD-204 / P2 / 设计系统视觉收口（浏览器矩阵验证）**：修正深色卡片/分页 surface、设置状态色、扩展状态反馈及窄窗宽度；核验控件、焦点、触屏目标和响应式动作区。具体截图、视口和 axe 结果列在 P1 执行记录。
 
@@ -57,7 +57,7 @@
 ### P2 增量与最终验证（2026-11-18）
 
 - **BK-AUD-201**：新增 `public/js/app/aiDrawerHistory.mjs`，隔离 AI 抽屉历史的 localStorage 存取和 12 条上限；`tests/app-modules.test.js` 覆盖错误 JSON、非数组、存储异常和截断。它只构成一次增量拆分，主入口仍然过大，保持未完成。
-- **BK-AUD-202**：`.github/workflows/ci.yml` 加入 Chrome 浏览器矩阵、8 项 E2E、扩展 fixture、Docker 健康检查与报告 artifact；首次 GitHub Actions 在 Chrome 启动阶段受 runner user namespaces/AppArmor 限制失败，后在脚本中加入 CI 专用 `--no-sandbox`，本机 `npm run ui:browser` 全套再次通过，托管复验待新提交触发。
+- **BK-AUD-202**：`.github/workflows/ci.yml` 加入 Chrome 浏览器矩阵、8 项 E2E、扩展 fixture、Docker 健康检查与报告 artifact；首次 GitHub Actions 在 Chrome 启动阶段受 runner user namespaces/AppArmor 限制失败，后在脚本中加入 CI 专用 `--no-sandbox`。本机 `npm run ui:browser` 全套通过，随后托管 CI run `44289283424` 的所有 16 步（含浏览器矩阵、扩展检查、Docker 启动与运维演练）通过；Docker PR workflow run `44289283256` 构建成功，登录和推送按 PR 条件跳过。
 - **BK-AUD-203**：同步修正文档和 OpenAPI preview 契约；`npm run docs:check` 通过。未运行远程 Worker/扩展 smoke，避免连接生产服务或真实账号数据。
 - **BK-AUD-204**：与 P1 一起用四档截图、暗色/Reduced Motion、局部溢出、axe 和键盘场景回归；详细机器报告见 `docs/screenshots/audit-2026-11-16/after/`。
 - **完整本地验证**：`npm ci`（0 vulnerabilities）；`npm audit --audit-level=low`（0 vulnerabilities）；`npm test`（24/24）；`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 和最终 `npm run ui:browser` 均通过；Docker 镜像构建、容器启动及 `/api/health` 通过。
