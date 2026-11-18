@@ -1,6 +1,6 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `4cf6124` 的 GitHub Actions run `44306759467`（16 步）和 Docker build run `44306758987` 均通过；此前标签解析及 Worker presentation 增量的 CI/Docker 验收亦通过。Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
+> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `67fa297` 的 GitHub Actions run `44308568325`（16 步）和 Docker build run `44308568271` 均通过；此前 Worker public-share 增量的 CI/Docker 验收亦通过。Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
@@ -77,4 +77,4 @@
 
 - **BK-AUD-201 Worker public share markup 拆分（2026-11-18）**：将公开集合 HTML template 移至 `src/worker/publicShareHtml.mjs`，Worker 主入口由 6,809 行降至 6,710 行；`tests/public-share-html.test.js` 验证用户标题/说明/书签/AI 文本 escaping，`javascript:` 链接与封面被拒绝为可执行 href/src。模块移动后 `ui:check` 原先按 Worker 内联模板位置的静态断言失败，已将 `scripts/ui-static-audit.mjs` 调整为验证新模块含 CSP-safe 外部 `public-share.mjs`，复跑通过。目标 XSS 测试 1/1；全套 `npm test` 45/45、docs/UI checks、Worker syntax/smoke、扩展检查、UI browser 101/8/16、Docker build/start/health 通过；GitHub Actions run `44306759467` 全部 16 步通过，Docker PR build run `44306758987` 通过且无 warning annotations。无接口/schema/persistence 变化，BK-AUD-201 仍未完成。
 
-- **BK-AUD-201 Node entitlement/subscription routes 拆分（2026-11-18）**：将 `src/routes/productRoutes.js` 的 entitlement、subscription read/write 和 quota handlers 移入 `src/routes/productSubscriptionRoutes.js`，通过注入 dbRepo、用户身份、quota summary 与 entitlement mutations 保持路由模块独立。`tests/product-subscription-routes.test.js` 验证 handler 注册、Alice 订阅写入及 Bob entitlement/subscription/quota 隔离。产品路由入口从 4,052 行降至 3,993 行。目标路由测试 1/1、全套 `npm test` 46/46、docs/UI/CF/扩展门禁、Worker smoke、浏览器 101/8/16 和 Docker healthy 通过；hosted CI 待提交后运行。无 API/schema 变化；BK-AUD-201 保持未完成。
+- **BK-AUD-201 Node entitlement/subscription routes 拆分（2026-11-18）**：将 `src/routes/productRoutes.js` 的 entitlement、subscription read/write 和 quota handlers 移入 `src/routes/productSubscriptionRoutes.js`，通过注入 dbRepo、用户身份、quota summary 与 entitlement mutations 保持路由模块独立。`tests/product-subscription-routes.test.js` 验证 handler 注册、Alice 订阅写入及 Bob entitlement/subscription/quota 隔离。产品路由入口从 4,052 行降至 3,993 行。目标路由测试 1/1、全套 `npm test` 46/46、docs/UI/CF/扩展门禁、Worker smoke、浏览器 101/8/16 和 Docker healthy 通过；GitHub Actions run `44308568325` 全部 16 步通过，Docker PR build run `44308568271` 通过且无 warning annotations。无 API/schema 变化；BK-AUD-201 保持未完成。
