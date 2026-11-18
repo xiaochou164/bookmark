@@ -1172,4 +1172,4 @@
 
 - **审计文档状态校准**：将首轮清单中 P0-001/002/003 的“待验证/需复测”改为本轮实际修复证据与回归结果；修正 `docs/TODO.md` 阶段标题；明确本轮自动化验证不等同第三方渗透测试，保留 BK-AUD-201、Safari 原生宿主和远端网络边界。验证：`npm run docs:check` 与 `git diff --check` 通过。
 
-- **CI 运行时告警收敛**：GitHub hosted checks 提示旧 Action 将被强制迁移到 Node 24。根据上游发布说明，将 checkout/setup-node/setup-chrome/upload-artifact 更新到 v5/v5/v2/v6，并将 Docker actions QEMU/Buildx/metadata/build-push 更新到 v4/v4/v6/v7；未改变 PR 构建不登录、不推送镜像的条件。首次 Node24 验证显示应用 CI 已到 Docker 构建步骤，Docker workflow 构建成功但仍提示旧 Docker Action 运行时；最终标签升级后的 hosted 验证待完成。
+- **CI 运行时与 Runner 告警收敛**：GitHub hosted checks 提示旧 Action 将被强制迁移到 Node 24，且 `ubuntu-latest` 即将切换到 Ubuntu 26。根据上游发布说明，将 checkout/setup-node/setup-chrome/upload-artifact 更新到 v5/v5/v2/v6，将 Docker actions QEMU/Buildx/metadata/build-push 更新到 v4/v4/v6/v7，并将两个 workflow 固定在 Ubuntu 24.04，避免 runner 镜像无意迁移；未改变 PR 构建不登录、不推送镜像的条件。Node24 Docker action 版本已完成构建验证；最终 pinned-runner CI 验证待完成。
