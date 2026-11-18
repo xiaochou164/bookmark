@@ -16,7 +16,7 @@
 | 浏览器扩展 | `chrome-extension/` | Chrome 书签树与 Rainbow 云书签双向同步 |
 | Safari 产物 | `safari-extension/` | 由 Chrome 扩展源文件生成的 Safari Web Extension 源目录 |
 
-生产地址为 `https://bookmark.sundays.ink`，Worker 备用地址由 Wrangler 部署结果给出。
+生产 Worker 地址及配置由发布环境维护。本地审计只用隔离数据验证 Node/Docker 与 Wrangler local，不把生产地址作为测试目标。
 
 ## 2. 关键数据流
 
@@ -94,7 +94,7 @@ Worker 与 Express 路径需要保持接口契约一致；新增接口时至少�
 
 ## 7. 发布流程
 
-推荐顺序：
+推荐顺序（以下部署命令须由维护者确认目标环境后单独执行；本地审计回归不包含部署）：
 
 ```bash
 npm test

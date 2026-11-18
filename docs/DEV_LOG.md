@@ -1157,3 +1157,11 @@
 - P0 追加：Worker 备份恢复外来 ID/任意 R2 key、IO 重投、JSON 半写文件、AI egress、Worker CSP 一并修复。真实 SQLite restore attack 与 Node 并发读取加入回归，测试扩为 22 项。无数据库结构迁移。
 
 - P0 最终复验：`npm test` 22/22、`cf:check`、`cf:smoke`、`extension:check`、`docs:check`、`ui:check` 通过；`npm audit --audit-level=low` 0。`docker build -t rainbow-audit:p0 .` 成功，另启临时容器核验最终构建。P0 完成仅覆盖本轮可验证边界，外部宿主限制保持记录。
+
+## 2026-11-18 — BK-AUD P1/P2 前端回归与文档收口
+
+- 待办：`BK-AUD-101`–`106`、`BK-AUD-202`–`204`；`BK-AUD-201` 增量拆分
+- 内容：修复工作台溢出、详情模式/键盘焦点、CSP 登录提交、drawer 焦点限制、扩展 Popup 状态反馈和 legacy 样式覆盖；增加 Chrome headless UI/E2E/扩展回归与性能采样。AI drawer history 存取抽到独立模块并由两项单测保护。纠正 OpenAPI 中 preview 的旧描述，并区分本轮结果与历史 UI checklist 记录。
+- 变更文件：`.github/workflows/ci.yml`、`public/app.mjs`、`public/js/app/aiDrawerHistory.mjs`、`public/css/`、`public/index.html`、`chrome-extension/`、`safari-extension/`、`scripts/`、`tests/app-modules.test.js`、`docs/`
+- 验证：`npm ci`（0 vulnerabilities）；`npm test`（24/24）；`npm run docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`；Docker 镜像和隔离健康检查通过。
+- 遗留：`BK-AUD-201` 其余大入口拆分未完成；托管 GitHub Actions、Safari 原生宿主和远程 Cloudflare 未运行。无生产部署、真实数据访问或 PR 合并。

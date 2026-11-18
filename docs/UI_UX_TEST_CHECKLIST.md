@@ -4,7 +4,7 @@
 关联修改清单：`docs/UI_UX_AUDIT_TODO.md`  
 功能回归基线：`docs/FRONTEND_REGRESSION_CHECKLIST.md`
 
-本轮执行记录（2026-07-05）：
+历史执行记录（2026-07-05；不代表当前轮次）：
 
 - `npm run cf:check` 通过。
 - `npm run cf:smoke` 通过，覆盖 Worker 主路径、AI 治理、公开集合 AI 导览、任务与协作流程。
@@ -13,6 +13,8 @@
 - Raindrop 登录态参照截图与 DOM 度量已归档到 `docs/screenshots/raindrop-reference/`，用于核对 300px 侧栏、80px 列表行和设置页应用壳结构。
 - `npm test` 通过，覆盖队列、对象存储、指标、日志脱敏和 HTTP 安全中间件。
 - `npm run extension:check` 通过；`npm run extension:smoke:remote -- https://bookmark.sundays.ink` 验证 Token、设备注册、双向差异和设备状态，同时确认 `previewMutatedServer=true` 的已知限制。
+
+本轮（2026-11-18）执行结果以 `docs/CODE_AUDIT_2026-11-16.md` 和 `docs/screenshots/audit-2026-11-16/after/` 为准。本地 fixture 覆盖四档响应式、暗色、键盘、axe、扩展 Popup/Options 和大样本；本轮未连接真实远端服务。上面的 `previewMutatedServer=true` 记录属于旧实现，当前 preview 零写由 Node/Worker/Chrome/Safari 本地回归覆盖。
 
 ## 1. 使用规则
 

@@ -22,6 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set up Chrome for browser regression
+        id: chrome
+        uses: browser-actions/setup-chrome@v1
+
       - name: Syntax check
         run: |
           node --check src/server.js
@@ -41,8 +45,38 @@ jobs:
       - name: Cloudflare Worker smoke
         run: npm run cf:smoke
 
+      - name: Cloudflare Worker syntax check
+        run: npm run cf:check
+
       - name: UI quality gates
         run: npm run ui:check
+
+      - name: Browser matrix, accessibility, keyboard and end-to-end regression
+        env:
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+        run: npm run ui:browser
+
+      - name: Extension syntax and Safari parity
+        run: npm run extension:check
+
+      - name: Build and smoke test production Docker image
+        run: |
+          docker build -t rainbow-audit:ci .
+          docker run -d --name rainbow-audit-ci -p 13789:3789 rainbow-audit:ci
+          trap 'docker logs rainbow-audit-ci; docker rm -f rainbow-audit-ci' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:13789/api/health; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Upload browser screenshots and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-audit-${{ github.run_id }}
+          path: docs/screenshots/audit-2026-11-16/after/
+          if-no-files-found: warn
 
       - name: Operations drill
         run: npm run ops:drill

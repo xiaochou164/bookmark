@@ -1,6 +1,6 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：静态审计已完成首轮；未在本次连接环境中运行依赖安装、动态浏览器交互、CI 或线上部署。以下「已证实」表示源码/历史测试报告中存在相应证据，并不等于已在 2026-11-16 的运行环境复现。所有未完成条目均须由 Codex 实测、修复并验收。历史 `[x]` 只表示既往收口，不作为本次验收证据。
+> 状态：P0/P1 和 P2-202/203/204 已在隔离本地环境完成实现及验收；P2-201 的大入口逐域拆分尚未完成。CI 配置已有本地等价验证，GitHub 托管 Actions 结果待 PR 创建后补录。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
@@ -10,18 +10,18 @@
 - [x] **BK-AUD-003 / P0 / 认证、数据隔离与输入安全专项（待验证）**：审阅 `src/routes/*`、`src/worker.mjs`、`src/http/middleware.js`、`src/services/*`，覆盖权限越权/跨租户、session/token、CSRF、SSRF（元数据抓取）、URL scheme、HTML 插值、同步删除、公开分享令牌、日志泄密；对每个发现提供具体路径/行号/攻击条件和回归测试；没有证据的风险不得称为漏洞。
 
 ## P1：前端布局与操作体验
-- [ ] **BK-AUD-101 / P1 / 列表操作区局部溢出（历史报告已证实）**：`docs/screenshots/ui-visual-baseline/audit-report.json` 的 1280px 报告记录 `.bookmark-row-side` 108px scrollWidth 对 104px clientWidth。定位当前生效 CSS（包括 legacy 层）与 DOM，修复而非隐藏溢出；覆盖 hover、focus、选中、详情打开和 360/640/920/1280px；以新的运行截图和尺寸断言收口。
-- [ ] **BK-AUD-102 / P1 / 详情栏与编辑态局部溢出（历史报告已证实）**：历史报告记录 `.detail-panel-mode-switch` 在 360/640px 为 101/96px、`#detailForm` 在桌面为 366/354px。检查容器 min-width、网格/flex、按钮文案、输入框与 Resize Handle，处理最小宽度、换行和滚动，不依赖全局 overflow-x:hidden；补浏览器断言。
-- [ ] **BK-AUD-103 / P1 / 信息架构、主次操作与响应式（待动态验证）**：按主列表/卡片/标题/看板、搜索建议、批量模式、侧栏树、详情只读/编辑、AI 抽屉逐状态走查。减少冗余入口和非必要工具占位，保证搜索及「添加」在窄屏可用、触屏不依赖 hover、抽屉/弹层不遮挡主要操作。对 360/640/920/1280px 各保留前后截图和行为描述；不破坏已有 Raindrop 对齐尺寸。
-- [ ] **BK-AUD-104 / P1 / 设置、插件与公开分享页（待动态验证）**：审查设置导航真实性、状态/错误/保存反馈、危险操作确认、插件连接/同步状态、公开长列表的搜索/空态/图片失败降级；避免无数据伪成功、过长表单、横向溢出。登录注册覆盖错误字段关联、键盘 Tab 切换与移动端首屏表单。
-- [ ] **BK-AUD-105 / P1 / 无障碍与键盘闭环（待动态验证）**：审计所有 menu/dialog/drawer/combobox、列表多选及扩展 Popup。验证 accessible name、aria-expanded/selected/invalid、焦点陷阱和关闭后的焦点恢复、Escape/方向键、触控目标、200% 缩放和 prefers-reduced-motion。使用 axe 或等价检查 + 实际键盘脚本；零严重/关键问题。
-- [ ] **BK-AUD-106 / P1 / 样式覆盖治理（结构性风险已证实）**：`public/styles.css` 同时加载 `legacy.css`、`legacy-workbench-overrides.css`、`legacy-safety.css` 及新 CSS；历史审计宣称新规则不应回流 legacy。逐组件建立最终样式归属，减少重复选择器和 !important；先写视觉回归再迁移，不允许批量删除造成 UI 回退。
+- [x] **BK-AUD-101 / P1 / 列表操作区局部溢出（已复现并修复）**：行内动作容器受 legacy `translateX(4px)` 推出 104px 布局；稳定层明确 reset transform，并使用最大内容宽度的图标动作组。看板选择 label 曾只有 44px 宽却包含 72px 内容，根因是全局输入框 padding/宽度套用到复选框，现复选框为 18px、标签点击高度 44px。101 张前后矩阵截图；终态全局与局部溢出均为 0。
+- [x] **BK-AUD-102 / P1 / 详情栏与编辑态局部溢出（已复现并修复）**：详情底部 sticky 动作栏负边距超出表单，详情模式按钮最小宽度撑出 360/640px。修复负边距、采用两列可收缩模式按钮与 `minmax(0,1fr)` 表单网格。浏览器四档检查与 axe 均通过。方向键切换后重绘会替换原 tab DOM，现按新节点 ID 恢复焦点。
+- [x] **BK-AUD-103 / P1 / 信息架构、主次操作与响应式（已动态验证）**：批量动作条原来将 360/640/1280px 页面撑到 1070/1070/1488px；现改为可换行第二行，保留完整操作。四布局、搜索建议/空结果、批量、菜单、通知、侧栏抽屉、详情编辑和 AI 抽屉在 360/640/920/1280px 验证，101 张前后截图；99 书签、153 集合、104 标签虚拟化回归通过。
+- [x] **BK-AUD-104 / P1 / 设置、插件与公开分享页（已动态验证）**：修复登录表单行内 `onsubmit` 违反 CSP、登录基线因复用会话误跳工作台、扩展 Popup 假报“已连接”以及其 360px 横向溢出。扩展缺少同步记录时显示“尚未验证”；预览/成功/失败状态使用真实消息反馈。设置/插件/公开/登录与注册四档截图及 Chrome/Safari Popup/Options 16 张截图通过。Safari 原生扩展宿主未可用真实浏览器载入，代码由生成一致性+VM 测试+浏览器 fixture 验证。
+- [x] **BK-AUD-105 / P1 / 无障碍与键盘闭环（已动态验证）**：补列表选择 accessible name、对话框名称、详情 tab 语义和方向键 roving、菜单 role、抽屉 inert/焦点限制及关闭恢复；axe-core 对 101 个页面状态和 16 个扩展状态检查，无 serious/critical 违规。键盘覆盖添加菜单、搜索、Enter 打开书签、方向键切换详情 tab、Dialog 与 AI 抽屉关闭/焦点恢复。640px CSS 视口作为 200% 桌面缩放的等效重排宽度验证；未控制操作系统浏览器缩放比例。Reduced motion 已验证。
+- [x] **BK-AUD-106 / P1 / 样式覆盖治理（已迁移并回归）**：以四档浏览器截图和计算样式为护栏，从三个 legacy 子表中删除已被稳定层同选择器/属性覆盖的声明（workbench 54、legacy 294、safety 约 60 处声明），保留实际生效兼容规则；重复选择器计数降至 14，CSS 总量从 192KiB 参考值降到 176.2KiB。对比图保留在本轮 before/after 目录，四档溢出与 axe 门禁全过。
 
 ## P2：工程质量、性能与交付
-- [ ] **BK-AUD-201 / P2 / 大模块解耦（已证实结构集中）**：`public/app.mjs` 约 9700 行，`src/worker.mjs` 约 7400 行，`src/routes/productRoutes.js` 约 4700 行；按书签列表/搜索/详情/侧栏/任务及 API 领域切分明确职责。先建立单元/集成测试与边界契约，再逐块迁移，避免一次性重写。
-- [ ] **BK-AUD-202 / P2 / 测试门禁和性能（已证实覆盖缺口）**：CI 有 `npm test`、smoke、`ui:check`，但未直接运行已有 `npm run ui:browser`；`scripts/ui-performance-budget.mjs` 只做静态字节大小/节点数预算，不等于真实加载性能。加入可重复的 Playwright/Chrome headless CI、关键交互回归、真实 LCP/INP/CLS 或相应实验室性能采样；大集合、大书签、慢网速和 200% zoom 必测。
-- [ ] **BK-AUD-203 / P2 / 文档与实现漂移（已证实）**：更新 `docs/CHROME_EXTENSION_SYNC.md`、`docs/TODO.md`、`docs/UI_UX_AUDIT_TODO.md` 中的过期「全部完成」描述和真实实现不一致处；补充 Node/Worker/扩展三条运行链的架构边界、操作说明以及部署/回退步骤。
-- [ ] **BK-AUD-204 / P2 / 设计系统视觉收口（待动态验证）**：统一控件高度、字体层级、间距、状态色、Toast、空态、骨架屏、菜单宽度、图标语义以及深浅主题；以可发现性、可读性、一致性为目标，不追求额外装饰。
+- [ ] **BK-AUD-201 / P2 / 大模块解耦（结构性问题仍存在）**：`public/app.mjs`、`src/worker.mjs`、`src/routes/productRoutes.js` 仍是大型集中入口。本轮仅把 AI drawer history 存取抽到 `public/js/app/aiDrawerHistory.mjs` 并以单测保护；认证、侧栏、搜索、书签、详情、任务已有模块边界。其余渲染/路由尚未迁移，需逐域拆分并建立 Node/Worker 契约测试，因此本项保持未完成。
+- [x] **BK-AUD-202 / P2 / 测试门禁和性能（本地实验室验证完成）**：CI 加入 Chrome headless UI/E2E/扩展回归、Cloudflare 语法门禁、Docker 构建启动和截图 artifact；浏览器脚本采集 FCP/LCP/CLS、INP observer、heap、长任务、布局/脚本耗时，并运行低速网、CPU 限速和大样本检查。托管 GitHub Actions 尚待 PR 触发；INP 若未捕获用户交互则不作为性能结论。
+- [x] **BK-AUD-203 / P2 / 文档与实现漂移**：修正 OpenAPI 对 `/api/chrome-sync` preview 的写入描述与 schema，说明 `preview: true` 零持久化写入；更新架构、扩展同步、UI 审计和 UI 测试清单，区分本轮证据与历史状态，并补充隔离测试、部署边界和外部限制。
+- [x] **BK-AUD-204 / P2 / 设计系统视觉收口（浏览器矩阵验证）**：修正深色卡片/分页 surface、设置状态色、扩展状态反馈及窄窗宽度；核验控件、焦点、触屏目标和响应式动作区。具体截图、视口和 axe 结果列在 P1 执行记录。
 
 ## 验收与执行约束
 1. 每项填写：问题证据（路径+行号/截图）、根因、变更文件、验证命令与结果、风险、回退方式；无法复现的标为「复核无异常」，不编造缺陷。
@@ -42,5 +42,25 @@
 
 回退：按阶段 revert 提交；无 schema 变更。预览客户端必须与服务器一起升级，旧服务端不识别 dry-run。
 风险：Cloudflare 的 outbound DNS/网络策略无法由本地 SQLite adapter 模拟；Safari 原生权限、签名与上架仍需 macOS Safari 扩展宿主验收。
+
+### P1 修复与验收（2026-11-18）
+
+- **工作台/样式**：`.bookmark-row-actions` 的 legacy transform、看板 checkbox 全局输入样式、批量工具栏宽度、详情 footer 负边距/网格最小尺寸均已按真实 DOM 根因修复。修改 `public/css/components.css`、`responsive.css`、`settings.css`、`tokens.css`、三个 legacy 子文件与 `public/index.html`。
+- **语义/焦点**：登录 inline handler 改为模块 submit 监听；详情 tabs 使用 `aria-selected` 和 roving tabindex；模式重绘后聚焦替换节点；菜单 role、选择框名称、dialog 名称、移动抽屉 inert/焦点陷阱与返回焦点补齐。修改 `public/app.mjs`、`public/index.html`。
+- **扩展反馈**：Chrome/Safari Popup 在无同步记录时显示未验证状态；状态详情可聚焦、窄窗口自适配且主色文本达到对比要求。修改源 Chrome 并运行 Safari 生成器同步。
+- **浏览器证据**：`npm run ui:browser` 通过：工作台 101 状态截图，严重/关键 axe 违规 0、局部/页面溢出 0、浏览器异常 0、HTTP 错误 0；keyboard menu/search/tabs/dialog/drawer 通过。E2E 8 项通过。扩展 Chrome/Safari Popup/Options 16 张状态截图，溢出与严重/关键 axe 违规 0。报告：`docs/screenshots/audit-2026-11-16/after/audit-report.json`、`ui-e2e-report.json`、`extensions/audit-report.json`。
+- **大数据/低性能**：真实浏览器 fixture 包含 99 本书签、153 集合、104 标签；集合和标签虚拟化、分页加载通过。640 CSS px（200% 桌面缩放等效布局宽度）无溢出且 89 个焦点目标可达；CPU 4×与 150ms/1.6Mbps 下导航计时 1393ms、CLS 0、JS heap 37.1MB、总任务 193ms、layout 12ms、script 4ms。该 headless 样本未捕获 FCP/LCP/INP（报告为 `null`），不是生产 SLA。
+- **可视比较**：`before/` 包含原 P0 基线截图；`after/` 包含修复后的四档 101 个主站状态和扩展 fixture。初始矩阵有 22 个布局溢出状态和 serious/critical axe 报告，终态为 0/0。对比样例：列表动作区稳定可达、窄屏批量工具栏换行、暗色卡片文字可读、扩展 Popup 360px 不横向滚动。
+- **静态门禁**：`npm run ui:check` 与 `npm run docs:check` 通过；app 383.5KiB/420KiB、CSS176.2KiB/192KiB、index DOM730/750、settings DOM556/560、legacy 重复选择器14。P1 阶段提交待最终全套 npm/Docker/CI 回归后创建。
+- **风险/边界**：200% 使用 640 CSS px 重排视口等效验证，未读取宿主操作系统 zoom；Safari 原生签名/权限未在 Safari 浏览器运行；性能数值受本机、缓存与 headless 实现影响，仅供同机复测比较。按 P2 补充 CI 截图 artifact 与宿主验证说明。
+
+### P2 增量与最终验证（2026-11-18）
+
+- **BK-AUD-201**：新增 `public/js/app/aiDrawerHistory.mjs`，隔离 AI 抽屉历史的 localStorage 存取和 12 条上限；`tests/app-modules.test.js` 覆盖错误 JSON、非数组、存储异常和截断。它只构成一次增量拆分，主入口仍然过大，保持未完成。
+- **BK-AUD-202**：`.github/workflows/ci.yml` 加入 Chrome 浏览器矩阵、8 项 E2E、扩展 fixture、Docker 健康检查与报告 artifact；`npm run ui:browser` 本地执行通过。GitHub 托管 Actions 尚无此 PR 的运行结果。
+- **BK-AUD-203**：同步修正文档和 OpenAPI preview 契约；`npm run docs:check` 通过。未运行远程 Worker/扩展 smoke，避免连接生产服务或真实账号数据。
+- **BK-AUD-204**：与 P1 一起用四档截图、暗色/Reduced Motion、局部溢出、axe 和键盘场景回归；详细机器报告见 `docs/screenshots/audit-2026-11-16/after/`。
+- **完整本地验证**：`npm ci`（0 vulnerabilities）；`npm audit --audit-level=low`（0 vulnerabilities）；`npm test`（24/24）；`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 和最终 `npm run ui:browser` 均通过；Docker 镜像构建、容器启动及 `/api/health` 通过。
+- **风险**：本轮性能样本未捕获 FCP/LCP/INP，只能报告导航、CLS、heap 和主线程耗时；200% 以 640 CSS px 重排宽度近似验证；Safari 原生安装/签名与 GitHub runner 未在本地验证。无生产部署、远程真实数据访问或合并。
 
 补充安全复核：Worker 上传备份的 `ON CONFLICT(id)` 原来可以覆盖其他用户记录，已加全量归属预检（在 replace 删除前）、SQL 所属用户条件、R2 源对象权限。真实 SQLite 队列回归证明失败快照不改变任一租户。IO 使用条件 UPDATE 原子领取以防重投；JSON 存储改为权限 0600 的临时文件原子 rename，并做并发读写回归。AI endpoint 禁止私网字面量与重定向，Node 通过 socket DNS 验证；正文限 2MiB。Worker 统一 CSP/安全头，预览 frame 过滤 scheme。22 项测试通过；本轮发现均有修复，云平台网络边界与 Safari 原生宿主列为外部验证限制。

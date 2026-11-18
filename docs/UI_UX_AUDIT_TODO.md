@@ -185,3 +185,9 @@
 - loading/empty/error/success 均有明确状态。
 - `npm run cf:check`、`npm run cf:smoke` 和远端 smoke 通过。
 - 若修改核心布局或组件，必须更新视觉回归基线和前端回归清单。
+
+## 2026-11-18 本轮复核补记
+
+本轮以 `docs/CODE_AUDIT_2026-11-16.md` 的 BK-AUD-101~106 验收记录和 `docs/screenshots/audit-2026-11-16/{before,after}/` 为准，不沿用本文件中早期全量 `[x]` 作为现状证据。已复现并修复：列表动作 transform 溢出、看板 checkbox 被通用 input 规则撑开、详情操作栏/模式开关窄屏溢出、批量栏宽度撑破、登录行内事件处理违反 CSP、详情 tab 重绘后焦点丢失、移动抽屉焦点逃逸、扩展 Popup 连接状态无记录却显示成功。四档视口、暗色、键盘、reduced-motion、axe 和大样本回归报告位于 after 目录。
+
+本轮仍未完成的大项：`BK-AUD-201` 前端/Worker/产品路由大入口拆分；Safari 原生打包/签名与 GitHub 托管 runner 验收需在各自宿主运行。远端生产 smoke 未执行。

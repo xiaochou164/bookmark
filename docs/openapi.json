@@ -104,6 +104,7 @@
           },
           "deviceId": { "type": "string" },
           "mirrorIndex": { "type": "object", "additionalProperties": true },
+          "preview": { "type": "boolean", "description": "Compute synchronization differences without persistent server or browser writes." },
           "deleteSync": { "type": "boolean" }
         },
         "required": ["folders"]
@@ -354,7 +355,7 @@
     "/api/chrome-sync": {
       "post": {
         "summary": "Merge a Chrome bookmark snapshot and return Chrome-side differences",
-        "description": "This endpoint currently mutates Rainbow state. It is not a dry-run endpoint.",
+        "description": "With preview=true, compute differences without persistent writes. Without preview, merge the snapshot and persist synchronization state.",
         "security": [{ "BearerAuth": [] }],
         "requestBody": {
           "required": true,
@@ -365,7 +366,7 @@
           }
         },
         "responses": {
-          "200": { "description": "Sync stats, toAddInChrome, toDeleteInChrome and mirrorIndex" },
+          "200": { "description": "Sync stats, toAddInChrome, toDeleteInChrome and mirrorIndex. Preview results are computed in memory and are not persisted." },
           "400": { "$ref": "#/components/responses/Error" }
         }
       }
