@@ -1273,4 +1273,5 @@
 - 根因/边界：`/api/product/ai/digest` 在 `src/routes/productRoutes.js` 内部同时负责套餐门禁、书签采样、统计、provider 调用、成功摘要与失败任务持久化，约 137 行逻辑混在主路由注册器。
 - 修改：抽取至 `src/routes/productDigestRoutes.js`，依赖通过注册参数注入；新增 `tests/product-digest-routes.test.js`，验证软删除和租户过滤、成功写入及保留 Bob 的既有数据，并验证 provider 失败仅记录 Alice 任务且错误继续传递。`productRoutes.js` 当前 3,444 行（本次净减 133 行）。
 - 验证：目标测试 2/2；`npm ci` 安装 166 个包且 0 vulnerabilities；`npm test` 53/53；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 均通过；`ui:browser` 通过（101 张页面状态、8 项 E2E、16 张扩展截图）；Docker build 成功，临时容器 `/api/health` 返回 `ok:true` 且 health status 为 `healthy`。hosted CI/Docker workflow 待提交后复验。
+- Hosted 验收：CI run `44320680576` 全部 16 步成功，Docker PR build run `44320680529` 成功。
 - 风险/回退：无 API/schema/数据格式变化；BK-AUD-201 仍未完成，可单独回滚本路由模块、注册改动和对应测试。
