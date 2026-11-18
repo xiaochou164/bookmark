@@ -1322,5 +1322,5 @@
 - 证据：`src/worker.mjs` 原先内联 `summarizeTaskHealth`、`summarizeRealtimeTasks` 和 `buildRealtimeSnapshot`，混合任务状态汇总、提醒筛选与 Worker 路由代码。
 - 根因：实时任务面板的纯汇总规则没有独立模块和直接回归测试。
 - 修改：抽取到 `src/worker/taskSummaries.mjs`；repo 持续按 `userId` 查询，默认插件 ID 维持 `raindropSync`，注入 `now` 供可重复测试；Worker 文件从 6,514 行降至 6,433 行。新增两项测试覆盖租户传参、任务/DLQ 状态、提醒完成/删除过滤与签名。
-- 验证：目标测试 2/2；`npm test` 63/63；`cf:check`、`cf:smoke`、`docs:check`、`ui:check`、`extension:check` 通过。Docker 镜像 build/start 成功，`/api/health` 返回 200；当前代码 hosted CI 待提交后确认。
+- 验证：目标测试 2/2；`npm test` 63/63；`cf:check`、`cf:smoke`、`docs:check`、`ui:check`、`extension:check` 通过。Docker 镜像 build/start 成功，`/api/health` 返回 200；GitHub CI run `44328101550`（16 步）与 Docker PR build run `44328102056` 均成功。
 - 风险：无 API、schema 或持久化变化；BK-AUD-201 保持未完成，可独立回滚 helper/import/test。

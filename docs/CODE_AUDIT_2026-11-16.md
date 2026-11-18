@@ -1,6 +1,6 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `67fa297` 的 GitHub Actions run `44308568325`（16 步）和 Docker build run `44308568271` 均通过；此前 Worker public-share 增量的 CI/Docker 验收亦通过。Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
+> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `50c25c5` 的 GitHub Actions run `44328101550`（16 步）和 Docker build run `44328102056` 均通过。Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
