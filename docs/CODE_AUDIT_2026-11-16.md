@@ -5,9 +5,9 @@
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
 ## P0：正确性与高风险
-- [x] **BK-AUD-001 / P0 / 部署入口一致性（已证实存在配置分歧）**：`Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，同时镜像按 production only 安装依赖而 Wrangler 位于 devDependencies；Docker 健康检查使用端口 3789。核实 Docker 实际目标应为 Node 服务还是 Worker，统一启动命令、依赖、端口、健康检查和 README；使用 `docker build`、容器启动、`/api/health` 验证，不可仅改文案。
-- [x] **BK-AUD-002 / P0 / 扩展同步预览的零写入契约（需复测）**：`docs/CHROME_EXTENSION_SYNC.md` 声称 PREVIEW 会写入服务端，而当前 `chrome-extension/background.js` 的云端预览入口实际改用 `/api/plugins/raindropSync/preview`，并仍有独立 `SYNC_WITH_RAINBOW` 代码路径。逐一验证 Chrome/Safari Popup、Options、消息分发和两个后端预览路径是否写云端/本地数据；预览必须不写、不删、不更新索引，修正文档及测试。若仅发现文档过期，更新文档并附测试证据，不要无故修改稳定逻辑。
-- [x] **BK-AUD-003 / P0 / 认证、数据隔离与输入安全专项（待验证）**：审阅 `src/routes/*`、`src/worker.mjs`、`src/http/middleware.js`、`src/services/*`，覆盖权限越权/跨租户、session/token、CSRF、SSRF（元数据抓取）、URL scheme、HTML 插值、同步删除、公开分享令牌、日志泄密；对每个发现提供具体路径/行号/攻击条件和回归测试；没有证据的风险不得称为漏洞。
+- [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
+- [x] **BK-AUD-002 / P0 / 扩展同步预览的零写入契约（已修复并做真实本地回归）**：原文档称 PREVIEW 会写入，且实际 Popup/Options 消息分发调用 `/api/chrome-sync` 时可触发写入。Chrome/Safari 现明确发送 preview；Node/Worker 使用只读内存 repo，认证时间、租户初始化、索引、deviceId、状态和日志均不落盘。VM 消息分发与隔离 SQLite/JSON HTTP 回归均比较持久化快照，Chrome/Safari preview 零写断言通过；扩展同步文档与 OpenAPI 已同步。
+- [x] **BK-AUD-003 / P0 / 认证、数据隔离与输入安全专项（本轮发现项已修复并回归）**：以 `src/routes/*`、`src/worker.mjs`、`src/http/middleware.js`、`src/services/*` 为审计范围，覆盖越权/跨租户、session/token、CSRF、SSRF、URL scheme、HTML sandbox、同步删除保护、备份恢复、队列重投、原子 JSON 写入及敏感日志。回归包括真实 SQLite Worker 和隔离 Node 服务；当前 `npm test` 32/32、`npm audit --audit-level=low` 0 漏洞。该结果不替代完整人工渗透测试；云平台 outbound 网络策略和 Safari 原生权限列为外部限制。
 
 ## P1：前端布局与操作体验
 - [x] **BK-AUD-101 / P1 / 列表操作区局部溢出（已复现并修复）**：行内动作容器受 legacy `translateX(4px)` 推出 104px 布局；稳定层明确 reset transform，并使用最大内容宽度的图标动作组。看板选择 label 曾只有 44px 宽却包含 72px 内容，根因是全局输入框 padding/宽度套用到复选框，现复选框为 18px、标签点击高度 44px。101 张前后矩阵截图；终态全局与局部溢出均为 0。
@@ -28,7 +28,7 @@
 2. 优先级顺序：P0 → P1 → P2；每个阶段单独 commit/PR，不改真实线上数据，不直接生产部署、不自动合并 PR。
 3. 必跑：`npm ci`、`npm test`、`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check`、`npm run ui:browser`（若环境不具备，记录原因及替代证据）；补充 Docker 构建和两种运行模式的健康检查。
 4. 浏览器矩阵：主工作台列表/卡片/详情查看与编辑/搜索建议/批量操作/菜单/通知/AI、登录、设置、插件、公开分享、Chrome/Safari Popup/Options；宽度 360/640/920/1280，至少桌面/移动分别验证键盘和触控操作。
-5. 本文是 2026-11-16 首轮静态审计清单。动态验证、依赖漏洞扫描、完整逐行安全评估及修复尚未完成；不得报告「全项目已通过」。
+5. 本文起于 2026-11-16 首轮静态审计；本轮已执行记录中的动态回归和依赖扫描。它不代表完整的第三方渗透测试或对每一行代码的形式化证明；报告时需同时列出未解决的 BK-AUD-201 和外部宿主限制，不得概括成「全项目已通过」。
 
 ## 本轮执行记录（持续更新）
 
