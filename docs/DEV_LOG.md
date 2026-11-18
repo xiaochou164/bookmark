@@ -1215,3 +1215,11 @@
 - 风险：无 API/schema 变化；其他产品路由和 Worker/app 入口仍待逐步迁移，BK-AUD-201 未关闭。
 
 - **BK-AUD-201 Subscription routes 托管验收**：`67fa297` 的 GitHub Actions run `44308568325` 16/16 步成功，Docker PR build run `44308568271` 成功且无 warning annotations。BK-AUD-201 仍保持未完成。
+
+## 2026-11-18 — BK-AUD-201 Node saved-search 路由拆分
+
+- 待办：继续缩小 `src/routes/productRoutes.js`，并确认用户只能访问自己的已保存搜索。
+- 根因/修改：saved-search CRUD 原先与其他产品 handlers 混在大型路由模块中；迁入 `src/routes/productSavedSearchRoutes.js`，依赖通过参数注入，保持既有请求和响应行为。新增 `tests/product-saved-search-routes.test.js` 覆盖创建、列表、更新、删除以及 Alice/Bob 隔离，Bob 无法读取 Alice 的条目，也无法更新或删除。
+- 影响：`productRoutes.js` 从 3,993 行降至 3,918 行；无 API/schema/持久化格式变化。
+- 验证：目标测试 1/1；`npm test` 47/47；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 报告 101 张截图、8 项 E2E、16 个扩展状态通过。Docker 镜像启动后健康状态为 healthy，临时映射端口访问 `/api/health` 返回 `200`；仅由浏览器脚本重生成的审阅截图已恢复。
+- 风险：其余产品路由、Worker 与前端大入口还需拆分，BK-AUD-201 仍未完成；本地验证完成，hosted CI/Docker checks 待推送后核验。
