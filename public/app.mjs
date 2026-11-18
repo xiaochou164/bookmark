@@ -4,6 +4,7 @@ import { api, queryString } from './js/api.mjs';
 import { createAppStore } from './js/stateStore.mjs';
 import { emptyStateHtml as uiEmptyStateHtml, statusBadgeHtml, taskProgressHtml, uiButtonHtml } from './js/uiComponents.mjs';
 import { focusableElementsWithin, handleMenuArrowNavigation, hasModalOpen } from './js/app/a11y.mjs';
+import { readAiDrawerHistory, writeAiDrawerHistory } from './js/app/aiDrawerHistory.mjs';
 import { currentAppPath, redirectToLoginPage } from './js/app/auth.mjs';
 import { inferItemKind, kindLabel } from './js/app/bookmarks.mjs';
 import { loadDetailSectionsUi, persistDetailSectionsUi } from './js/app/detail.mjs';
@@ -75,7 +76,6 @@ let aiQaDialogState = {
   scope: 'auto',
   limit: 6
 };
-const AI_DRAWER_HISTORY_STORAGE_KEY = 'rainbow.aiDrawerHistory';
 let aiSideDrawerState = {
   open: false,
   loading: false,
@@ -242,8 +242,7 @@ function normalizeBookmarkLayoutMode(value) {
 
 function loadAiDrawerHistory() {
   try {
-    const raw = JSON.parse(window.localStorage.getItem(AI_DRAWER_HISTORY_STORAGE_KEY) || '[]');
-    return Array.isArray(raw) ? raw.slice(0, 12) : [];
+    return readAiDrawerHistory(window.localStorage);
   } catch (_err) {
     return [];
   }
@@ -251,9 +250,9 @@ function loadAiDrawerHistory() {
 
 function persistAiDrawerHistory(history) {
   try {
-    window.localStorage.setItem(AI_DRAWER_HISTORY_STORAGE_KEY, JSON.stringify((Array.isArray(history) ? history : []).slice(0, 12)));
+    writeAiDrawerHistory(window.localStorage, history);
   } catch (_err) {
-    // ignore localStorage failures
+    // Storage can be unavailable in restricted browser contexts.
   }
 }
 
@@ -1149,6 +1148,7 @@ function renderHeaderMenuControls() {
   byId('headerSortMenu')?.querySelectorAll('[data-sort-option]').forEach((el) => {
     const active = String(el.dataset.sortOption || '') === String(state.filters.sort || '');
     el.classList.toggle('active', active);
+    el.setAttribute('role', 'menuitemradio');
     el.setAttribute('aria-checked', String(active));
   });
 
@@ -1157,6 +1157,7 @@ function renderHeaderMenuControls() {
   byId('headerViewMenu')?.querySelectorAll('[data-layout-option]').forEach((el) => {
     const active = String(el.dataset.layoutOption || '') === String(bookmarkLayoutMode || '');
     el.classList.toggle('active', active);
+    el.setAttribute('role', 'menuitemradio');
     el.setAttribute('aria-checked', String(active));
   });
   byId('headerViewColumnsBtn')?.classList.toggle('hidden', bookmarkLayoutMode !== 'list');
@@ -3715,7 +3716,7 @@ function cardHtml(item) {
     ${cover}
     <div class="card-top">
       <div class="card-top-row">
-        <label class="card-select"><input type="checkbox" data-select="${item.id}" ${selected}/> <span class="sr-only">选择</span></label>
+        <label class="card-select"><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/> <span class="sr-only">选择</span></label>
         <span>${bookmarkFlagsText(item)}</span>
       </div>
       <div class="card-host-row-wrap">
@@ -3775,7 +3776,7 @@ function listRowHtml(item) {
          <img class="bookmark-row-thumb-favicon" alt="" src="${bookmarkFaviconUrl(item)}" width="16" height="16" loading="lazy" />
        </span>`;
   return `<article class="bookmark-row ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
-    <label class="bookmark-row-select"><input type="checkbox" data-select="${item.id}" ${selected}/> <span>选择</span></label>
+    <label class="bookmark-row-select"><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/> <span>选择</span></label>
     <button type="button" class="bookmark-row-thumb ${coverUrl ? 'has-cover is-loading' : 'no-cover'}" data-preview-card="${item.id}" title="打开预览" data-thumb-kind="${escapeHtml(inferItemKind(item))}">
       ${thumbInner}
     </button>
@@ -3807,7 +3808,7 @@ function headlineHtml(item) {
   const selected = state.selected.has(item.id) ? 'checked' : '';
   const selectedClass = state.selected.has(item.id) ? 'selected' : '';
   return `<article class="bookmark-headline ${active} ${selectedClass}" data-id="${item.id}" tabindex="0" aria-label="${escapeHtml(item.title || '书签')}">
-    <label class="bookmark-headline-select"><input type="checkbox" data-select="${item.id}" ${selected}/></label>
+    <label class="bookmark-headline-select"><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/></label>
     <img alt="" src="${bookmarkFaviconUrl(item)}" width="16" height="16" />
     <button type="button" class="bookmark-headline-title" data-preview-card="${item.id}" title="打开预览">${escapeHtml(item.title)}</button>
     <div class="bookmark-headline-meta muted bookmark-meta">
@@ -3844,7 +3845,7 @@ function moodboardHtml(item) {
     <button type="button" class="bookmark-board-media" data-preview-card="${item.id}" title="打开预览">${bg}</button>
     <div class="bookmark-board-overlay">
       <div class="bookmark-board-top">
-        <label><input type="checkbox" data-select="${item.id}" ${selected}/> 选择</label>
+        <label><input type="checkbox" aria-label="选择 ${escapeHtml(item.title || '书签')}" data-select="${item.id}" ${selected}/> 选择</label>
         <span>${escapeHtml(bookmarkFlagsText(item))}</span>
       </div>
       <button type="button" class="bookmark-board-title" data-preview-card="${item.id}">${title}</button>
@@ -3961,6 +3962,17 @@ function bindSplitResizeHandle(handle, {
   });
 }
 
+function syncOverlayAccessibility() {
+  const narrow = window.innerWidth <= 920;
+  const detailOpen = narrow && Boolean(state.activeId);
+  const main = document.querySelector('.shell .main');
+  const sidebar = document.querySelector('.shell .sidebar');
+  const detail = byId('detailPanel');
+  if (main) main.inert = mobileSidebarOpen || detailOpen || aiSideDrawerState.open;
+  if (sidebar) sidebar.inert = narrow && !mobileSidebarOpen || detailOpen || aiSideDrawerState.open;
+  if (detail) detail.inert = !state.activeId || mobileSidebarOpen || aiSideDrawerState.open;
+}
+
 function setMobileSidebarOpen(open, { restoreFocus = true } = {}) {
   mobileSidebarOpen = Boolean(open) && window.innerWidth <= 920;
   const shell = document.querySelector('.shell');
@@ -3974,6 +3986,7 @@ function setMobileSidebarOpen(open, { restoreFocus = true } = {}) {
   trigger?.setAttribute('aria-label', mobileSidebarOpen ? '关闭导航' : '打开导航');
   backdrop?.classList.toggle('hidden', !mobileSidebarOpen);
   sidebar?.setAttribute('aria-hidden', String(!mobileSidebarOpen && window.innerWidth <= 920));
+  syncOverlayAccessibility();
   if (mobileSidebarOpen) {
     requestAnimationFrame(() => focusableElementsWithin(sidebar)[0]?.focus());
   } else if (restoreFocus) {
@@ -4006,7 +4019,7 @@ function isDetailDrawerFocusTrapActive() {
   if (!state.activeId) return false;
   if (hasModalOpen()) return false;
   const shell = document.querySelector('.shell');
-  return Boolean(shell?.classList.contains('detail-panel-open'));
+  return window.innerWidth <= 920 && Boolean(shell?.classList.contains('detail-panel-open'));
 }
 
 function trapDetailDrawerTabFocus(e) {
@@ -4058,6 +4071,7 @@ function syncDetailDrawerShellState(item) {
   }
   closeBtn?.classList.toggle('hidden', !open);
   backdrop?.classList.toggle('hidden', !open);
+  syncOverlayAccessibility();
   if (!open) {
     document.body.classList.remove('detail-drawer-open');
     detailDrawerReturnFocus = null;
@@ -4793,13 +4807,13 @@ function updateDetailPanelHeadUi(item = null) {
   if (viewBtn) {
     viewBtn.disabled = !hasItem;
     viewBtn.classList.toggle('active', hasItem && !detailEditMode);
-    viewBtn.setAttribute('aria-pressed', String(Boolean(hasItem && !detailEditMode)));
+    viewBtn.setAttribute('tabindex', detailEditMode ? '-1' : '0');
     viewBtn.setAttribute('aria-selected', String(Boolean(hasItem && !detailEditMode)));
   }
   if (editBtn) {
     editBtn.disabled = !hasItem;
     editBtn.classList.toggle('active', hasItem && detailEditMode);
-    editBtn.setAttribute('aria-pressed', String(Boolean(hasItem && detailEditMode)));
+    editBtn.setAttribute('tabindex', detailEditMode ? '0' : '-1');
     editBtn.setAttribute('aria-selected', String(Boolean(hasItem && detailEditMode)));
   }
   if (prevBtn) prevBtn.disabled = !hasItem || idx <= 0;
@@ -6205,7 +6219,9 @@ function aiDrawerContextBookmark() {
     || null;
 }
 
+let aiDrawerReturnFocus = null;
 function setAiSideDrawerOpen(open) {
+  if (open && !aiSideDrawerState.open) aiDrawerReturnFocus = document.activeElement;
   aiSideDrawerState.open = Boolean(open);
   const drawer = byId('aiSideDrawer');
   const backdrop = byId('aiSideDrawerBackdrop');
@@ -6216,6 +6232,8 @@ function setAiSideDrawerOpen(open) {
   if (backdrop) backdrop.classList.toggle('hidden', !aiSideDrawerState.open);
   document.body.classList.toggle('ai-side-drawer-open', aiSideDrawerState.open);
   renderAiSideDrawer();
+  syncOverlayAccessibility();
+  if (!open) { aiDrawerReturnFocus?.focus?.(); aiDrawerReturnFocus = null; }
 }
 
 function renderAiDrawerSuggestions(item = aiDrawerContextBookmark()) {
@@ -7051,20 +7069,20 @@ function render预览Dialog() {
 
   if (mode === 'image') {
     const img = byId('previewImage');
-    img.src = url;
+    img.src = safeUrl(url);
     img.classList.remove('hidden');
     return;
   }
 
   if (mode === 'video') {
     const video = byId('previewVideo');
-    video.src = url;
+    video.src = safeUrl(url);
     video.classList.remove('hidden');
     return;
   }
 
   const frame = byId('previewFrame');
-  frame.src = url;
+  frame.src = safeUrl(url);
   frame.classList.remove('hidden');
 }
 
@@ -7771,9 +7789,19 @@ function bindActions() {
     scheduleSidebarAuxiliaryVirtualRender();
   }, { capture: true, passive: true });
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Tab' && aiSideDrawerState.open && !hasModalOpen()) {
+      const items = focusableElementsWithin(byId('aiSideDrawer'));
+      const index = items.indexOf(document.activeElement);
+      if (index < 0 || e.shiftKey && index === 0 || !e.shiftKey && index === items.length - 1) {
+        e.preventDefault();
+        (e.shiftKey ? items.at(-1) : items[0])?.focus();
+        return;
+      }
+    }
     if (trapMobileSidebarTabFocus(e)) return;
     if (trapDetailDrawerTabFocus(e)) return;
     if (handleMenuArrowNavigation(e)) return;
+    if (e.target?.closest?.('.detail-panel-mode-switch')) return;
     if (e.key === 'Escape') {
       let closedTransient = false;
       if (mobileSidebarOpen) { setMobileSidebarOpen(false); closedTransient = true; }
@@ -8256,6 +8284,12 @@ function bindActions() {
   byId('authCloseBtn').addEventListener('click', () => {
     byId('authDialog').close();
   });
+  document.querySelectorAll('[data-auth-form]').forEach((form) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      byId(form.dataset.authForm === 'login' ? 'authLoginBtn' : 'authRegisterBtn').click();
+    });
+  });
   byId('authLoginBtn').addEventListener('click', async () => {
     try {
       const out = await api('/api/auth/login', {
@@ -8382,6 +8416,17 @@ function bindActions() {
     window.open(window.location.href, '_blank', 'noopener');
   });
 
+  document.querySelector('.detail-panel-mode-switch')?.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const buttons = [...event.currentTarget.querySelectorAll('[role="tab"]')];
+    const target = event.key === 'Home' ? buttons[0] : event.key === 'End' ? buttons.at(-1) : buttons.find(button => button !== document.activeElement);
+    const targetId = target?.id;
+    target?.click();
+    // Changing view/edit mode re-renders the detail panel. Restore focus to
+    // the replacement tab node instead of the detached pre-render element.
+    (targetId ? byId(targetId) : target)?.focus();
+  });
   byId('askAiBtn')?.addEventListener('click', () => {
     setAiSideDrawerOpen(true);
     queueMicrotask(() => byId('aiDrawerQuestion')?.focus?.());

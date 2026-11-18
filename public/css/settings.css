@@ -252,7 +252,7 @@ body.auth-page:has(.settings-page-shell) {
   display: block;
   min-height: 100vh;
   padding: 0;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .settings-page-shell {
@@ -274,7 +274,7 @@ body.auth-page:has(.settings-page-shell) {
   border: 0;
   border-right: 1px solid #e2e2e2;
   border-radius: 0;
-  background: rgb(246, 245, 244);
+  background: var(--color-sidebar);
   box-shadow: none;
   gap: 16px;
 }
@@ -321,7 +321,7 @@ body.auth-page:has(.settings-page-shell) {
 .settings-nav-account-text small,
 .settings-nav-title,
 .settings-back-link {
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
 }
 
 .settings-nav-title {
@@ -332,16 +332,12 @@ body.auth-page:has(.settings-page-shell) {
   text-transform: none;
 }
 
-.settings-nav-pages {
-  gap: 0;
-}
-
 .settings-nav-page {
   min-height: 32px;
   padding: 0 12px;
   border: 0;
   border-radius: 8px;
-  color: #333;
+  color: var(--color-text);
   font-size: 14px;
   font-weight: 400;
 }
@@ -369,7 +365,7 @@ body.auth-page:has(.settings-page-shell) {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #333;
+  color: var(--color-text);
   font-size: 14px;
   text-align: left;
   text-decoration: none;
@@ -378,7 +374,7 @@ body.auth-page:has(.settings-page-shell) {
 .settings-nav-block .ghost:hover,
 .settings-back-link:hover {
   background: rgba(0, 0, 0, .05);
-  color: #111;
+  color: var(--color-text);
   text-decoration: none;
 }
 
@@ -388,7 +384,7 @@ body.auth-page:has(.settings-page-shell) {
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: #fff;
+  background: var(--color-surface);
   box-shadow: none;
 }
 
@@ -414,7 +410,7 @@ body.auth-page:has(.settings-page-shell) {
 
 .settings-page-header-main .muted {
   font-size: 13px;
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
 }
 
 .settings-page-header-actions .button-link {
@@ -431,7 +427,7 @@ body.auth-page:has(.settings-page-shell) {
   border-radius: 0;
   border-bottom: 1px solid #ededed;
   background: transparent;
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -468,7 +464,7 @@ body.auth-page:has(.settings-page-shell) {
 .settings-section-head .muted {
   max-width: 64ch;
   font-size: 13px;
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
 }
 
 .settings-section-grid {
@@ -515,7 +511,7 @@ body.auth-page:has(.settings-page-shell) {
   gap: 16px;
   align-items: center;
   min-height: 36px;
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 13px;
 }
 
@@ -529,7 +525,7 @@ body.auth-page:has(.settings-page-shell) {
   min-height: 32px;
   border: 1px solid #d8dde6;
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-surface);
   color: #222;
   font-size: 14px;
 }
@@ -577,7 +573,7 @@ body.auth-page:has(.settings-page-shell) {
 
 @media (max-width: 920px) {
   body.auth-page:has(.settings-page-shell) {
-    background: #fff;
+    background: var(--color-surface);
   }
 
   .settings-page-shell {
@@ -618,15 +614,15 @@ body.auth-page:has(.settings-page-shell) {
 /* Raindrop settings 1:1 pass */
 .settings-page-shell {
   grid-template-columns: 300px minmax(0, 1fr);
-  background: #fff;
-  color: rgb(26, 26, 26);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .settings-nav {
   padding: 0;
-  background: rgb(246, 245, 244);
+  background: var(--color-sidebar);
   border-right: 1px solid rgb(224, 224, 224);
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   font-size: 14px;
 }
 
@@ -637,7 +633,7 @@ body.auth-page:has(.settings-page-shell) {
   display: grid;
   place-items: center;
   border-radius: 4px;
-  color: rgb(77, 77, 77);
+  color: var(--color-text);
   font-size: 30px;
   font-weight: 300;
   line-height: 28px;
@@ -647,7 +643,7 @@ body.auth-page:has(.settings-page-shell) {
 .settings-nav-back:hover,
 .settings-nav-back:focus-visible {
   background: rgba(0, 0, 0, .05);
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   outline: none;
   text-decoration: none;
 }
@@ -690,14 +686,14 @@ body.auth-page:has(.settings-page-shell) {
 }
 
 .settings-nav-account-text strong {
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   font-size: 17px;
   font-weight: 700;
   line-height: 22px;
 }
 
 .settings-nav-account-text small {
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 14px;
   line-height: 20px;
 }
@@ -710,7 +706,7 @@ body.auth-page:has(.settings-page-shell) {
 .settings-nav-title {
   min-height: 32px;
   padding: 0 16px;
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 400;
   line-height: 32px;
@@ -735,7 +731,7 @@ body.auth-page:has(.settings-page-shell) {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   font-size: 17px;
   font-weight: 400;
   line-height: 32px;
@@ -804,14 +800,14 @@ body.auth-page:has(.settings-page-shell) {
 .settings-back-link:hover,
 .settings-back-link:focus-visible {
   background: rgb(238, 238, 238);
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   outline: none;
 }
 
 .settings-nav-page.active,
 .settings-nav-page[aria-current='true'] {
-  background: rgb(230, 230, 230);
-  color: rgb(26, 26, 26);
+  background: var(--color-surface-subtle);
+  color: var(--color-text);
   font-weight: 600;
 }
 
@@ -822,11 +818,11 @@ body.auth-page:has(.settings-page-shell) {
 
 .settings-back-link {
   margin-top: auto;
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
 }
 
 .settings-page-card {
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .settings-page-header,
@@ -844,7 +840,7 @@ body.auth-page:has(.settings-page-shell) {
 }
 
 .settings-page-card h1 {
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   font-size: 20px;
   font-weight: 700;
   line-height: 28px;
@@ -860,7 +856,7 @@ body.auth-page:has(.settings-page-shell) {
   margin-top: 0;
   padding: 0;
   border: 0;
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 13px;
   line-height: 32px;
 }
@@ -903,7 +899,7 @@ body.auth-page:has(.settings-page-shell) {
 .settings-panel h3,
 .settings-tool-subpanel h4,
 .settings-data-list-title {
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   font-size: 16px;
   font-weight: 600;
   line-height: 22px;
@@ -911,7 +907,7 @@ body.auth-page:has(.settings-page-shell) {
 
 .settings-panel > .muted,
 .settings-panel-subsection > .muted {
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 13px;
   line-height: 18px;
 }
@@ -926,13 +922,13 @@ body.auth-page:has(.settings-page-shell) {
   gap: 16px;
   min-height: 34px;
   align-items: center;
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 14px;
   line-height: 20px;
 }
 
 .settings-form label > span {
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
 }
 
 .settings-form label input,
@@ -945,8 +941,8 @@ body.auth-page:has(.settings-page-shell) {
   padding: 0 10px;
   border: 1px solid rgb(224, 224, 224);
   border-radius: 5px;
-  background: #fff;
-  color: rgb(26, 26, 26);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: 14px;
   line-height: 30px;
   box-shadow: none;
@@ -965,8 +961,8 @@ body.auth-page:has(.settings-page-shell) {
 .settings-panel input:focus,
 .settings-panel select:focus,
 .settings-panel textarea:focus {
-  border-color: rgb(25, 135, 225);
-  box-shadow: 0 0 0 1px rgb(25, 135, 225);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
   outline: none;
 }
 
@@ -984,8 +980,8 @@ body.auth-page:has(.settings-page-shell) {
   padding: 0 12px;
   border: 1px solid rgb(224, 224, 224);
   border-radius: 5px;
-  background: #fff;
-  color: rgb(26, 26, 26);
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: 14px;
   font-weight: 400;
   line-height: 30px;
@@ -994,8 +990,8 @@ body.auth-page:has(.settings-page-shell) {
 
 .settings-actions button:not(.ghost),
 .settings-actions button.primary {
-  border-color: rgb(25, 135, 225);
-  background: rgb(25, 135, 225);
+  border-color: var(--accent);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -1009,7 +1005,7 @@ body.auth-page:has(.settings-page-shell) {
 .settings-output-actions button:focus-visible {
   border-color: rgb(198, 198, 198);
   background: rgb(246, 246, 246);
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   outline: none;
 }
 
@@ -1028,7 +1024,7 @@ body.auth-page:has(.settings-page-shell) {
 }
 
 .settings-output {
-  color: rgb(128, 128, 128);
+  color: var(--color-text-muted);
   font-size: 13px;
   line-height: 18px;
 }
@@ -1055,7 +1051,7 @@ body.auth-page:has(.settings-page-shell) {
 
 .settings-panel-subsection h4 {
   margin: 0 0 10px;
-  color: rgb(26, 26, 26);
+  color: var(--color-text);
   font-size: 15px;
   line-height: 21px;
 }

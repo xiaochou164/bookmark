@@ -1,0 +1,405 @@
+{
+  "createdAt": "2026-11-16T11:04:19.727Z",
+  "results": [
+    {
+      "platform": "chrome",
+      "page": "popup",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-popup-mobile-360.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": true,
+      "status": "云书签预览（未写入）\n--- Chrome 侧 ---\nChrome 文件夹数: 3\nChrome 书签总数: 42\n新增到 Chrome: 2 (预览，未写入)\n从 Chrome 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Chrome:\n  +Chrome: 示例书签 (阅读)\n\n待从 Chrome 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "chrome",
+      "page": "popup",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-popup-small-640.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": false,
+      "status": "云书签预览（未写入）\n--- Chrome 侧 ---\nChrome 文件夹数: 3\nChrome 书签总数: 42\n新增到 Chrome: 2 (预览，未写入)\n从 Chrome 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Chrome:\n  +Chrome: 示例书签 (阅读)\n\n待从 Chrome 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "chrome",
+      "page": "popup",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-popup-tablet-920.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": false,
+      "status": "云书签预览（未写入）\n--- Chrome 侧 ---\nChrome 文件夹数: 3\nChrome 书签总数: 42\n新增到 Chrome: 2 (预览，未写入)\n从 Chrome 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Chrome:\n  +Chrome: 示例书签 (阅读)\n\n待从 Chrome 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "chrome",
+      "page": "popup",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-popup-desktop-1280.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": false,
+      "status": "云书签预览（未写入）\n--- Chrome 侧 ---\nChrome 文件夹数: 3\nChrome 书签总数: 42\n新增到 Chrome: 2 (预览，未写入)\n从 Chrome 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Chrome:\n  +Chrome: 示例书签 (阅读)\n\n待从 Chrome 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "chrome",
+      "page": "options",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-options-mobile-360.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nChrome 文件夹: 3，Chrome 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Chrome: 2 (预览)\n待推送到 Chrome:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    },
+    {
+      "platform": "chrome",
+      "page": "options",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-options-small-640.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nChrome 文件夹: 3，Chrome 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Chrome: 2 (预览)\n待推送到 Chrome:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    },
+    {
+      "platform": "chrome",
+      "page": "options",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-options-tablet-920.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nChrome 文件夹: 3，Chrome 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Chrome: 2 (预览)\n待推送到 Chrome:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    },
+    {
+      "platform": "chrome",
+      "page": "options",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/chrome-options-desktop-1280.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nChrome 文件夹: 3，Chrome 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Chrome: 2 (预览)\n待推送到 Chrome:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "popup",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-popup-mobile-360.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": true,
+      "status": "云书签预览（未写入）\n--- Safari 侧 ---\nSafari 文件夹数: 3\nSafari 书签总数: 42\n新增到 Safari: 2 (预览，未写入)\n从 Safari 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Safari:\n  +Chrome: 示例书签 (阅读)\n\n待从 Safari 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "popup",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-popup-small-640.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": false,
+      "status": "云书签预览（未写入）\n--- Safari 侧 ---\nSafari 文件夹数: 3\nSafari 书签总数: 42\n新增到 Safari: 2 (预览，未写入)\n从 Safari 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Safari:\n  +Chrome: 示例书签 (阅读)\n\n待从 Safari 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "popup",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-popup-tablet-920.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": false,
+      "status": "云书签预览（未写入）\n--- Safari 侧 ---\nSafari 文件夹数: 3\nSafari 书签总数: 42\n新增到 Safari: 2 (预览，未写入)\n从 Safari 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Safari:\n  +Chrome: 示例书签 (阅读)\n\n待从 Safari 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "popup",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-popup-desktop-1280.png",
+      "serious": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "targets": [
+            [
+              "small"
+            ],
+            [
+              "#rbSyncBtn > .btn-label > .btn-sub"
+            ]
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "targets": [
+            [
+              "#statusBox"
+            ]
+          ]
+        }
+      ],
+      "overflow": false,
+      "status": "云书签预览（未写入）\n--- Safari 侧 ---\nSafari 文件夹数: 3\nSafari 书签总数: 42\n新增到 Safari: 2 (预览，未写入)\n从 Safari 删除: 1 (预览，未删除)\n\n--- 云端 DB 侧 ---\n新增到 Rainbow: 1\n更新/移动到 Rainbow: 2 / 1\n本地删除同步到 Rainbow: 0\n本地文件夹删除同步到 Rainbow: 0\n已跳过重复: 38\n\n待同步到 Safari:\n  +Chrome: 示例书签 (阅读)\n\n待从 Safari 删除:\n  -Chrome: https://obsolete.example",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "options",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-options-mobile-360.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nSafari 文件夹: 3，Safari 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Safari: 2 (预览)\n待推送到 Safari:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "options",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-options-small-640.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nSafari 文件夹: 3，Safari 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Safari: 2 (预览)\n待推送到 Safari:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "options",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-options-tablet-920.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nSafari 文件夹: 3，Safari 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Safari: 2 (预览)\n待推送到 Safari:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    },
+    {
+      "platform": "safari",
+      "page": "options",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/before/extensions/safari-options-desktop-1280.png",
+      "serious": [],
+      "overflow": false,
+      "status": "预览完成（未写入）\nSafari 文件夹: 3，Safari 书签总数: 42\n新增到 Rainbow: 1，跳过重复: 38\n更新/移动到 Rainbow: 2 / 1，本地删除同步: 0，文件夹删除: 0\n待同步到 Safari: 2 (预览)\n待推送到 Safari:\n  +Chrome: 示例书签 (阅读)",
+      "activeElement": ""
+    }
+  ]
+}

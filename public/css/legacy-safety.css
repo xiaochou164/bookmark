@@ -5,10 +5,6 @@
  * systems were active at once.
  */
 @layer layout-safety {
-/* Layout stabilization: keep dense tool surfaces readable at every width. */
-body {
-  min-width: 320px;
-}
 
 .shell,
 .main,
@@ -31,7 +27,7 @@ input,
 textarea {
   max-width: 100%;
   min-width: 0;
-  font: inherit;
+
 }
 
 button {
@@ -86,14 +82,6 @@ input[type="radio"] {
   }
 }
 
-.toolbar {
-  grid-template-columns: minmax(220px, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  border-radius: 12px;
-  padding: 10px;
-}
-
 .toolbar-left,
 .toolbar-right,
 .search-wrap {
@@ -101,7 +89,7 @@ input[type="radio"] {
 }
 
 .toolbar-right {
-  flex-wrap: wrap;
+
   row-gap: 8px;
 }
 
@@ -117,9 +105,9 @@ input[type="radio"] {
 
 .search-wrap input {
   min-height: 44px;
-  height: auto;
+
   border-radius: 10px !important;
-  padding-right: 74px;
+
 }
 
 #advancedSearchToggleBtn {
@@ -173,9 +161,9 @@ button.ghost,
 
 .view-header {
   flex-wrap: wrap;
-  align-items: flex-start;
+
   border-radius: 12px;
-  padding: 12px;
+
   gap: 10px 14px;
 }
 
@@ -211,10 +199,6 @@ button.ghost,
 .actions-header-tools,
 .actions-bulk {
   min-width: 0;
-}
-
-.actions-header-tools > .header-menu-wrap {
-  flex: 0 1 auto;
 }
 
 .actions-header-tools > .header-tool-btn,
@@ -267,14 +251,6 @@ button.ghost,
   grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
 }
 
-.cards.layout-list .bookmark-row {
-  grid-template-columns: auto 64px minmax(0, 1fr) minmax(124px, auto);
-  align-items: center;
-  gap: 12px;
-  border-radius: 12px;
-  padding: 12px;
-}
-
 .cards.layout-list .bookmark-row-main,
 .cards.layout-list .bookmark-row-side,
 .cards.layout-list .bookmark-row-titleline,
@@ -297,12 +273,12 @@ button.ghost,
 
 .cards.layout-list .bookmark-row-actions {
   opacity: 1;
-  pointer-events: auto;
+
   transform: none;
 }
 
 .cards.layout-list .bookmark-row-actions .icon-action-btn {
-  width: 32px;
+
   height: 32px;
   border-radius: 8px;
 }
@@ -330,7 +306,7 @@ button.ghost,
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
-  padding: 10px 12px;
+
 }
 
 .pager-right {
@@ -339,37 +315,13 @@ button.ghost,
 }
 
 .detail-panel-head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-  gap: 8px;
+
   border-radius: 0;
-  padding: 8px 2px 10px;
-  margin: -2px 0 10px;
-}
 
-.detail-panel-head-main {
-  width: 100%;
-}
-
-.detail-panel-head-tools {
-  width: 100%;
-  justify-content: flex-start;
-  gap: 6px;
-}
-
-.detail-panel-nav,
-.detail-panel-preview-shortcuts,
-.detail-panel-mode-switch {
-  border-radius: 8px;
 }
 
 .detail-panel-mode-switch {
   flex: 1 1 128px;
-}
-
-.detail-panel-mode-switch > button {
-  min-width: 0;
 }
 
 .detail-summary-top,
@@ -483,7 +435,7 @@ button.ghost,
 }
 
 .settings-nav-page {
-  min-height: 40px;
+
   white-space: normal;
 }
 
@@ -492,10 +444,6 @@ button.ghost,
   .view-header,
   .advanced-search-panel:not(.hidden) {
     position: static;
-  }
-
-  .toolbar {
-    grid-template-columns: 1fr;
   }
 
   .toolbar-right {
@@ -518,9 +466,7 @@ button.ghost,
 
   #askAiBtn {
     display: inline-flex;
-    min-width: 78px;
-    padding: 0 12px;
-    justify-content: center;
+
     white-space: nowrap;
   }
 
@@ -578,23 +524,9 @@ button.ghost,
     width: 100%;
   }
 
-  .view-title-block h1 {
-    font-size: 18px;
-  }
-
-  .actions-header-tools > .header-menu-wrap {
-    flex: 1 1 30%;
-  }
-
-  .cards.layout-list .bookmark-row {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-  }
-
   .cards.layout-list .bookmark-row-thumb {
     grid-column: 1 / -1;
-    width: 100%;
-    height: 112px;
+
     order: 2;
   }
 
@@ -693,10 +625,6 @@ button.ghost,
     max-width: 100%;
   }
 
-  .view-title-block h1 {
-    font-size: 17px;
-  }
-
   .actions-header-tools > .header-menu-wrap {
     flex-basis: 100%;
   }
@@ -710,35 +638,11 @@ button.ghost,
     grid-template-columns: 1fr;
   }
 
-  .detail-summary-toolbar .icon-action-btn,
-  .detail-panel-nav .icon-action-btn,
-  .detail-panel-preview-shortcuts .icon-action-btn,
-  .detail-panel-more-wrap .icon-action-btn,
-  #detailCloseBtn.icon-action-btn {
-    width: 34px;
-    height: 34px;
-  }
-
   .dialog-actions button,
   .preview-actions button,
   .ai-folder-summary-actions button,
   .ai-qa-inline-actions button {
     flex: 1 1 100%;
-  }
-
-  .settings-page-shell {
-    width: 100%;
-  }
-
-  .settings-nav,
-  .settings-page-card,
-  .settings-section,
-  .settings-panel {
-    padding: 14px;
-  }
-
-  .settings-page-card h1 {
-    font-size: 25px;
   }
 
   .settings-page-header-actions > *,
@@ -776,10 +680,6 @@ button.ghost,
   overflow: hidden;
 }
 
-.cards.layout-list .bookmark-row-actions {
-  justify-content: flex-end;
-}
-
 .toolbar button,
 .view-header button,
 .dialog-actions button,
@@ -791,13 +691,6 @@ button.ghost,
 }
 
 @media (max-width: 1180px) {
-  .cards.layout-list .bookmark-row {
-    grid-template-columns: auto 56px minmax(0, 1fr) minmax(0, auto);
-  }
-
-  .cards.layout-list .bookmark-row-side {
-    min-width: 0;
-  }
 }
 
 @media (max-width: 640px) {
@@ -809,10 +702,6 @@ button.ghost,
     width: auto;
     min-width: 0;
     max-width: calc(100vw - 16px);
-  }
-
-  .cards.layout-list .bookmark-row-actions {
-    justify-content: flex-start;
   }
 }
 }
