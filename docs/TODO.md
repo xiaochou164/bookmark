@@ -378,6 +378,6 @@
 - [x] **P1** `BK-AUD-105` 键盘、触控与无障碍
 - [x] **P1** `BK-AUD-106` CSS legacy 样式治理
 - [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护（本轮将约 300 行 AI 治理逻辑抽到独立服务、拆出 governance 路由模块，并拆出 Worker Chrome sync helpers；新增 8 项单测，`src/worker.mjs` 剩余路由和 app 渲染域仍待逐步拆分）
-- [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复，CI run `44289283424` 成功）
+- [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复，最新代码 CI run `44291803799` 成功）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理
 - [x] **P2** `BK-AUD-204` 设计系统细节收口
