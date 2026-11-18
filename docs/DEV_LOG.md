@@ -1295,3 +1295,5 @@
 - 修改：新增 `src/routes/productAiActionRoutes.js`，注入 `runAi*Job` callbacks，路由路径与行为保持不变；新增 `tests/product-ai-action-routes.test.js` 两项测试检查 15 个 endpoints 的参数和 folder/bookmark 404 转换。`productRoutes.js` 从 3,292 行降至 3,088 行。
 - 验证：目标测试 2/2；全套 `npm test` 57/57；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和隔离 Docker `/api/health` healthy 通过。本地 `ui:browser` 未在此增量重跑（无 UI 源变更），由待运行的 hosted workflow 覆盖浏览器矩阵。
 - 风险/回退：无 API/schema/persistence 变化；BK-AUD-201 未关闭，可独立回滚路由模块、入口注册和测试。
+
+- Hosted 验收：AI action route code head `2874fbf` 的 GitHub Actions CI run `44324485032` 全部 16 步成功（含 browser matrix、extension parity、Docker startup 和 operations drill）；Docker PR build run `44324485034` 成功。
