@@ -1202,5 +1202,7 @@
 
 - 待办：进一步拆分 Worker 主入口中的公开集合 HTML rendering，并锁定 escaping/scheme 行为。
 - 修改：新增 `src/worker/publicShareHtml.mjs` 抽取公开页 template，新增 `tests/public-share-html.test.js` 覆盖标题/说明/书签/AI 数据转义与 `javascript:` URL 限制；Worker 入口从 6,809 行降至 6,710 行。静态门禁从 Worker 源码调整到新 rendering module 检查外部 CSP-safe 脚本标记。
-- 验证：XSS 模板回归 1/1；全套 `npm test` 45/45、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）、Docker build/start/healthy `/api/health` 通过；hosted CI 待推送后运行。
+- 验证：XSS 模板回归 1/1；全套 `npm test` 45/45、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser`（101/8/16）、Docker build/start/healthy `/api/health` 通过；hosted CI run `44306759467` 的 16 步全部成功，Docker PR build run `44306758987` 成功且无 warning annotations。
 - 风险：无 API/schema/persistence 变化；`BK-AUD-201` 其他大型路由/前端渲染入口仍待增量拆分。
+
+- **BK-AUD-201 Worker public share 托管验收**：`4cf6124` 的 GitHub Actions run `44306759467` 16/16 步通过，Docker PR build run `44306758987` 成功且无 warning annotations。

@@ -1,6 +1,6 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `2b7626d` 的 GitHub Actions run `44304695292`（16 步）和 Docker build run `44304695208` 均通过；标签解析提交 `4d42442` 的 CI/Docker 验收亦通过。Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
+> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `4cf6124` 的 GitHub Actions run `44306759467`（16 步）和 Docker build run `44306758987` 均通过；此前标签解析及 Worker presentation 增量的 CI/Docker 验收亦通过。Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
@@ -75,4 +75,4 @@
 
 - **BK-AUD-201 Worker HTML/预览辅助逻辑继续解耦（2026-11-18）**：将 Worker HTML entity/title/meta/link/article 提取、预览类型、YouTube embed URL、公开 URL scheme 校验与 HTML escaping 移入 `src/worker/bookmarkPresentation.mjs`，入口由 6,925 行降至 6,809 行。`tests/bookmark-presentation.test.js` 两项覆盖 HTML metadata/article 解析、media 分类、YouTube host allowlist、scheme 限制与 escaping；按当前行为验证 inline tag 周边空格，不改变提取语义。验证：目标测试 2/2，全套 `npm test` 44/44、docs/UI 静态检查、Worker syntax/smoke、扩展检查、浏览器 101/8/16、Docker build/start/health 通过；hosted CI 待提交后运行。无 API/schema/persistence 变化，BK-AUD-201 保持未完成。
 
-- **BK-AUD-201 Worker public share markup 拆分（2026-11-18）**：将公开集合 HTML template 移至 `src/worker/publicShareHtml.mjs`，Worker 主入口由 6,809 行降至 6,710 行；`tests/public-share-html.test.js` 验证用户标题/说明/书签/AI 文本 escaping，`javascript:` 链接与封面被拒绝为可执行 href/src。模块移动后 `ui:check` 原先按 Worker 内联模板位置的静态断言失败，已将 `scripts/ui-static-audit.mjs` 调整为验证新模块含 CSP-safe 外部 `public-share.mjs`，复跑通过。目标 XSS 测试 1/1；全套 `npm test` 45/45、docs/UI checks、Worker syntax/smoke、扩展检查、UI browser 101/8/16、Docker build/start/health 通过；hosted CI 待提交后运行。无接口/schema/persistence 变化，BK-AUD-201 仍未完成。
+- **BK-AUD-201 Worker public share markup 拆分（2026-11-18）**：将公开集合 HTML template 移至 `src/worker/publicShareHtml.mjs`，Worker 主入口由 6,809 行降至 6,710 行；`tests/public-share-html.test.js` 验证用户标题/说明/书签/AI 文本 escaping，`javascript:` 链接与封面被拒绝为可执行 href/src。模块移动后 `ui:check` 原先按 Worker 内联模板位置的静态断言失败，已将 `scripts/ui-static-audit.mjs` 调整为验证新模块含 CSP-safe 外部 `public-share.mjs`，复跑通过。目标 XSS 测试 1/1；全套 `npm test` 45/45、docs/UI checks、Worker syntax/smoke、扩展检查、UI browser 101/8/16、Docker build/start/health 通过；GitHub Actions run `44306759467` 全部 16 步通过，Docker PR build run `44306758987` 通过且无 warning annotations。无接口/schema/persistence 变化，BK-AUD-201 仍未完成。
