@@ -5,6 +5,8 @@ const nodeGovernance = require('../src/services/aiGovernance');
 test('Worker AI governance defaults and feature policy normalization match Node policy', async () => {
   const worker = await import('../src/worker/aiGovernance.mjs');
   assert.deepEqual(worker.DEFAULT_AI_FEATURE_POLICY, nodeGovernance.DEFAULT_AI_FEATURE_POLICY);
+  assert.deepEqual(worker.DEFAULT_AI_PRIVACY_POLICY, nodeGovernance.DEFAULT_AI_PRIVACY_POLICY);
+  assert.deepEqual(worker.DEFAULT_AI_EVAL_SAMPLES, nodeGovernance.DEFAULT_AI_EVAL_SAMPLES);
   assert.deepEqual(worker.normalizeAiFeaturePolicy({ enabled: false, capabilities: { qa: false } }), {
     ...worker.DEFAULT_AI_FEATURE_POLICY,
     enabled: false,

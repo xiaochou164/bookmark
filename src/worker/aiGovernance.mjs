@@ -54,19 +54,19 @@ export const DEFAULT_AI_EVAL_SAMPLES = Object.freeze([
   {
     id: 'eval_autotag_ai_article',
     task: 'bookmark.autotag',
-    input: { title: 'OpenAI API structured outputs guide', url: 'https://platform.openai.com/docs/guides/structured-outputs' },
+    input: { title: 'OpenAI API structured outputs guide', url: 'https://platform.openai.com/docs/guides/structured-outputs', note: 'schema constrained JSON' },
     expected: { tags: ['AI', 'OpenAI', 'API'], keywords: ['structured', 'json'] }
   },
   {
     id: 'eval_summary_product',
     task: 'bookmark.summary',
-    input: { title: 'Rainbow product roadmap', note: 'product planning and release priorities' },
+    input: { title: 'Rainbow product roadmap', url: 'https://example.com/roadmap', note: 'product planning and release priorities' },
     expected: { tags: ['产品', '路线图'], keywords: ['规划', '优先级', '发布'] }
   },
   {
     id: 'eval_classify_design',
     task: 'bookmark.classify',
-    input: { title: 'Design system accessibility checklist', note: 'contrast, focus, keyboard navigation' },
+    input: { title: 'Design system accessibility checklist', url: 'https://example.com/a11y', note: 'contrast, focus, keyboard navigation' },
     expected: { tags: ['设计系统', '可访问性'], keywords: ['contrast', 'keyboard', 'focus'] }
   }
 ]);
