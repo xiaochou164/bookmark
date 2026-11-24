@@ -18,8 +18,6 @@
 
 本轮最新增量：AI batch/backfill processors 已迁至 `src/worker/aiTaskProcessors.mjs`，Worker 入口降至 5,956 行；新增 2 项租户边界、部分失败进度与 summary 候选筛选回归，目标测试 2/2、全套 `npm test` 72/72、docs/UI/CF/smoke/extension 门禁通过；`npm run ui:browser` 通过（101 张页面状态、8 项 E2E、16 张扩展截图），生成截图已恢复到已审阅基线。BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
-该增量托管验收已完成：GitHub CI `45391499346` 16/16 成功，Docker PR build `45391499363` 成功；BK-AUD-201 仍未完成。
-
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
 - [x] **BK-AUD-002 / P0 / 扩展同步预览的零写入契约（已修复并做真实本地回归）**：原文档称 PREVIEW 会写入，且实际 Popup/Options 消息分发调用 `/api/chrome-sync` 时可触发写入。Chrome/Safari 现明确发送 preview；Node/Worker 使用只读内存 repo，认证时间、租户初始化、索引、deviceId、状态和日志均不落盘。VM 消息分发与隔离 SQLite/JSON HTTP 回归均比较持久化快照，Chrome/Safari preview 零写断言通过；扩展同步文档与 OpenAPI 已同步。
@@ -46,7 +44,7 @@
 
 - 证据/根因：AI 批量标签与历史回填任务原先与 Worker 队列分发、语义去重和 HTTP 入口共存，provider fallback、进度写回和候选过滤无法单独回归，增加改动时误触租户边界的风险。
 - 修改：将 `processAiBatchTask`、`processAiBackfillTask` 迁至 `src/worker/aiTaskProcessors.mjs`，通过注入 `createRepo`、`buildStateForUser`、标签归一化和合并策略保持现有行为与 userId 约束；`src/worker.mjs` 仅保留队列分发。新增 `tests/worker-ai-batch-processors.test.js`，覆盖批量任务缺失书签的 partial 结果/进度、租户参数，以及回填 summary 模式仅处理未删除且无备注书签。
-- 验证：目标测试 2/2；`npm test` 72/72；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），生成截图已恢复基线。`docker build -t rainbow-audit-local .` 成功，临时容器 `/api/health` 返回 `ok:true` 且 Docker health 状态为 `healthy`；hosted CI `45391499346`（16/16）和 Docker `45391499363` 均通过。
+- 验证：目标测试 2/2；`npm test` 72/72；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），生成截图已恢复基线。`docker build -t rainbow-audit-local .` 成功，临时容器 `/api/health` 返回 `ok:true` 且 Docker health 状态为 `healthy`；hosted CI/Docker 将在本次提交后复验。
 - 风险：无 API、schema 或持久化格式变化；AI IO、semantic dedupe、`public/app.mjs` 和其他 Worker/Node 大型入口仍未完全拆分，BK-AUD-201 保持未完成。
 
 ## BK-AUD-201 Worker external resources 拆分（2026-11-24）

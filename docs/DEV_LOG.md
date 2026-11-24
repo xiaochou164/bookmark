@@ -1373,3 +1373,11 @@
 - 核心内容：保持既有 heuristic/provider fallback、merge/replace 标签策略、partial/failed/succeeded 状态和批量进度格式；回填 summary 仍只处理未删除且空备注书签；所有 repo/state 调用继续显式传入认证用户 ID。
 - 验证：目标测试 2/2；`npm test` 72/72；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101 张页面截图、8 项 E2E、16 张扩展截图），生成截图已恢复到审阅基线；`docker build -t rainbow-audit-local .` 成功，临时容器 `/api/health` 返回 `ok:true` 且 Docker health 为 `healthy`。
 - 遗留风险：hosted CI `45391499346`（16/16）与 Docker `45391499363` 已通过；IO、semantic dedupe、`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 继续开放。无 API/schema/持久化格式变化。
+
+## 2026-11-24 — BK-AUD-201 Worker semantic dedupe task 拆分
+
+- 问题/根因：语义去重队列任务内联在 `src/worker.mjs`，同时负责租户状态读取、文本向量哈希、exact URL/语义边聚类、结果裁剪和 AI job 状态写回，缺少独立任务级回归。
+- 修改文件：将 `processSemanticDedupeTask` 迁移至 `src/worker/aiTaskProcessors.mjs`，`src/worker.mjs` 通过依赖注入分发；新增 `tests/worker-semantic-dedupe-task.test.js`。
+- 核心内容：保留原阈值和 limit clamp、软删除过滤、并查集聚类、exact URL 与 semantic edges、folder path 和 provider result 格式；hash 函数显式注入，避免任务模块依赖 Worker 认证实现。
+- 验证：目标测试 1/1；`npm test` 73/73；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；Docker build 成功，临时容器 `/api/health` 为 `ok:true` 且 health 为 `healthy`。
+- 遗留风险：hosted CI/Docker 将在提交后复验；IO task、`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 继续开放。无 API/schema/持久化格式变化。
