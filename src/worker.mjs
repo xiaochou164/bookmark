@@ -36,7 +36,11 @@ import {
   processPluginTask as runPluginTask, processMetadataTask as runMetadataTask,
   processBrokenLinkScanTask as runBrokenLinkScanTask
 } from './worker/taskProcessors.mjs';
-import { processAiRuleTask as runAiRuleTask } from './worker/aiTaskProcessors.mjs';
+import {
+  processAiRuleTask as runAiRuleTask,
+  processAiBatchTask as runAiBatchTask,
+  processAiBackfillTask as runAiBackfillTask
+} from './worker/aiTaskProcessors.mjs';
 import crypto from 'node:crypto';
 import openapiSpec from '../docs/openapi.json' with { type: 'json' };
 import {
@@ -2959,173 +2963,6 @@ function eventStreamResponse(event, payload, { requestId } = {}) {
   return new Response(`retry: 3000\n\nevent: ${event}\ndata: ${JSON.stringify(payload)}\n\n`, { headers });
 }
 
-async function processAiBatchTask(env, message) {
-  const repo = createRepo(env);
-  const task = await repo.getAiBatchTask(message.userId, message.taskId);
-  if (!task || String(task.status || '') === 'paused') return;
-  const aiConfig = await repo.getAiConfig(message.userId);
-  const bookmarkIds = Array.isArray(task.bookmarkIds) ? task.bookmarkIds.map(String) : [];
-  const applyMode = ['merge', 'replace'].includes(String(task.applyMode || '').trim())
-    ? String(task.applyMode).trim()
-    : String(aiConfig?.tagging?.applyMode || 'merge');
-  await repo.updateAiBatchTask(message.userId, task.id, {
-    status: 'running',
-    startedAt: Date.now(),
-    lastAttemptAt: Date.now(),
-    attemptCount: Number(task.attemptCount || 0) + 1,
-    progress: { total: bookmarkIds.length, processed: 0 }
-  });
-  let succeeded = 0;
-  let failed = 0;
-  let processed = 0;
-  for (const bookmarkId of bookmarkIds) {
-    try {
-      const bookmark = await repo.getBookmark(message.userId, bookmarkId);
-      if (!bookmark || bookmark.deletedAt) {
-        failed += 1;
-        processed += 1;
-        continue;
-      }
-      let suggestedTags = inferSuggestedTags(bookmark);
-      let summary = summarizeText([bookmark.note, bookmark.metadata?.description, bookmark.title].filter(Boolean).join(' '), 160);
-      let provider = { providerType: 'cloudflare-worker', model: 'heuristic-v1', transport: 'heuristic_fallback' };
-      if (aiProviderLooksConfigured(aiConfig)) {
-        try {
-          const suggestion = await generateBookmarkTagSuggestions({ config: aiConfig, bookmark });
-          suggestedTags = normalizeTags(suggestion.suggestedTags || []);
-          summary = String(suggestion.summary || summary || '');
-          provider = suggestion.provider || provider;
-        } catch {
-          // Keep heuristic tags when provider is unavailable.
-        }
-      }
-      let updated = await repo.updateBookmark(message.userId, bookmark.id, {
-        tags: mergeBookmarkTags(bookmark.tags || [], suggestedTags, applyMode)
-      });
-      updated = await repo.setBookmarkAiSuggestions(message.userId, bookmark.id, {
-        ...(updated.aiSuggestions || {}),
-        autoTag: {
-          suggestedTags,
-          summary,
-          applied: true,
-          generatedAt: Date.now(),
-          applyMode,
-          provider
-        }
-      });
-      succeeded += 1;
-      processed += 1;
-    } catch {
-      failed += 1;
-      processed += 1;
-    }
-    await repo.updateAiBatchTask(message.userId, task.id, (current) => ({
-      ...current,
-      status: 'running',
-      progress: { total: bookmarkIds.length, processed },
-      result: { succeeded, failed, processed, applyMode }
-    }));
-  }
-  await repo.updateAiBatchTask(message.userId, task.id, {
-    status: failed ? (succeeded ? 'partial' : 'failed') : 'succeeded',
-    progress: { total: bookmarkIds.length, processed },
-    result: { succeeded, failed, processed, applyMode },
-    finishedAt: Date.now()
-  });
-}
-
-async function processAiBackfillTask(env, message) {
-  const repo = createRepo(env);
-  const task = await repo.getAiBackfillTask(message.userId, message.taskId);
-  if (!task || String(task.status || '') === 'paused') return;
-  const aiConfig = await repo.getAiConfig(message.userId);
-  const mode = String(task.mode || 'autotag');
-  const limit = Math.max(0, Number(task.limit || 0) || 0);
-  const state = await buildStateForUser(env, message.userId);
-  const candidates = state.bookmarks
-    .filter((item) => !item.deletedAt)
-    .filter((item) => (mode === 'summary' ? !String(item.note || '').trim() : true))
-    .slice(0, limit || state.bookmarks.length);
-  await repo.updateAiBackfillTask(message.userId, task.id, {
-    status: 'running',
-    startedAt: Date.now(),
-    lastAttemptAt: Date.now(),
-    attemptCount: Number(task.attemptCount || 0) + 1,
-    progress: { total: candidates.length, processed: 0 }
-  });
-  let processed = 0;
-  let succeeded = 0;
-  let failed = 0;
-  for (const bookmark of candidates) {
-    try {
-      if (mode === 'summary') {
-        let suggestedSummary = summarizeText([bookmark.note, bookmark.metadata?.description, bookmark.article?.excerpt, bookmark.title].filter(Boolean).join(' '), 180);
-        let provider = { providerType: 'cloudflare-worker', model: 'heuristic-v1', transport: 'heuristic_fallback' };
-        if (aiProviderLooksConfigured(aiConfig)) {
-          try {
-            const suggestion = await generateBookmarkSummarySuggestion({ config: aiConfig, bookmark });
-            suggestedSummary = String(suggestion.summary || suggestedSummary).trim() || suggestedSummary;
-            provider = suggestion.provider || provider;
-          } catch {
-            // Keep heuristic summary when provider is unavailable.
-          }
-        }
-        let updated = await repo.updateBookmark(message.userId, bookmark.id, { note: suggestedSummary });
-        updated = await repo.setBookmarkAiSuggestions(message.userId, bookmark.id, {
-          ...(updated.aiSuggestions || {}),
-          summarySuggestion: suggestedSummary,
-          summaryGeneratedAt: Date.now(),
-          provider
-        });
-      } else {
-        let suggestedTags = inferSuggestedTags(bookmark);
-        let summary = summarizeText([bookmark.note, bookmark.metadata?.description, bookmark.title].filter(Boolean).join(' '), 160);
-        let provider = { providerType: 'cloudflare-worker', model: 'heuristic-v1', transport: 'heuristic_fallback' };
-        if (aiProviderLooksConfigured(aiConfig)) {
-          try {
-            const suggestion = await generateBookmarkTagSuggestions({ config: aiConfig, bookmark });
-            suggestedTags = normalizeTags(suggestion.suggestedTags || []);
-            summary = String(suggestion.summary || summary || '');
-            provider = suggestion.provider || provider;
-          } catch {
-            // Keep heuristic tags when provider is unavailable.
-          }
-        }
-        let updated = await repo.updateBookmark(message.userId, bookmark.id, {
-          tags: mergeBookmarkTags(bookmark.tags || [], suggestedTags, String(aiConfig?.tagging?.applyMode || 'merge'))
-        });
-        updated = await repo.setBookmarkAiSuggestions(message.userId, bookmark.id, {
-          ...(updated.aiSuggestions || {}),
-          autoTag: {
-            suggestedTags,
-            summary,
-            applied: true,
-            generatedAt: Date.now(),
-            applyMode: String(aiConfig?.tagging?.applyMode || 'merge'),
-            provider
-          }
-        });
-      }
-      succeeded += 1;
-    } catch {
-      failed += 1;
-    }
-    processed += 1;
-    await repo.updateAiBackfillTask(message.userId, task.id, (current) => ({
-      ...current,
-      status: 'running',
-      progress: { total: candidates.length, processed },
-      result: { succeeded, failed, processed, mode }
-    }));
-  }
-  await repo.updateAiBackfillTask(message.userId, task.id, {
-    status: failed ? (succeeded ? 'partial' : 'failed') : 'succeeded',
-    progress: { total: candidates.length, processed },
-    result: { succeeded, failed, processed, mode },
-    finishedAt: Date.now()
-  });
-}
-
 async function processSemanticDedupeTask(env, message) {
   const repo = createRepo(env);
   const job = await repo.getAiJob(message.userId, message.jobId);
@@ -3262,8 +3099,8 @@ async function processTaskMessage(env, message) {
   if (message.kind === 'plugin_task') return runPluginTask(env, message, { createRepo });
   if (message.kind === 'io_task') return processIoTask(env, message);
   if (message.kind === 'metadata_task') return runMetadataTask(env, message, { createRepo });
-  if (message.kind === 'ai_batch_task') return processAiBatchTask(env, message);
-  if (message.kind === 'ai_backfill_task') return processAiBackfillTask(env, message);
+  if (message.kind === 'ai_batch_task') return runAiBatchTask(env, message, { createRepo, normalizeTags, mergeBookmarkTags });
+  if (message.kind === 'ai_backfill_task') return runAiBackfillTask(env, message, { createRepo, buildStateForUser, normalizeTags, mergeBookmarkTags });
   if (message.kind === 'ai_rule_task') return runAiRuleTask(env, message, { createRepo, normalizeTags, mergeBookmarkTags });
   if (message.kind === 'broken_link_scan_task') return runBrokenLinkScanTask(env, message, { createRepo, buildStateForUser });
   if (message.kind === 'semantic_dedupe_task') return processSemanticDedupeTask(env, message);
