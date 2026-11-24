@@ -1335,3 +1335,4 @@
 - 风险：无 API、schema 或持久化变化；Worker 与 Node 仍有独立运行时实现，BK-AUD-201 保持未完成。
 
 - 托管验收：代码 head `be15417` 的 GitHub CI run `45383523713` 16/16 成功，Docker PR build `45383514232` 成功。macOS/Colima 本地 Docker 因 `deb.debian.org` DNS 解析失败而未完成重建，失败发生在 Dockerfile apt 阶段，不归因于应用代码。
+- 本机浏览器复验（2026-11-24）：`npm run ui:browser` 通过，生成 101 张页面状态截图、8 项 E2E 检查和 16 张扩展状态截图；CVDisplayLink 日志是无头 macOS 图形环境告警，未导致检查失败。生成的 PNG 仅有渲染字节差异，已还原到已审阅基线。
