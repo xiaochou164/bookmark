@@ -36,3 +36,29 @@ test('Worker metadata task processor records tenant-local not-found failures wit
   assert.equal(calls[3][2].status, 'failed');
   assert.equal(calls[3][2].result.failure.code, 'METADATA_FETCH_NETWORK');
 });
+
+test('Worker broken-link processor filters deleted bookmarks and classifies bounded URL results per tenant', async () => {
+  const { processBrokenLinkScanTask } = await import('../src/worker/taskProcessors.mjs');
+  const calls = [];
+  const repo = {
+    getAiJob: async (userId, jobId) => { calls.push(['job', userId, jobId]); return { id: jobId, createdAt: 10, request: { limit: 3 } }; },
+    updateAiJob: async (...args) => calls.push(['update', ...args])
+  };
+  await processBrokenLinkScanTask({}, { userId: 'alice', jobId: 'scan-1' }, {
+    createRepo: () => repo,
+    buildStateForUser: async (_env, userId) => {
+      assert.equal(userId, 'alice');
+      return { bookmarks: [
+        { id: 'ok', url: 'https://example.test' },
+        { id: 'local', url: 'http://127.0.0.1:3000' },
+        { id: 'invalid', url: 'file:///tmp/a' },
+        { id: 'deleted', url: 'https://deleted.test', deletedAt: 1 }
+      ] };
+    }
+  });
+  const completed = calls.at(-1)[3];
+  assert.equal(completed.status, 'succeeded');
+  assert.equal(completed.result.checked, 3);
+  assert.equal(completed.result.broken, 2);
+  assert.deepEqual(completed.result.results.map((item) => item.status), ['ok', 'unreachable', 'invalid']);
+});

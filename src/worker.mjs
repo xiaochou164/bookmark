@@ -32,7 +32,10 @@ import {
   aiCapabilityForPath, isAiGovernancePath, buildPublicAiGuide
 } from './worker/aiGovernance.mjs';
 import { summarizeTaskHealth, buildRealtimeSnapshot } from './worker/taskSummaries.mjs';
-import { processPluginTask as runPluginTask, processMetadataTask as runMetadataTask } from './worker/taskProcessors.mjs';
+import {
+  processPluginTask as runPluginTask, processMetadataTask as runMetadataTask,
+  processBrokenLinkScanTask as runBrokenLinkScanTask
+} from './worker/taskProcessors.mjs';
 import crypto from 'node:crypto';
 import openapiSpec from '../docs/openapi.json' with { type: 'json' };
 import {
@@ -3220,52 +3223,6 @@ async function processAiRuleTask(env, message) {
   }
 }
 
-async function processBrokenLinkScanTask(env, message) {
-  const repo = createRepo(env);
-  const job = await repo.getAiJob(message.userId, message.jobId);
-  if (!job) return;
-  await repo.updateAiJob(message.userId, job.id, {
-    status: 'running',
-    startedAt: Date.now(),
-    lastAttemptAt: Date.now(),
-    attemptCount: Number(job.attemptCount || 0) + 1
-  });
-  try {
-    const state = await buildStateForUser(env, message.userId);
-    const limit = Math.max(1, Math.min(100, Number(job.request?.limit || 20) || 20));
-    const items = state.bookmarks.filter((item) => !item.deletedAt).slice(0, limit);
-    const results = items.map((bookmark) => {
-      const url = String(bookmark.url || '');
-      let status = 'unknown';
-      if (!/^https?:\/\//i.test(url)) status = 'invalid';
-      else if (/localhost|127\.0\.0\.1/i.test(url)) status = 'unreachable';
-      else status = 'ok';
-      return { bookmarkId: bookmark.id, url: bookmark.url, status };
-    });
-    await repo.updateAiJob(message.userId, job.id, {
-      status: 'succeeded',
-      finishedAt: Date.now(),
-      result: {
-        id: job.id,
-        type: 'broken_link_scan',
-        status: 'succeeded',
-        results,
-        checked: results.length,
-        broken: results.filter((item) => item.status !== 'ok').length,
-        createdAt: Number(job.createdAt || Date.now()),
-        updatedAt: Date.now()
-      },
-      error: null
-    });
-  } catch (error) {
-    await repo.updateAiJob(message.userId, job.id, {
-      status: 'failed',
-      finishedAt: Date.now(),
-      error: { message: String(error?.message || error) }
-    });
-  }
-}
-
 async function processSemanticDedupeTask(env, message) {
   const repo = createRepo(env);
   const job = await repo.getAiJob(message.userId, message.jobId);
@@ -3405,7 +3362,7 @@ async function processTaskMessage(env, message) {
   if (message.kind === 'ai_batch_task') return processAiBatchTask(env, message);
   if (message.kind === 'ai_backfill_task') return processAiBackfillTask(env, message);
   if (message.kind === 'ai_rule_task') return processAiRuleTask(env, message);
-  if (message.kind === 'broken_link_scan_task') return processBrokenLinkScanTask(env, message);
+  if (message.kind === 'broken_link_scan_task') return runBrokenLinkScanTask(env, message, { createRepo, buildStateForUser });
   if (message.kind === 'semantic_dedupe_task') return processSemanticDedupeTask(env, message);
 }
 
