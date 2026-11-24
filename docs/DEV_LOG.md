@@ -1354,5 +1354,5 @@
 - 证据：`src/worker.mjs` 原先内联 broken-link scan 任务，混合用户状态读取、URL 分类、结果计数和 AI job 状态更新。
 - 根因：扫描任务没有独立处理器，租户过滤和 deleted bookmark 规则缺少直接任务级回归。
 - 修改：迁移至 `src/worker/taskProcessors.mjs`，通过 `createRepo`/`buildStateForUser` 注入保持 userId 边界；保留 1–100 的扫描上限、`http(s)`/本地地址/非法 scheme 分类和失败状态写入。Worker 入口从 6,259 行降至 6,216 行，新增第三项 task processor 回归。
-- 验证：目标测试 3/3；`npm test` 68/68；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。Docker/hosted CI 待当前提交后确认。
+- 验证：目标测试 3/3；`npm test` 68/68；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。GitHub CI `45388109218` 16/16、Docker PR build `45388109307` 均成功。
 - 风险：无 API、schema 或持久化格式变化；IO、AI batch/backfill/rules 和 semantic dedupe 任务域仍需继续拆分，BK-AUD-201 保持未完成。

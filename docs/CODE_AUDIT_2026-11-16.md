@@ -12,7 +12,7 @@
 
 该增量托管验收已完成：GitHub CI `45386350505` 16/16 成功，Docker PR build `45386350540` 成功；BK-AUD-201 仍未完成。
 
-当前工作树增量：broken-link scan processor 已并入 `src/worker/taskProcessors.mjs`，Worker 入口降至 6,216 行；目标测试 3/3、全套 `npm test` 68/68、docs/UI/CF/smoke/extension 门禁通过，待提交后进行托管验收。
+当前工作树增量：broken-link scan processor 已并入 `src/worker/taskProcessors.mjs`，Worker 入口降至 6,216 行；目标测试 3/3、全套 `npm test` 68/68、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45388109218` 16/16、Docker PR build `45388109307` 均成功。
 
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
