@@ -39,7 +39,8 @@ import {
 import {
   processAiRuleTask as runAiRuleTask,
   processAiBatchTask as runAiBatchTask,
-  processAiBackfillTask as runAiBackfillTask
+  processAiBackfillTask as runAiBackfillTask,
+  processSemanticDedupeTask as runSemanticDedupeTask
 } from './worker/aiTaskProcessors.mjs';
 import crypto from 'node:crypto';
 import openapiSpec from '../docs/openapi.json' with { type: 'json' };
@@ -2963,137 +2964,6 @@ function eventStreamResponse(event, payload, { requestId } = {}) {
   return new Response(`retry: 3000\n\nevent: ${event}\ndata: ${JSON.stringify(payload)}\n\n`, { headers });
 }
 
-async function processSemanticDedupeTask(env, message) {
-  const repo = createRepo(env);
-  const job = await repo.getAiJob(message.userId, message.jobId);
-  if (!job) return;
-  await repo.updateAiJob(message.userId, job.id, {
-    status: 'running',
-    startedAt: Date.now(),
-    lastAttemptAt: Date.now(),
-    attemptCount: Number(job.attemptCount || 0) + 1
-  });
-  try {
-    const threshold = Math.max(0.7, Math.min(0.995, Number(job.request?.threshold || 0.9) || 0.9));
-    const minClusterSize = Math.max(2, Math.min(20, Number(job.request?.minClusterSize || 2) || 2));
-    const limit = Math.max(20, Math.min(500, Number(job.request?.limit || 240) || 240));
-    const state = await buildStateForUser(env, message.userId);
-    const folders = state.folders;
-    const bookmarks = state.bookmarks
-      .filter((item) => !item.deletedAt)
-      .sort((a, b) => (Number(b.updatedAt || b.createdAt || 0) || 0) - (Number(a.updatedAt || a.createdAt || 0) || 0))
-      .slice(0, limit);
-    const items = bookmarks.map((bookmark) => ({
-      bookmark,
-      id: String(bookmark.id),
-      vector: (() => {
-        const text = [bookmark.title, bookmark.note, bookmark.metadata?.description, bookmark.article?.excerpt].join(' ');
-        const words = wordsFromText(text);
-        const vec = new Array(64).fill(0);
-        for (const word of words) {
-          const hash = Number.parseInt(sha256Hex(word).slice(0, 8), 16);
-          vec[hash % vec.length] += 1;
-        }
-        return vec;
-      })(),
-      urlKey: normalizeUrlLoose(bookmark.url || '').toLowerCase(),
-      host: (() => { try { return new URL(bookmark.url || '').hostname.replace(/^www\./, ''); } catch { return ''; } })()
-    }));
-    const parent = new Map(items.map((x) => [x.id, x.id]));
-    const find = (x) => {
-      let p = parent.get(x) || x;
-      while (p !== (parent.get(p) || p)) p = parent.get(p);
-      let n = x;
-      while (n !== p) {
-        const nextP = parent.get(n) || n;
-        parent.set(n, p);
-        n = nextP;
-      }
-      return p;
-    };
-    const union = (a, b) => {
-      const ra = find(a);
-      const rb = find(b);
-      if (ra !== rb) parent.set(rb, ra);
-    };
-    const edges = [];
-    const exactByUrl = new Map();
-    for (const it of items) {
-      if (!it.urlKey) continue;
-      if (!exactByUrl.has(it.urlKey)) exactByUrl.set(it.urlKey, []);
-      exactByUrl.get(it.urlKey).push(it.id);
-    }
-    for (const ids of exactByUrl.values()) {
-      if (ids.length < 2) continue;
-      for (let i = 1; i < ids.length; i += 1) {
-        union(ids[0], ids[i]);
-        edges.push({ a: ids[0], b: ids[i], similarity: 1, reason: 'exact_url' });
-      }
-    }
-    for (let i = 0; i < items.length; i += 1) {
-      for (let j = i + 1; j < items.length; j += 1) {
-        const sim = cosineSimilarity(items[i].vector, items[j].vector);
-        if (sim < threshold) continue;
-        union(items[i].id, items[j].id);
-        edges.push({ a: items[i].id, b: items[j].id, similarity: Number(sim.toFixed(4)), reason: 'semantic' });
-      }
-    }
-    const groupsMap = new Map();
-    for (const it of items) {
-      const root = find(it.id);
-      if (!groupsMap.has(root)) groupsMap.set(root, []);
-      groupsMap.get(root).push(it);
-    }
-    const clusters = [...groupsMap.entries()]
-      .filter(([, members]) => members.length >= minClusterSize)
-      .map(([root, members]) => ({
-        id: `semdup_${root}`,
-        size: members.length,
-        maxSimilarity: Number(Math.max(...edges.filter((e) => members.some((m) => m.id === e.a) && members.some((m) => m.id === e.b)).map((e) => Number(e.similarity || 0)), 0).toFixed(4)),
-        avgSimilarity: Number((edges.filter((e) => members.some((m) => m.id === e.a) && members.some((m) => m.id === e.b)).reduce((sum, e) => sum + Number(e.similarity || 0), 0) / Math.max(1, edges.filter((e) => members.some((m) => m.id === e.a) && members.some((m) => m.id === e.b)).length)).toFixed(4)),
-        potentialDuplicates: Math.max(0, members.length - 1),
-        representative: members[0] ? { bookmarkId: members[0].id, title: String(members[0].bookmark.title || ''), url: String(members[0].bookmark.url || '') } : null,
-        representativeSources: uniqueByLower(members.map((m) => m.host)).slice(0, 6).map((host) => ({ host, count: members.filter((m) => m.host === host).length })),
-        items: members.map((m) => ({
-          id: m.bookmark.id,
-          title: m.bookmark.title,
-          url: m.bookmark.url,
-          host: m.host,
-          folderId: m.bookmark.folderId,
-          folderPath: folderPathOf(folders, m.bookmark.folderId),
-          tags: Array.isArray(m.bookmark.tags) ? m.bookmark.tags.slice(0, 10) : [],
-          updatedAt: m.bookmark.updatedAt,
-          createdAt: m.bookmark.createdAt
-        })),
-        edges: edges.filter((e) => members.some((m) => m.id === e.a) && members.some((m) => m.id === e.b)).slice(0, 20)
-      }))
-      .sort((a, b) => (b.size - a.size) || (b.maxSimilarity - a.maxSimilarity));
-    await repo.updateAiJob(message.userId, job.id, {
-      status: 'succeeded',
-      finishedAt: Date.now(),
-      result: {
-        id: job.id,
-        type: 'semantic_dedupe_cluster_scan',
-        status: 'succeeded',
-        threshold,
-        minClusterSize,
-        scanned: items.length,
-        clusters,
-        totalClusters: clusters.length,
-        potentialDuplicates: clusters.reduce((n, c) => n + Number(c.potentialDuplicates || 0), 0),
-        provider: { providerType: 'cloudflare-worker', model: 'heuristic-semantic-v1' }
-      },
-      error: null
-    });
-  } catch (error) {
-    await repo.updateAiJob(message.userId, job.id, {
-      status: 'failed',
-      finishedAt: Date.now(),
-      error: { message: String(error?.message || error) }
-    });
-  }
-}
-
 async function processTaskMessage(env, message) {
   await ensureSchema(env);
   if (message.kind === 'plugin_task') return runPluginTask(env, message, { createRepo });
@@ -3103,7 +2973,7 @@ async function processTaskMessage(env, message) {
   if (message.kind === 'ai_backfill_task') return runAiBackfillTask(env, message, { createRepo, buildStateForUser, normalizeTags, mergeBookmarkTags });
   if (message.kind === 'ai_rule_task') return runAiRuleTask(env, message, { createRepo, normalizeTags, mergeBookmarkTags });
   if (message.kind === 'broken_link_scan_task') return runBrokenLinkScanTask(env, message, { createRepo, buildStateForUser });
-  if (message.kind === 'semantic_dedupe_task') return processSemanticDedupeTask(env, message);
+  if (message.kind === 'semantic_dedupe_task') return runSemanticDedupeTask(env, message, { createRepo, buildStateForUser, hashText: sha256Hex });
 }
 
 async function handleQueue(batch, env) {
