@@ -1,4 +1,5 @@
-import { fetchBookmarkMetadata, failurePayload } from './externalResources.mjs';
+import { exportCsvPayload, exportHtmlPayload, exportJsonPayload, parseImportCsv, parseImportHtml, parseImportJson } from './bookmarkTransfer.mjs';
+import { fetchBookmarkMetadata, failurePayload, readR2Text } from './externalResources.mjs';
 
 export async function processPluginTask(env, message, { createRepo }) {
   const repo = createRepo(env);
@@ -95,6 +96,91 @@ export async function processBrokenLinkScanTask(env, message, { createRepo, buil
       status: 'failed',
       finishedAt: Date.now(),
       error: { message: String(error?.message || error) }
+    });
+  }
+}
+
+export async function processIoTask(env, message, {
+  createRepo,
+  buildStateForUser,
+  writeR2Text,
+  runStatement,
+  normalizeTags,
+  safeJsonParse,
+  rootFolderId = 'root'
+}) {
+  const repo = createRepo(env);
+  const task = await repo.getIoTask(message.userId, message.taskId);
+  if (!task || task.status !== 'queued') return;
+  const startAt = Date.now();
+  const claim = await runStatement(
+    env.DB.prepare(`UPDATE io_tasks SET status = 'running', started_at = ?3 WHERE user_id = ?1 AND id = ?2 AND status = 'queued'`),
+    message.userId,
+    task.id,
+    startAt
+  );
+  if (claim.meta?.changes === 0) return;
+  await repo.updateIoTask(task.id, {
+    status: 'running', progress: { percent: 20, step: 'starting' }, startedAt: startAt, finishedAt: 0
+  });
+  try {
+    const state = await buildStateForUser(env, message.userId);
+    let result = null;
+    let outputFile = null;
+    if (task.type === 'export_json') {
+      const body = JSON.stringify(exportJsonPayload(state), null, 2);
+      outputFile = await writeR2Text(env, 'exports', `io/${task.id}.json`, body, 'application/json; charset=utf-8');
+      result = { format: 'json', bookmarks: state.bookmarks.length, folders: state.folders.length };
+    } else if (task.type === 'export_csv') {
+      const body = exportCsvPayload(state);
+      outputFile = await writeR2Text(env, 'exports', `io/${task.id}.csv`, body, 'text/csv; charset=utf-8');
+      result = { format: 'csv', bookmarks: state.bookmarks.length };
+    } else if (task.type === 'export_html') {
+      const body = exportHtmlPayload(state);
+      outputFile = await writeR2Text(env, 'exports', `io/${task.id}.html`, body, 'text/html; charset=utf-8');
+      result = { format: 'html', bookmarks: state.bookmarks.length };
+    } else if (task.type.startsWith('import_')) {
+      let entries = [];
+      if (task.type === 'import_json') entries = parseImportJson(task.input.content || '', { rootFolderId, normalizeTags, parseJson: (input) => safeJsonParse(input, null) });
+      if (task.type === 'import_csv') entries = parseImportCsv(task.input.content || '', { rootFolderId, normalizeTags });
+      if (task.type === 'import_html') entries = parseImportHtml(task.input.content || '', { rootFolderId, normalizeTags });
+      let created = 0;
+      for (const entry of entries) {
+        await repo.createBookmark(message.userId, { ...entry, folderId: task.input.targetFolderId || entry.folderId || rootFolderId });
+        created += 1;
+      }
+      result = { imported: created, total: entries.length };
+    } else if (task.type === 'restore_backup') {
+      const sourceKey = String(task.input?.backupFile?.key || '');
+      if (sourceKey && !(await repo.listBackups(message.userId)).some((backup) => backup.file?.key === sourceKey)) {
+        throw Object.assign(new Error('Backup object not found'), { status: 404, code: 'NOT_FOUND' });
+      }
+      const source = task.input?.backupFile?.key
+        ? await readR2Text(env, sourceKey)
+        : String(task.input?.content || '');
+      const payload = safeJsonParse(source, null);
+      if (!payload) throw new Error('invalid backup payload');
+      result = await repo.restoreBackupState(message.userId, payload, {
+        mode: ['merge', 'replace'].includes(String(task.input?.mode || '')) ? String(task.input.mode) : 'merge'
+      });
+    } else {
+      throw new Error(`unsupported task type: ${task.type}`);
+    }
+    const reportFile = await writeR2Text(
+      env,
+      'reports',
+      `io/${task.id}.json`,
+      JSON.stringify({ taskId: task.id, type: task.type, result }, null, 2),
+      'application/json; charset=utf-8'
+    );
+    await repo.updateIoTask(task.id, {
+      status: 'succeeded', result, progress: { percent: 100, step: 'completed' }, outputFile, reportFile,
+      startedAt: startAt, finishedAt: Date.now()
+    });
+  } catch (error) {
+    await repo.updateIoTask(task.id, {
+      status: 'failed', error: String(error?.message || error), progress: { percent: 100, step: 'failed' },
+      startedAt: startAt, finishedAt: Date.now()
     });
   }
 }
