@@ -1356,3 +1356,12 @@
 - 修改：迁移至 `src/worker/taskProcessors.mjs`，通过 `createRepo`/`buildStateForUser` 注入保持 userId 边界；保留 1–100 的扫描上限、`http(s)`/本地地址/非法 scheme 分类和失败状态写入。Worker 入口从 6,259 行降至 6,216 行，新增第三项 task processor 回归。
 - 验证：目标测试 3/3；`npm test` 68/68；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。GitHub CI `45388109218` 16/16、Docker PR build `45388109307` 均成功。
 - 风险：无 API、schema 或持久化格式变化；IO、AI batch/backfill/rules 和 semantic dedupe 任务域仍需继续拆分，BK-AUD-201 保持未完成。
+
+
+## BK-AUD-201 / P2 — Worker AI rules processor 解耦
+
+- 证据：`src/worker.mjs` 原先内联按用户规则执行自动标签/摘要的 AI job，混合 provider fallback、noteMode 和 job 状态更新。
+- 根因：单书签规则任务没有独立处理器，成功/失败状态和租户参数缺少直接回归。
+- 修改：迁移至 `src/worker/aiTaskProcessors.mjs`，注入 `createRepo`、标签归一化和合并策略；继续使用 heuristic fallback、provider 配置门禁、`if_empty`/`replace` noteMode 和原 job result 格式。Worker 入口从 6,216 行降至 6,119 行，新增 `tests/worker-ai-task-processors.test.js` 两项回归。
+- 验证：目标测试 2/2；`npm test` 70/70；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。Docker/hosted CI 待当前提交后确认。
+- 风险：无 API、schema 或持久化格式变化；AI batch/backfill、IO 和 semantic dedupe 任务域仍需继续拆分，BK-AUD-201 保持未完成。
