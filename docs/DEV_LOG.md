@@ -1345,5 +1345,5 @@
 - 证据：`src/worker.mjs` 原先内联插件同步任务和元数据抓取任务，任务状态写入、租户参数与外部抓取错误处理直接混在 Worker 入口。
 - 根因：插件/元数据任务处理器没有独立边界和直接租户回归测试。
 - 修改：迁移至 `src/worker/taskProcessors.mjs`，通过 `createRepo` 注入保留现有 repo 和 userId 边界；元数据任务继续调用 `externalResources` 的安全抓取与错误分类。Worker 入口从 6,311 行降至 6,259 行，新增 `tests/worker-task-processors.test.js` 两项回归。
-- 验证：目标测试 2/2；`npm test` 67/67；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。Docker/hosted CI 待当前提交后确认。
+- 验证：目标测试 2/2；`npm test` 67/67；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。GitHub CI `45386350505` 16/16 成功，Docker PR build `45386350540` 成功。
 - 风险：无 API、schema 或持久化格式变化；AI/IO/其他任务域仍在入口中，BK-AUD-201 保持未完成。
