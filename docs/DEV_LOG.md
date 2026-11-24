@@ -1372,4 +1372,4 @@
 - 修改文件：`src/worker/aiTaskProcessors.mjs` 新增 `processAiBatchTask`、`processAiBackfillTask`；`src/worker.mjs` 仅保留依赖注入后的队列分发；新增 `tests/worker-ai-batch-processors.test.js`。
 - 核心内容：保持既有 heuristic/provider fallback、merge/replace 标签策略、partial/failed/succeeded 状态和批量进度格式；回填 summary 仍只处理未删除且空备注书签；所有 repo/state 调用继续显式传入认证用户 ID。
 - 验证：目标测试 2/2；`npm test` 72/72；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101 张页面截图、8 项 E2E、16 张扩展截图），生成截图已恢复到审阅基线；`docker build -t rainbow-audit-local .` 成功，临时容器 `/api/health` 返回 `ok:true` 且 Docker health 为 `healthy`。
-- 遗留风险：hosted CI/Docker 将在提交后复验；IO、semantic dedupe、`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 继续开放。无 API/schema/持久化格式变化。
+- 遗留风险：hosted CI `45391499346`（16/16）与 Docker `45391499363` 已通过；IO、semantic dedupe、`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 继续开放。无 API/schema/持久化格式变化。
