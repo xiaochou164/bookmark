@@ -6,7 +6,7 @@
 
 ## 当前状态覆盖
 
-以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `45383523713` / Docker `45383514232`；Worker 当前入口为 6,311 行，最近 external resources 增量的 CI/Docker 验收已通过。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,956 行，最近 AI batch/backfill 增量的 hosted 验收待本次提交后复验。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
 
 本轮最新增量：Worker 当前入口降至 6,259 行，插件任务与元数据任务处理器已迁至 `src/worker/taskProcessors.mjs`；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过，BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
@@ -15,6 +15,8 @@
 当前工作树增量：broken-link scan processor 已并入 `src/worker/taskProcessors.mjs`，Worker 入口降至 6,216 行；目标测试 3/3、全套 `npm test` 68/68、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45388109218` 16/16、Docker PR build `45388109307` 均成功。
 
 当前工作树增量：AI rules processor 已迁至 `src/worker/aiTaskProcessors.mjs`，Worker 入口降至 6,119 行；目标测试 2/2、全套 `npm test` 70/70、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45389699468` 16/16、Docker PR build `45389699369` 均成功。
+
+本轮最新增量：AI batch/backfill processors 已迁至 `src/worker/aiTaskProcessors.mjs`，Worker 入口降至 5,956 行；新增 2 项租户边界、部分失败进度与 summary 候选筛选回归，目标测试 2/2、全套 `npm test` 72/72、docs/UI/CF/smoke/extension 门禁通过；`npm run ui:browser` 通过（101 张页面状态、8 项 E2E、16 张扩展截图），生成截图已恢复到已审阅基线。BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
@@ -36,7 +38,14 @@
 - [x] **BK-AUD-202 / P2 / 测试门禁和性能（托管验收通过）**：CI 加入 Chrome headless UI/E2E/扩展回归、Cloudflare 语法门禁、Docker 构建启动和截图 artifact；浏览器脚本采集 FCP/LCP/CLS、INP observer、heap、长任务、布局/脚本耗时，并运行低速网、CPU 限速和大样本检查。首次托管运行显示 runner 的 user namespace/AppArmor 限制导致 Chrome `No usable sandbox`；`scripts/ui-browser-audit.mjs` 现仅在 `CI` 环境传入 `--no-sandbox`，本机保持默认沙箱。最终代码 CI run `44300423004` 的全部 16 步通过，Docker PR build run `44300423001` 通过且未推送镜像；Docker action 已升级到 Node 24，`ubuntu-latest` 改固定 `ubuntu-24.04`，两项 checks 无 warning annotations。INP 若未捕获用户交互则不作为性能结论。
 - [x] **BK-AUD-203 / P2 / 文档与实现漂移**：修正 OpenAPI 对 `/api/chrome-sync` preview 的写入描述与 schema，说明 `preview: true` 零持久化写入；更新架构、扩展同步、UI 审计和 UI 测试清单，区分本轮证据与历史状态，并补充隔离测试、部署边界和外部限制。
 - [x] **BK-AUD-204 / P2 / 设计系统视觉收口（浏览器矩阵验证）**：修正深色卡片/分页 surface、设置状态色、扩展状态反馈及窄窗宽度；核验控件、焦点、触屏目标和响应式动作区。具体截图、视口和 axe 结果列在 P1 执行记录。
-- [ ] **BK-AUD-205 / P2 / Node/Worker AI 评估样本漂移（发现并修复，hosted 验收待完成）**：证据为 `src/services/aiGovernance.js` 的默认评估输入包含 URL/note，而 `src/worker.mjs` 原 Worker fixture 省略了三条样本中的 URL/note，导致两后端评估输入不等价。根因是 defaults 在 CJS/Worker 两处独立维护。已将 Worker 样本补齐为 Node 同值，并在 `tests/worker-ai-governance.test.js` 增加 `DEFAULT_AI_EVAL_SAMPLES` 深比较（同时检查 privacy/feature policy defaults）。本机目标测试 4/4、全套 npm test 61/61 通过；最终勾选等待 latest hosted CI。
+- [x] **BK-AUD-205 / P2 / Node/Worker AI 评估样本漂移（已修复并完成 hosted 验收）**：证据为 `src/services/aiGovernance.js` 的默认评估输入包含 URL/note，而 `src/worker.mjs` 原 Worker fixture 省略了三条样本中的 URL/note，导致两后端评估输入不等价。根因是 defaults 在 CJS/Worker 两处独立维护。已将 Worker 样本补齐为 Node 同值，并在 `tests/worker-ai-governance.test.js` 增加 `DEFAULT_AI_EVAL_SAMPLES` 深比较（同时检查 privacy/feature policy defaults）。本机目标测试 4/4、全套 `npm test` 61/61 通过；GitHub CI `44327200479` 与 Docker `44327200197` 均通过。
+
+## BK-AUD-201 / P2 — Worker AI batch/backfill processors 解耦（2026-11-24）
+
+- 证据/根因：AI 批量标签与历史回填任务原先与 Worker 队列分发、语义去重和 HTTP 入口共存，provider fallback、进度写回和候选过滤无法单独回归，增加改动时误触租户边界的风险。
+- 修改：将 `processAiBatchTask`、`processAiBackfillTask` 迁至 `src/worker/aiTaskProcessors.mjs`，通过注入 `createRepo`、`buildStateForUser`、标签归一化和合并策略保持现有行为与 userId 约束；`src/worker.mjs` 仅保留队列分发。新增 `tests/worker-ai-batch-processors.test.js`，覆盖批量任务缺失书签的 partial 结果/进度、租户参数，以及回填 summary 模式仅处理未删除且无备注书签。
+- 验证：目标测试 2/2；`npm test` 72/72；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），生成截图已恢复基线。`docker build -t rainbow-audit-local .` 成功，临时容器 `/api/health` 返回 `ok:true` 且 Docker health 状态为 `healthy`；hosted CI/Docker 将在本次提交后复验。
+- 风险：无 API、schema 或持久化格式变化；AI IO、semantic dedupe、`public/app.mjs` 和其他 Worker/Node 大型入口仍未完全拆分，BK-AUD-201 保持未完成。
 
 ## BK-AUD-201 Worker external resources 拆分（2026-11-24）
 

@@ -1365,3 +1365,11 @@
 - 修改：迁移至 `src/worker/aiTaskProcessors.mjs`，注入 `createRepo`、标签归一化和合并策略；继续使用 heuristic fallback、provider 配置门禁、`if_empty`/`replace` noteMode 和原 job result 格式。Worker 入口从 6,216 行降至 6,119 行，新增 `tests/worker-ai-task-processors.test.js` 两项回归。
 - 验证：目标测试 2/2；`npm test` 70/70；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。GitHub CI `45389699468` 16/16、Docker PR build `45389699369` 均成功。
 - 风险：无 API、schema 或持久化格式变化；AI batch/backfill、IO 和 semantic dedupe 任务域仍需继续拆分，BK-AUD-201 保持未完成。
+
+## 2026-11-24 — BK-AUD-201 Worker AI batch/backfill processors 拆分
+
+- 问题/根因：AI 批量标签和历史回填任务原先内联在 `src/worker.mjs`，与队列分发、语义任务及 HTTP 入口混杂；provider fallback、进度写回和 summary 候选过滤缺少任务级回归，容易在后续维护中破坏 userId 边界。
+- 修改文件：`src/worker/aiTaskProcessors.mjs` 新增 `processAiBatchTask`、`processAiBackfillTask`；`src/worker.mjs` 仅保留依赖注入后的队列分发；新增 `tests/worker-ai-batch-processors.test.js`。
+- 核心内容：保持既有 heuristic/provider fallback、merge/replace 标签策略、partial/failed/succeeded 状态和批量进度格式；回填 summary 仍只处理未删除且空备注书签；所有 repo/state 调用继续显式传入认证用户 ID。
+- 验证：目标测试 2/2；`npm test` 72/72；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101 张页面截图、8 项 E2E、16 张扩展截图），生成截图已恢复到审阅基线；`docker build -t rainbow-audit-local .` 成功，临时容器 `/api/health` 返回 `ok:true` 且 Docker health 为 `healthy`。
+- 遗留风险：hosted CI/Docker 将在提交后复验；IO、semantic dedupe、`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 继续开放。无 API/schema/持久化格式变化。
