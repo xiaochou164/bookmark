@@ -1324,3 +1324,12 @@
 - 修改：抽取到 `src/worker/taskSummaries.mjs`；repo 持续按 `userId` 查询，默认插件 ID 维持 `raindropSync`，注入 `now` 供可重复测试；Worker 文件从 6,514 行降至 6,433 行。新增两项测试覆盖租户传参、任务/DLQ 状态、提醒完成/删除过滤与签名。
 - 验证：目标测试 2/2；`npm test` 63/63；`cf:check`、`cf:smoke`、`docs:check`、`ui:check`、`extension:check` 通过。Docker 镜像 build/start 成功，`/api/health` 返回 200；GitHub CI run `44328101550`（16 步）与 Docker PR build run `44328102056` 均成功。
 - 风险：无 API、schema 或持久化变化；BK-AUD-201 保持未完成，可独立回滚 helper/import/test。
+
+
+## BK-AUD-201 / P2 — Worker external resources 解耦
+
+- 证据：`src/worker.mjs` 原先内联 `fetchBookmarkMetadata`、`fetchBookmarkArticle`、错误分类、R2 读取和备份归一化，入口同时承担网络安全边界和 API 分发。
+- 根因：外部资源安全规则和任务调用方没有独立模块，错误分类缺少直接回归覆盖。
+- 修改：抽取至 `src/worker/externalResources.mjs`，继续使用 `publicFetch` 的 URL 协议、重定向、响应大小和 deadline 约束；入口从 6,433 行降至 6,311 行。新增两项测试覆盖协议拒绝、HTTP/DNS 分类、R2 缺失对象和 backup payload 类型边界。
+- 验证：目标测试 2/2；`npm test` 65/65；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。Docker 和 hosted CI 待当前提交后确认。
+- 风险：无 API、schema 或持久化变化；Worker 与 Node 仍有独立运行时实现，BK-AUD-201 保持未完成。

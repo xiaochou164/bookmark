@@ -26,6 +26,10 @@
 - [x] **BK-AUD-204 / P2 / 设计系统视觉收口（浏览器矩阵验证）**：修正深色卡片/分页 surface、设置状态色、扩展状态反馈及窄窗宽度；核验控件、焦点、触屏目标和响应式动作区。具体截图、视口和 axe 结果列在 P1 执行记录。
 - [ ] **BK-AUD-205 / P2 / Node/Worker AI 评估样本漂移（发现并修复，hosted 验收待完成）**：证据为 `src/services/aiGovernance.js` 的默认评估输入包含 URL/note，而 `src/worker.mjs` 原 Worker fixture 省略了三条样本中的 URL/note，导致两后端评估输入不等价。根因是 defaults 在 CJS/Worker 两处独立维护。已将 Worker 样本补齐为 Node 同值，并在 `tests/worker-ai-governance.test.js` 增加 `DEFAULT_AI_EVAL_SAMPLES` 深比较（同时检查 privacy/feature policy defaults）。本机目标测试 4/4、全套 npm test 61/61 通过；最终勾选等待 latest hosted CI。
 
+## BK-AUD-201 Worker external resources 拆分（2026-11-24）
+
+`src/worker.mjs` 原先内联外部 URL 元数据/文章抓取、SSRF 结果错误分类、R2 备份对象读取和备份 payload 归一化。迁移至 `src/worker/externalResources.mjs`，复用同一 `publicFetch` 安全边界（协议、重定向、大小和超时），入口从 6,433 行降至 6,311 行。新增 `tests/worker-external-resources.test.js` 两项回归，覆盖不允许的 URL 协议、DNS/HTTP 错误重试分类、缺失对象和数组边界。目标测试 2/2、全套 `npm test` 65/65、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 已通过；Docker 与最新 hosted CI 待提交后验收。无 API/schema/data-format 改动，BK-AUD-201 继续开放。
+
 ## 验收与执行约束
 1. 每项填写：问题证据（路径+行号/截图）、根因、变更文件、验证命令与结果、风险、回退方式；无法复现的标为「复核无异常」，不编造缺陷。
 2. 优先级顺序：P0 → P1 → P2；每个阶段单独 commit/PR，不改真实线上数据，不直接生产部署、不自动合并 PR。
