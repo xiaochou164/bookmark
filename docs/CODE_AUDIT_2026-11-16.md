@@ -4,6 +4,10 @@
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
+## 当前状态覆盖
+
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `45383523713` / Docker `45383514232`；Worker 当前入口为 6,311 行，最近 external resources 增量的 CI/Docker 验收已通过。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
+
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
 - [x] **BK-AUD-002 / P0 / 扩展同步预览的零写入契约（已修复并做真实本地回归）**：原文档称 PREVIEW 会写入，且实际 Popup/Options 消息分发调用 `/api/chrome-sync` 时可触发写入。Chrome/Safari 现明确发送 preview；Node/Worker 使用只读内存 repo，认证时间、租户初始化、索引、deviceId、状态和日志均不落盘。VM 消息分发与隔离 SQLite/JSON HTTP 回归均比较持久化快照，Chrome/Safari preview 零写断言通过；扩展同步文档与 OpenAPI 已同步。

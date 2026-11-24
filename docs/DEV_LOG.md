@@ -1331,8 +1331,10 @@
 - 证据：`src/worker.mjs` 原先内联 `fetchBookmarkMetadata`、`fetchBookmarkArticle`、错误分类、R2 读取和备份归一化，入口同时承担网络安全边界和 API 分发。
 - 根因：外部资源安全规则和任务调用方没有独立模块，错误分类缺少直接回归覆盖。
 - 修改：抽取至 `src/worker/externalResources.mjs`，继续使用 `publicFetch` 的 URL 协议、重定向、响应大小和 deadline 约束；入口从 6,433 行降至 6,311 行。新增两项测试覆盖协议拒绝、HTTP/DNS 分类、R2 缺失对象和 backup payload 类型边界。
-- 验证：目标测试 2/2；`npm test` 65/65；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。Docker 和 hosted CI 待当前提交后确认。
+- 验证：目标测试 2/2；`npm test` 65/65；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。Docker PR build `45383514232` 和 hosted CI `45383523713` 均成功；本地 Docker 因 `deb.debian.org` DNS 解析失败未完成重建。
 - 风险：无 API、schema 或持久化变化；Worker 与 Node 仍有独立运行时实现，BK-AUD-201 保持未完成。
+
+- 外部资源增量托管验收：代码 head `be15417` 的 CI `45383523713` 16/16 成功，Docker `45383514232` 成功；本地 Docker 的 DNS 限制已在审计记录中说明。
 
 - 托管验收：代码 head `be15417` 的 GitHub CI run `45383523713` 16/16 成功，Docker PR build `45383514232` 成功。macOS/Colima 本地 Docker 因 `deb.debian.org` DNS 解析失败而未完成重建，失败发生在 Dockerfile apt 阶段，不归因于应用代码。
 - 本机浏览器复验（2026-11-24）：`npm run ui:browser` 通过，生成 101 张页面状态截图、8 项 E2E 检查和 16 张扩展状态截图；CVDisplayLink 日志是无头 macOS 图形环境告警，未导致检查失败。生成的 PNG 仅有渲染字节差异，已还原到已审阅基线。

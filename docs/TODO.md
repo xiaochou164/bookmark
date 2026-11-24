@@ -385,7 +385,7 @@
 - [x] **P2** `BK-AUD-204` 设计系统细节收口
 - [x] **P2** `BK-AUD-205` Node/Worker AI 默认评估样本漂移（Worker 原 fixture 缺 3 条 URL/note，已补齐并加入 parity test；本地 4/4、npm test 61/61、GitHub CI `44327200479`（16 步）与 Docker PR build `44327200197` 通过）
 
-BK-AUD-201 最新增量（2026-11-24）：Worker external resource helper 已抽到 `src/worker/externalResources.mjs`，入口降至 6,311 行；新增 2 项协议、错误分类、R2 和备份 payload 回归。目标 2/2、全套 `npm test` 65/65、docs/UI/CF/extension 本地门禁通过；Docker 与本次提交后的 hosted CI 待完成，BK-AUD-201 仍未完成。
+BK-AUD-201 最新增量（2026-11-24）：Worker external resource helper 已抽到 `src/worker/externalResources.mjs`，入口降至 6,311 行；新增 2 项协议、错误分类、R2 和备份 payload 回归。目标 2/2、全套 `npm test` 65/65、docs/UI/CF/extension 本地门禁通过；GitHub CI `45383523713` 与 Docker PR build `45383514232` 通过，本地 Docker 因 `deb.debian.org` DNS 解析失败未完成重建，BK-AUD-201 仍未完成。
 
 BK-AUD-201 最新验收（2026-11-24）：GitHub CI `45383523713` 16/16 通过，Docker PR build `45383514232` 通过；本地 Colima Docker 因 `deb.debian.org` DNS 解析失败未完成重建，已记录为环境限制。BK-AUD-201 仍未完成。
 
