@@ -36,6 +36,7 @@ import {
   processPluginTask as runPluginTask, processMetadataTask as runMetadataTask,
   processBrokenLinkScanTask as runBrokenLinkScanTask
 } from './worker/taskProcessors.mjs';
+import { processAiRuleTask as runAiRuleTask } from './worker/aiTaskProcessors.mjs';
 import crypto from 'node:crypto';
 import openapiSpec from '../docs/openapi.json' with { type: 'json' };
 import {
@@ -3125,104 +3126,6 @@ async function processAiBackfillTask(env, message) {
   });
 }
 
-async function processAiRuleTask(env, message) {
-  const repo = createRepo(env);
-  const job = await repo.getAiJob(message.userId, message.jobId);
-  if (!job || String(job.status || '') === 'paused') return;
-  const bookmarkId = String(job.bookmarkId || message.bookmarkId || '');
-  if (!bookmarkId) return;
-  await repo.updateAiJob(message.userId, job.id, {
-    status: 'running',
-    startedAt: Date.now(),
-    lastAttemptAt: Date.now(),
-    attemptCount: Number(job.attemptCount || 0) + 1
-  });
-  try {
-    const bookmark = await repo.getBookmark(message.userId, bookmarkId);
-    if (!bookmark || bookmark.deletedAt) throw new Error('bookmark not found');
-    const config = await repo.getAiRuleConfig(message.userId);
-    const trigger = String(job.request?.trigger || message.trigger || 'manual');
-    const actions = [];
-    let currentBookmark = bookmark;
-    if (config?.actions?.autoTag?.enabled) {
-      const aiConfig = await repo.getAiConfig(message.userId);
-      const applyMode = String(config?.actions?.autoTag?.applyMode || aiConfig?.tagging?.applyMode || 'merge');
-      let suggestedTags = inferSuggestedTags(currentBookmark);
-      let provider = { providerType: 'cloudflare-worker', model: 'heuristic-v1', transport: 'heuristic_fallback' };
-      if (aiProviderLooksConfigured(aiConfig)) {
-        try {
-          const suggestion = await generateBookmarkTagSuggestions({ config: aiConfig, bookmark: currentBookmark });
-          suggestedTags = normalizeTags(suggestion.suggestedTags || []);
-          provider = suggestion.provider || provider;
-        } catch {
-          // Keep heuristic tags.
-        }
-      }
-      currentBookmark = await repo.updateBookmark(message.userId, bookmarkId, {
-        tags: mergeBookmarkTags(currentBookmark.tags || [], suggestedTags, applyMode)
-      });
-      currentBookmark = await repo.setBookmarkAiSuggestions(message.userId, bookmarkId, {
-        ...(currentBookmark.aiSuggestions || {}),
-        autoTag: {
-          suggestedTags,
-          applied: true,
-          generatedAt: Date.now(),
-          applyMode,
-          provider
-        }
-      });
-      actions.push({ type: 'autoTag', applied: true, tagCount: suggestedTags.length, provider });
-    }
-    if (config?.actions?.summary?.enabled) {
-      const aiConfig = await repo.getAiConfig(message.userId);
-      let suggestedSummary = summarizeText([currentBookmark.note, currentBookmark.metadata?.description, currentBookmark.article?.excerpt, currentBookmark.title].filter(Boolean).join(' '), 180);
-      let provider = { providerType: 'cloudflare-worker', model: 'heuristic-v1', transport: 'heuristic_fallback' };
-      if (aiProviderLooksConfigured(aiConfig)) {
-        try {
-          const suggestion = await generateBookmarkSummarySuggestion({ config: aiConfig, bookmark: currentBookmark });
-          suggestedSummary = String(suggestion.summary || suggestedSummary).trim() || suggestedSummary;
-          provider = suggestion.provider || provider;
-        } catch {
-          // Keep heuristic summary.
-        }
-      }
-      const noteMode = String(config?.actions?.summary?.noteMode || 'if_empty');
-      const shouldApply = noteMode === 'replace' || !String(currentBookmark.note || '').trim();
-      if (shouldApply) {
-        currentBookmark = await repo.updateBookmark(message.userId, bookmarkId, { note: suggestedSummary });
-      }
-      currentBookmark = await repo.setBookmarkAiSuggestions(message.userId, bookmarkId, {
-        ...(currentBookmark.aiSuggestions || {}),
-        summarySuggestion: suggestedSummary,
-        summaryGeneratedAt: Date.now(),
-        provider
-      });
-      actions.push({ type: 'summary', applied: shouldApply, provider });
-    }
-    const run = {
-      id: String(job.id || ''),
-      bookmarkId,
-      trigger,
-      status: 'succeeded',
-      actions,
-      createdAt: Number(job.createdAt || Date.now()),
-      updatedAt: Date.now()
-    };
-    await repo.updateAiJob(message.userId, job.id, {
-      status: 'succeeded',
-      finishedAt: Date.now(),
-      result: run,
-      error: null
-    });
-  } catch (error) {
-    await repo.updateAiJob(message.userId, job.id, {
-      status: 'failed',
-      finishedAt: Date.now(),
-      error: { message: String(error?.message || error) }
-    });
-  }
-}
-
 async function processSemanticDedupeTask(env, message) {
   const repo = createRepo(env);
   const job = await repo.getAiJob(message.userId, message.jobId);
@@ -3361,7 +3264,7 @@ async function processTaskMessage(env, message) {
   if (message.kind === 'metadata_task') return runMetadataTask(env, message, { createRepo });
   if (message.kind === 'ai_batch_task') return processAiBatchTask(env, message);
   if (message.kind === 'ai_backfill_task') return processAiBackfillTask(env, message);
-  if (message.kind === 'ai_rule_task') return processAiRuleTask(env, message);
+  if (message.kind === 'ai_rule_task') return runAiRuleTask(env, message, { createRepo, normalizeTags, mergeBookmarkTags });
   if (message.kind === 'broken_link_scan_task') return runBrokenLinkScanTask(env, message, { createRepo, buildStateForUser });
   if (message.kind === 'semantic_dedupe_task') return processSemanticDedupeTask(env, message);
 }
