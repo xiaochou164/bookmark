@@ -30,6 +30,10 @@
 
 `src/worker.mjs` 原先内联外部 URL 元数据/文章抓取、SSRF 结果错误分类、R2 备份对象读取和备份 payload 归一化。迁移至 `src/worker/externalResources.mjs`，复用同一 `publicFetch` 安全边界（协议、重定向、大小和超时），入口从 6,433 行降至 6,311 行。新增 `tests/worker-external-resources.test.js` 两项回归，覆盖不允许的 URL 协议、DNS/HTTP 错误重试分类、缺失对象和数组边界。目标测试 2/2、全套 `npm test` 65/65、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 已通过；Docker 与最新 hosted CI 待提交后验收。无 API/schema/data-format 改动，BK-AUD-201 继续开放。
 
+## BK-AUD-201 Worker external resources 托管验收（2026-11-24）
+
+最新代码 head `be15417` 的 GitHub CI run `45383523713` 16/16 全部成功，包含浏览器/无障碍/键盘/E2E、扩展 parity、Docker smoke 和 operations drill；Docker PR build `45383514232` 成功。当前 macOS/Colima 本地 Docker 重建曾在 Dockerfile `apt-get update` 阶段因 `deb.debian.org` DNS 无法解析而失败，未进入应用层；托管 Docker 是本次可用的独立镜像验收证据。BK-AUD-201 仍未完成，其他大型入口继续分阶段拆分。
+
 ## 验收与执行约束
 1. 每项填写：问题证据（路径+行号/截图）、根因、变更文件、验证命令与结果、风险、回退方式；无法复现的标为「复核无异常」，不编造缺陷。
 2. 优先级顺序：P0 → P1 → P2；每个阶段单独 commit/PR，不改真实线上数据，不直接生产部署、不自动合并 PR。

@@ -1333,3 +1333,5 @@
 - 修改：抽取至 `src/worker/externalResources.mjs`，继续使用 `publicFetch` 的 URL 协议、重定向、响应大小和 deadline 约束；入口从 6,433 行降至 6,311 行。新增两项测试覆盖协议拒绝、HTTP/DNS 分类、R2 缺失对象和 backup payload 类型边界。
 - 验证：目标测试 2/2；`npm test` 65/65；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过。Docker 和 hosted CI 待当前提交后确认。
 - 风险：无 API、schema 或持久化变化；Worker 与 Node 仍有独立运行时实现，BK-AUD-201 保持未完成。
+
+- 托管验收：代码 head `be15417` 的 GitHub CI run `45383523713` 16/16 成功，Docker PR build `45383514232` 成功。macOS/Colima 本地 Docker 因 `deb.debian.org` DNS 解析失败而未完成重建，失败发生在 Dockerfile apt 阶段，不归因于应用代码。

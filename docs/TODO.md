@@ -387,4 +387,6 @@
 
 BK-AUD-201 最新增量（2026-11-24）：Worker external resource helper 已抽到 `src/worker/externalResources.mjs`，入口降至 6,311 行；新增 2 项协议、错误分类、R2 和备份 payload 回归。目标 2/2、全套 `npm test` 65/65、docs/UI/CF/extension 本地门禁通过；Docker 与本次提交后的 hosted CI 待完成，BK-AUD-201 仍未完成。
 
+BK-AUD-201 最新验收（2026-11-24）：GitHub CI `45383523713` 16/16 通过，Docker PR build `45383514232` 通过；本地 Colima Docker 因 `deb.debian.org` DNS 解析失败未完成重建，已记录为环境限制。BK-AUD-201 仍未完成。
+
 BK-AUD-201 最新增量（2026-11-18）：Worker task health/realtime snapshot helper 已抽到 `src/worker/taskSummaries.mjs`，Worker 主入口降至 6,433 行；新增两项租户边界、DLQ 与提醒过滤测试。目标 2/2、全套 `npm test` 63/63，docs/UI/CF/extension 本地门禁通过；Docker 镜像启动后 `/api/health` 返回 200；GitHub CI run `44328101550`（16 步）与 Docker PR build run `44328102056` 均通过，BK-AUD-201 仍未完成。
