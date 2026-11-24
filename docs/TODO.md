@@ -393,6 +393,6 @@ BK-AUD-201 最新增量（2026-11-24）：插件任务与元数据任务处理�
 
 BK-AUD-201 最新增量（2026-11-24）：broken-link scan processor 已并入 `src/worker/taskProcessors.mjs`，Worker 入口降至 6,216 行；目标测试 3/3、全套 `npm test` 68/68、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45388109218` 16/16、Docker PR build `45388109307` 通过，BK-AUD-201 仍未完成。
 
-BK-AUD-201 最新增量（2026-11-24）：AI rules processor 已抽到 `src/worker/aiTaskProcessors.mjs`，Worker 入口降至 6,119 行；目标测试 2/2、全套 `npm test` 70/70、docs/UI/CF/smoke/extension 门禁通过，Docker/hosted CI 待本次提交后验收，BK-AUD-201 仍未完成。
+BK-AUD-201 最新增量（2026-11-24）：AI rules processor 已抽到 `src/worker/aiTaskProcessors.mjs`，Worker 入口降至 6,119 行；目标测试 2/2、全套 `npm test` 70/70、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45389699468` 16/16、Docker PR build `45389699369` 通过，BK-AUD-201 仍未完成。
 
 BK-AUD-201 最新增量（2026-11-18）：Worker task health/realtime snapshot helper 已抽到 `src/worker/taskSummaries.mjs`，Worker 主入口降至 6,433 行；新增两项租户边界、DLQ 与提醒过滤测试。目标 2/2、全套 `npm test` 63/63，docs/UI/CF/extension 本地门禁通过；Docker 镜像启动后 `/api/health` 返回 200；GitHub CI run `44328101550`（16 步）与 Docker PR build run `44328102056` 均通过，BK-AUD-201 仍未完成。
