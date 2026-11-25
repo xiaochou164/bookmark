@@ -1433,5 +1433,5 @@
 - 问题/根因：详情页高亮/注释渲染与 CRUD 监听器原先内联在 `public/app.mjs`，详情切换后的异步响应缺少模块级旧书签隔离测试。
 - 修改文件：新增 `public/js/app/highlights.mjs`；`public/app.mjs` 注入 controller 并保留详情按钮装配；更新 `scripts/ui-static-audit.mjs` 增加 RA-FE-010；新增 `tests/highlights-ui.test.js`。
 - 核心内容：保留编辑/删除高亮、注释新增/编辑/删除、refreshAll 和 Toast；用户内容与 data 属性统一 escaping，controller 通过 active bookmark 和 load sequence 抑制过期结果。
-- 验证：目标测试 1/1；`npm test` 80/80；`npm run ui:check` 通过（入口 347.1KiB、CSS 176.2KiB）；`npm run ui:browser` 101/8/16 通过，截图恢复基线；hosted 验收待本次代码提交后复验。
+- 验证：目标测试 1/1；`npm test` 80/80；`npm run ui:check` 通过（入口 347.1KiB、CSS 176.2KiB）；`npm run ui:browser` 101/8/16 通过，截图恢复基线；最终代码头 hosted CI `45557395256` 16/16、Docker `45557395165` 通过。
 - 遗留风险：预览/搜索/设置及详情按钮绑定等其他大型域仍需拆分，BK-AUD-201 保持未完成；无 API/schema/持久化格式变化。
