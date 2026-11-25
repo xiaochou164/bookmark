@@ -1418,4 +1418,4 @@
 - 修改文件：新增 `public/js/app/pluginSync.mjs`，在 `public/app.mjs` 通过 `createPluginSyncController` 注入 API、DOM、store 配置写入和刷新；更新 `scripts/ui-static-audit.mjs` 增加 RA-FE-008；新增 `tests/plugin-sync-ui.test.js`。
 - 核心内容：保留任务 ID 编码、queued/running 1 秒轮询、终态清理和刷新、计划字段默认归一化与错误输出；成功任务仍触发全局书签刷新。
 - 验证：目标测试 1/1；`npm test` 78/78；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
-- 遗留风险：hosted CI/Docker 将在提交后复验；插件事件装配、详情/搜索/设置等大型入口仍需继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
+- 遗留风险：hosted CI `45553778576`（16/16）与 Docker `45553778536` 已通过；插件事件装配、详情/搜索/设置等大型入口仍需继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。

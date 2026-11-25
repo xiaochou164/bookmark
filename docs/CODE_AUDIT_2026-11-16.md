@@ -28,7 +28,7 @@
 
 本轮最新增量：实时通知中心的 SSE/轮询连接、任务快照汇总、通知去重/已读、Toast 和刷新调度已从 `public/app.mjs` 抽至 `public/js/app/realtimeNotifications.mjs`，入口降至 9,209 行（371.4KiB）；新增 `tests/realtime-notifications-ui.test.js`，覆盖任务活跃/失败摘要、初始快照去重和轮询通知。`ui-static-audit` 已改为检查新模块边界，`npm test` 77/77、docs/UI/CF/smoke/extension 门禁、浏览器 101/8/16 和 Docker build/start/healthy 通过；hosted CI `45552355409` 16/16、Docker `45552355425` 通过，BK-AUD-201 继续开放。
 
-本轮最新增量：插件同步面板的任务轮询、配置、计划、历史、审计、设备和健康状态加载已从 `public/app.mjs` 抽至 `public/js/app/pluginSync.mjs`，入口降至 9,103 行（358.2KiB）；新增 `tests/plugin-sync-ui.test.js`，覆盖计划字段归一化、配置加载、任务列表和终态轮询刷新。静态 UI 审计新增 plugin controller 边界检查，`npm test` 78/78、docs/UI/CF/smoke/extension 门禁、浏览器 101/8/16 和 Docker build/start/healthy 通过；hosted 验收待推送后复验，BK-AUD-201 继续开放。
+本轮最新增量：插件同步面板的任务轮询、配置、计划、历史、审计、设备和健康状态加载已从 `public/app.mjs` 抽至 `public/js/app/pluginSync.mjs`，入口降至 9,103 行（358.2KiB）；新增 `tests/plugin-sync-ui.test.js`，覆盖计划字段归一化、配置加载、任务列表和终态轮询刷新。静态 UI 审计新增 plugin controller 边界检查，`npm test` 78/78、docs/UI/CF/smoke/extension 门禁、浏览器 101/8/16 和 Docker build/start/healthy 通过；hosted CI `45553778576` 16/16、Docker `45553778536` 通过，BK-AUD-201 继续开放。
 
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
@@ -94,7 +94,7 @@
 - 修改：新增 `public/js/app/pluginSync.mjs`，通过 `createPluginSyncController` 注入 API、DOM 访问、store 配置写入和全局刷新；`public/app.mjs` 保留事件装配；静态审计增加 RA-FE-008；新增 `tests/plugin-sync-ui.test.js`。
 - 核心内容：保留任务 ID URL 编码、queued/running 定时轮询、终态清理并刷新审计/设备/健康/历史、成功任务刷新书签、计划字段默认值及错误输出。
 - 验证：目标测试 1/1；`npm test` 78/78；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
-- 遗留风险：hosted CI/Docker 将在本次提交后复验；插件页面事件装配仍位于 `bindActions`，详情/搜索/设置等其他大型域继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
+- 遗留风险：hosted CI `45553778576`（16/16）与 Docker `45553778536` 已通过；插件页面事件装配仍位于 `bindActions`，详情/搜索/设置等其他大型域继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
 
 ## BK-AUD-201 Worker external resources 拆分（2026-11-24）
 
