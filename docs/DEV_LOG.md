@@ -1410,4 +1410,4 @@
 - 修改文件：新增 `public/js/app/realtimeNotifications.mjs`，在 `public/app.mjs` 中通过 `createRealtimeNotificationsController` 注入 API、认证状态、当前书签和既有刷新 helper；更新 `scripts/ui-static-audit.mjs` 检查模块边界；新增 `tests/realtime-notifications-ui.test.js`。
 - 核心内容：保留 SSE→5 秒轮询回退、首次快照不提示、签名去重、最多 20 条通知、打开即已读、菜单关闭、任务/提醒刷新和错误静默策略；controller 暴露独立摘要与快照行为供回归。
 - 验证：目标测试 1/1；`npm test` 77/77；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
-- 遗留风险：hosted CI/Docker 将在本次提交后复验；`public/app.mjs` 仍有详情、搜索、插件和设置等大型渲染/事件域，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
+- 遗留风险：hosted CI `45552355409`（16/16）与 Docker `45552355425` 已通过；`public/app.mjs` 仍有详情、搜索、插件和设置等大型渲染/事件域，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
