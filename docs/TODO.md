@@ -388,6 +388,8 @@
 
 - BK-AUD-201 最新增量（2026-11-25）：导入/导出任务面板已从 `public/app.mjs` 抽至 `public/js/app/ioTasks.mjs`，入口降至 9,355 行；新增 `tests/io-task-ui.test.js` 1 项回归，覆盖选中范围导出和活动任务状态，并保留任务详情、下载、日志、重试、轮询和焦点反馈。目标测试 1/1、`npm test` 76/76、docs/UI/CF/smoke/extension 门禁、`ui:browser` 101/8/16 及 Docker build/start/healthy 通过，截图已恢复基线；hosted CI `45550791268` 16/16、Docker `45550791281` 通过，BK-AUD-201 保持未完成。
 
+- BK-AUD-201 最新增量（2026-11-25）：实时通知中心的 SSE/轮询 controller 已从 `public/app.mjs` 抽至 `public/js/app/realtimeNotifications.mjs`，入口降至 9,209 行（371.4KiB）；新增 `tests/realtime-notifications-ui.test.js` 1 项回归，覆盖任务摘要、快照去重和轮询通知；`npm test` 77/77、docs/UI/CF/smoke/extension 门禁、`ui:browser` 101/8/16 及 Docker build/start/healthy 通过，截图已恢复基线；hosted 验收待推送后复验，BK-AUD-201 保持未完成。
+
 - [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理
 - [x] **P2** `BK-AUD-204` 设计系统细节收口

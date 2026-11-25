@@ -1403,3 +1403,11 @@
 - 证据/根因：最新 hosted CI 的并行 `npm test` 偶发将 `product-digest-routes` provider failure 用例报为 `selected time window has no new bookmarks`；同一命令本地重复运行也可复现，说明测试依赖墙上时钟而非 UI 变更导致。
 - 修改：`src/routes/productDigestRoutes.js` 增加可选 `now` 注入，默认保持 `Date.now()`；`tests/product-digest-routes.test.js` 两个场景使用固定时间戳和注入时钟，保持时间窗及租户断言不变。
 - 验证：digest 专项测试通过；并行全套 `npm test` 重复运行稳定通过；无 API/schema/持久化格式变化。
+
+## 2026-11-25 — BK-AUD-201 前端 realtime notification controller 拆分
+
+- 问题/根因：`public/app.mjs` 内联实时通知 DOM、SSE 连接、轮询回退、快照签名去重、任务/提醒摘要、Toast 和刷新调度；连接生命周期与菜单状态耦合，缺少模块级回归。
+- 修改文件：新增 `public/js/app/realtimeNotifications.mjs`，在 `public/app.mjs` 中通过 `createRealtimeNotificationsController` 注入 API、认证状态、当前书签和既有刷新 helper；更新 `scripts/ui-static-audit.mjs` 检查模块边界；新增 `tests/realtime-notifications-ui.test.js`。
+- 核心内容：保留 SSE→5 秒轮询回退、首次快照不提示、签名去重、最多 20 条通知、打开即已读、菜单关闭、任务/提醒刷新和错误静默策略；controller 暴露独立摘要与快照行为供回归。
+- 验证：目标测试 1/1；`npm test` 77/77；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
+- 遗留风险：hosted CI/Docker 将在本次提交后复验；`public/app.mjs` 仍有详情、搜索、插件和设置等大型渲染/事件域，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
