@@ -66,6 +66,7 @@ const pluginSyncSource = read('public/js/app/pluginSync.mjs');
 const metadataTasksSource = read('public/js/app/metadataTasks.mjs');
 const highlightsSource = read('public/js/app/highlights.mjs');
 const searchSuggestSource = read('public/js/app/searchSuggest.mjs');
+const previewControllerSource = read('public/js/app/previewController.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -117,6 +118,9 @@ if (!appSource.includes('createHighlightsController') || !highlightsSource.inclu
 }
 if (!appSource.includes('createSearchSuggestController') || !searchSuggestSource.includes('renderSearchSuggestPopover') || !searchSuggestSource.includes('activateSearchSuggestItem') || !searchSuggestSource.includes('scheduleClose')) {
   failures.push('RA-FE-011 search suggestions and recent queries must use a dedicated accessible controller');
+}
+if (!appSource.includes('createPreviewController') || !previewControllerSource.includes('renderPreviewDialog') || !previewControllerSource.includes('loadPreviewForBookmark') || !previewControllerSource.includes('getReaderSelectionPayload')) {
+  failures.push('RA-FE-012 preview and reader interactions must use a dedicated controller with stale-response protection');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
@@ -345,7 +349,9 @@ const appEntry = read('public/app.mjs');
 for (const moduleName of ['a11y', 'auth', 'bookmarks', 'detail', 'dialogs', 'preview', 'search', 'sidebar', 'tasks']) {
   const file = `public/js/app/${moduleName}.mjs`;
   const source = read(file);
-  if (!appEntry.includes(`./js/app/${moduleName}.mjs`)) failures.push(`public/app.mjs must import ${file}`);
+  const importedByApp = appEntry.includes(`./js/app/${moduleName}.mjs`);
+  const importedByPreviewController = moduleName === 'preview' && previewControllerSource.includes(`./${moduleName}.mjs`);
+  if (!importedByApp && !importedByPreviewController) failures.push(`public/app.mjs must import ${file}`);
   const lineCount = source.trim().split(/\r?\n/).length;
   if (lineCount > 1000) failures.push(`${file} exceeds the 1000-line app module budget: ${lineCount}`);
 }

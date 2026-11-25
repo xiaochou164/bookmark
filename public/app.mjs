@@ -18,7 +18,7 @@ import {
   uiConfirm,
   uiPrompt
 } from './js/app/dialogs.mjs';
-import { previewStateLabel } from './js/app/preview.mjs';
+import { createPreviewController } from './js/app/previewController.mjs';
 import { loadSidebarTagsUi, persistSidebarTagsUi } from './js/app/sidebar.mjs';
 import {
   formatMetadataTaskInfo,
@@ -40,10 +40,6 @@ const SAVED_SEARCHES_UI_ENABLED = false;
 let draggedFolderId = null;
 let toastTimer = null;
 let toastUndoHandler = null;
-let previewActiveBookmarkId = null;
-let previewPayload = null;
-let previewMode = 'auto';
-let previewUiState = 'idle';
 let detailRelatedBookmarksState = {
   bookmarkId: '',
   loading: false,
@@ -200,6 +196,27 @@ const searchSuggestController = createSearchSuggestController({
   renderSidebar,
   clearAdvancedSavedSearch: () => { advancedSearchState.activeSavedId = ''; }
 });
+const previewController = createPreviewController({
+  api,
+  byId,
+  state,
+  store,
+  safeUrl,
+  kindLabel,
+  setIconButtonLabel,
+  renderDetail,
+  refreshAll,
+  renderDetailFetchStatusSummary,
+  showToast
+});
+const {
+  closePreviewDialog,
+  extractArticleForActiveBookmark,
+  getReaderSelectionPayload,
+  loadPreviewForBookmark: load预览ForBookmark,
+  openPreviewDialog: open预览Dialog,
+  state: previewControllerState
+} = previewController;
 const {
   activateSearchSuggestItem,
   applySearchQueryValue,
@@ -1539,41 +1556,6 @@ function validateCollectionCreateForm() {
   return true;
 }
 
-function setPreviewUiState(stateName, message = '') {
-  const next = String(stateName || 'idle');
-  previewUiState = next;
-  const badge = byId('previewStateBadge');
-  const note = byId('previewStateNote');
-  const loading = byId('previewLoading');
-  const surface = byId('previewDialog')?.querySelector('.preview-surface');
-  if (badge) {
-    badge.dataset.state = next;
-    badge.textContent = previewStateLabel(next);
-  }
-  if (note) note.textContent = String(message || '');
-  if (loading) loading.classList.toggle('hidden', next !== 'loading');
-  if (surface) surface.classList.toggle('is-loading', next === 'loading');
-  if (state.activeId && previewActiveBookmarkId && String(state.activeId) === String(previewActiveBookmarkId)) {
-    renderDetail();
-  }
-}
-
-function hydratePreviewToolbarIcons() {
-  const mappings = [
-    ['previewRefreshBtn', 'refresh', '刷新预览'],
-    ['previewExtractArticleBtn', 'edit', '提取正文'],
-    ['previewReaderBtn', 'preview', '阅读模式'],
-    ['previewAddHighlightBtn', 'favorite', '高亮选区'],
-    ['previewOriginalBtn', 'open', '打开原文'],
-    ['previewCloseBtn', 'close', '关闭预览']
-  ];
-  mappings.forEach(([id, icon, label]) => {
-    const btn = byId(id);
-    if (!btn || btn.dataset.iconHydrated) return;
-    setIconButtonLabel(btn, icon, btn.textContent || label);
-    btn.dataset.iconHydrated = '1';
-  });
-}
 
 function iconSvg(name, { title = '' } = {}) {
   const n = String(name || '').trim().toLowerCase();
@@ -4501,9 +4483,9 @@ function renderDetailFetchStatusSummary({ item = null, task = null } = {}) {
   else if (!articleStatus && String(item?.url || '').trim()) chips.push('<span class="meta-chip type">可提取正文</span>');
   if (item?.aiSuggestions?.readerSummary?.shortSummary) chips.push('<span class="meta-chip info">阅读摘要已生成</span>');
 
-  if (previewActiveBookmarkId && String(previewActiveBookmarkId) === String(item.id || '')) {
-    if (previewUiState === 'ready' && previewMode === 'reader') chips.push('<span class="meta-chip info">预览阅读模式中</span>');
-    else if (previewUiState === 'ready') chips.push('<span class="meta-chip success">预览窗口已打开</span>');
+  if (previewControllerState.activeBookmarkId && String(previewControllerState.activeBookmarkId) === String(item.id || '')) {
+    if (previewControllerState.uiState === 'ready' && previewControllerState.mode === 'reader') chips.push('<span class="meta-chip info">预览阅读模式中</span>');
+    else if (previewControllerState.uiState === 'ready') chips.push('<span class="meta-chip success">预览窗口已打开</span>');
   }
 
   chipsEl.innerHTML = chips.join('');
@@ -4630,7 +4612,7 @@ function updateDetailPanelHeadUi(item = null) {
   const ids = detailPanelVisibleItems().map((x) => String(x.id));
   const idx = detailPanelActiveIndex();
   const hasItem = Boolean(item);
-  const previewOpenForActive = Boolean(byId('previewDialog')?.open && previewActiveBookmarkId && String(previewActiveBookmarkId) === String(item?.id || ''));
+  const previewOpenForActive = Boolean(byId('previewDialog')?.open && previewControllerState.activeBookmarkId && String(previewControllerState.activeBookmarkId) === String(item?.id || ''));
   const aiBusy = detailAiOperationBusy();
 
   if (modeBadge) modeBadge.textContent = hasItem ? (detailEditMode ? '编辑模式' : '查看模式') : '未选择';
@@ -4650,13 +4632,13 @@ function updateDetailPanelHeadUi(item = null) {
   if (nextBtn) nextBtn.disabled = !hasItem || idx < 0 || idx >= ids.length - 1;
   if (webBtn) {
     webBtn.disabled = !hasItem;
-    webBtn.classList.toggle('active', hasItem && previewOpenForActive && previewMode !== 'reader');
-    webBtn.setAttribute('aria-pressed', String(Boolean(hasItem && previewOpenForActive && previewMode !== 'reader')));
+    webBtn.classList.toggle('active', hasItem && previewOpenForActive && previewControllerState.mode !== 'reader');
+    webBtn.setAttribute('aria-pressed', String(Boolean(hasItem && previewOpenForActive && previewControllerState.mode !== 'reader')));
   }
   if (readerBtn) {
     readerBtn.disabled = !hasItem;
-    readerBtn.classList.toggle('active', hasItem && previewOpenForActive && previewMode === 'reader');
-    readerBtn.setAttribute('aria-pressed', String(Boolean(hasItem && previewOpenForActive && previewMode === 'reader')));
+    readerBtn.classList.toggle('active', hasItem && previewOpenForActive && previewControllerState.mode === 'reader');
+    readerBtn.setAttribute('aria-pressed', String(Boolean(hasItem && previewOpenForActive && previewControllerState.mode === 'reader')));
   }
   if (aiTagBtn) {
     const canRun = hasItem && !Boolean(item?.deletedAt) && !aiBusy;
@@ -6174,13 +6156,13 @@ function renderDetail() {
     else if (metaStatus === 'failed') chips.push('<span class="meta-chip danger">元数据失败</span>');
     else if (metaStatus === 'fetching') chips.push('<span class="meta-chip info">抓取中</span>');
     else if (metaStatus === 'queued') chips.push('<span class="meta-chip">排队中</span>');
-    const previewOpen = Boolean(byId('previewDialog')?.open && String(previewActiveBookmarkId || '') === String(item.id));
+    const previewOpen = Boolean(byId('previewDialog')?.open && String(previewControllerState.activeBookmarkId || '') === String(item.id));
     if (previewOpen) {
-      if (previewUiState === 'loading') chips.push('<span class="meta-chip info">预览加载中</span>');
-      else if (previewUiState === 'ready') chips.push('<span class="meta-chip success">预览已打开</span>');
-      else if (previewUiState === 'fallback') chips.push('<span class="meta-chip">预览降级</span>');
-      else if (previewUiState === 'error') chips.push('<span class="meta-chip danger">预览失败</span>');
-      if (previewMode === 'reader') chips.push('<span class="meta-chip info">阅读模式</span>');
+      if (previewControllerState.uiState === 'loading') chips.push('<span class="meta-chip info">预览加载中</span>');
+      else if (previewControllerState.uiState === 'ready') chips.push('<span class="meta-chip success">预览已打开</span>');
+      else if (previewControllerState.uiState === 'fallback') chips.push('<span class="meta-chip">预览降级</span>');
+      else if (previewControllerState.uiState === 'error') chips.push('<span class="meta-chip danger">预览失败</span>');
+      if (previewControllerState.mode === 'reader') chips.push('<span class="meta-chip info">阅读模式</span>');
     }
     byId('detailSummaryChips').innerHTML = chips.join('');
   }
@@ -6354,200 +6336,6 @@ async function saveDetail() {
   await refreshAll();
 }
 
-function reset预览Surface() {
-  byId('previewFrame').classList.add('hidden');
-  byId('previewImage').classList.add('hidden');
-  byId('previewVideo').classList.add('hidden');
-  byId('previewFallback').classList.add('hidden');
-  byId('previewError').classList.add('hidden');
-  byId('previewError').textContent = '';
-  byId('previewFrame').src = 'about:blank';
-  byId('previewImage').src = '';
-  byId('previewVideo').removeAttribute('src');
-  byId('previewVideo').load();
-  setPreviewUiState('idle', '选择一个书签以查看预览。');
-}
-
-function getReaderSelectionPayload() {
-  const frame = byId('previewFrame');
-  if (!frame || !frame.contentWindow) throw new Error('预览框架尚未就绪');
-  let sel;
-  try {
-    sel = frame.contentWindow.getSelection();
-  } catch (_err) {
-    throw new Error('仅可在阅读模式中选区高亮');
-  }
-  if (!sel || !sel.rangeCount) throw new Error('未选择文本');
-  const text = String(sel.toString() || '').trim();
-  if (!text) throw new Error('未选择文本');
-  const range = sel.getRangeAt(0);
-  let prefix = '';
-  let suffix = '';
-  let startOffset = 0;
-  let endOffset = 0;
-  try {
-    const node = range.startContainer;
-    if (node && node.nodeType === Node.TEXT_NODE) {
-      const source = String(node.textContent || '');
-      startOffset = Number(range.startOffset || 0);
-      endOffset = Number(range.endOffset || startOffset + text.length);
-      prefix = source.slice(Math.max(0, startOffset - 32), startOffset);
-      suffix = source.slice(endOffset, Math.min(source.length, endOffset + 32));
-    }
-  } catch (_err) {
-    // Cross-document constants or non-text node; keep anchors minimal.
-  }
-  return {
-    text,
-    quote: text,
-    anchors: {
-      exact: text,
-      prefix,
-      suffix,
-      startOffset,
-      endOffset,
-      selector: ''
-    }
-  };
-}
-
-function render预览Dialog() {
-  hydratePreviewToolbarIcons();
-  const titleEl = byId('previewDialogTitle');
-  const metaEl = byId('previewDialogMeta');
-  const payloadEl = byId('previewPayload');
-  const readerBtn = byId('previewReaderBtn');
-  const extractBtn = byId('previewExtractArticleBtn');
-  const originalBtn = byId('previewOriginalBtn');
-  const addHighlightBtn = byId('previewAddHighlightBtn');
-  reset预览Surface();
-
-  if (!previewPayload) {
-    titleEl.textContent = '预览';
-    metaEl.textContent = '尚未加载预览。';
-    payloadEl.textContent = '';
-    setIconButtonLabel(readerBtn, 'preview', '阅读模式');
-    setIconButtonLabel(addHighlightBtn, 'favorite', '高亮选区');
-    readerBtn.disabled = true;
-    readerBtn.setAttribute('aria-pressed', 'false');
-    extractBtn.disabled = true;
-    originalBtn.disabled = true;
-    addHighlightBtn.disabled = true;
-    addHighlightBtn.classList.remove('active');
-    byId('previewFallback').classList.remove('hidden');
-    if (previewUiState !== 'error' && previewUiState !== 'loading') {
-      setPreviewUiState('idle', '尚未加载预览。');
-    }
-    return;
-  }
-
-  const p = previewPayload.preview || previewPayload;
-  const summary = p.summary || {};
-  titleEl.textContent = p.title || '预览';
-  metaEl.textContent = [kindLabel(p.kind), summary.siteName, summary.contentType, summary.articleStatus, summary.metadataStatus]
-    .filter(Boolean)
-    .join(' · ');
-  payloadEl.textContent = JSON.stringify(p, null, 2);
-  originalBtn.disabled = !p?.fallback?.openUrl && !p?.sourceUrl;
-  readerBtn.disabled = !Boolean(p?.reader?.available);
-  setIconButtonLabel(readerBtn, previewMode === 'reader' ? 'open' : 'preview', previewMode === 'reader' ? '网页模式' : '阅读模式');
-  readerBtn.setAttribute('aria-pressed', String(previewMode === 'reader'));
-  extractBtn.disabled = String(p?.kind || '') !== 'web';
-  addHighlightBtn.disabled = !(previewMode === 'reader' && p?.reader?.available);
-  addHighlightBtn.classList.toggle('active', previewMode === 'reader' && p?.reader?.available);
-
-  const useReader = previewMode === 'reader' && p?.reader?.available;
-  const mode = useReader ? 'iframe' : String(p?.render?.mode || 'iframe');
-  const url = useReader ? String(p.reader.renderUrl || '') : String(p?.render?.url || '');
-
-  if (!url || Boolean(p?.render?.frameRestricted)) {
-    byId('previewFallback').classList.remove('hidden');
-    setPreviewUiState('fallback', !url ? '当前条目没有可嵌入预览，已降级为打开原文。' : '目标网站的安全策略（X-Frame-Options / CSP）禁止嵌入展示，请直接打开原文。');
-    return;
-  }
-
-  setPreviewUiState('ready', useReader ? '阅读模式已就绪。' : '预览已加载。');
-
-  if (mode === 'image') {
-    const img = byId('previewImage');
-    img.src = safeUrl(url);
-    img.classList.remove('hidden');
-    return;
-  }
-
-  if (mode === 'video') {
-    const video = byId('previewVideo');
-    video.src = safeUrl(url);
-    video.classList.remove('hidden');
-    return;
-  }
-
-  const frame = byId('previewFrame');
-  frame.src = safeUrl(url);
-  frame.classList.remove('hidden');
-}
-
-async function load预览ForBookmark(bookmarkId, { preferredMode = 'auto' } = {}) {
-  const id = String(bookmarkId || state.activeId || '');
-  if (!id) return;
-  previewActiveBookmarkId = id;
-  if (preferredMode) previewMode = preferredMode;
-  byId('previewDialogMeta').textContent = '正在加载预览...';
-  byId('previewError').classList.add('hidden');
-  setPreviewUiState('loading', '正在请求预览内容…');
-  try {
-    const payload = await api(`/api/bookmarks/${id}/preview`);
-    previewPayload = payload;
-    render预览Dialog();
-  } catch (err) {
-    previewPayload = null;
-    render预览Dialog();
-    byId('previewError').textContent = `预览加载失败：${err.message}`;
-    byId('previewError').classList.remove('hidden');
-    byId('previewFallback').classList.remove('hidden');
-    setPreviewUiState('error', '预览请求失败，可尝试刷新或打开原文。');
-  }
-}
-
-async function open预览Dialog(bookmarkId, { preferredMode = 'auto' } = {}) {
-  const dlg = byId('previewDialog');
-  if (!dlg.open) dlg.showModal();
-  await load预览ForBookmark(bookmarkId, { preferredMode });
-  if (state.activeId && String(state.activeId) === String(previewActiveBookmarkId || '')) renderDetail();
-}
-
-async function extractArticleForActiveBookmark({ openReaderAfter = false } = {}) {
-  const id = String(state.activeId || previewActiveBookmarkId || '');
-  if (!id) return;
-  try {
-    byId('detailArticleInfo').textContent = '正文：提取中...';
-    renderDetailFetchStatusSummary({
-      item: state.bookmarks.find((x) => x.id === id) || state.allBookmarks.find((x) => x.id === id) || null
-    });
-    const out = await api(`/api/bookmarks/${id}/article/extract`, {
-      method: 'POST',
-      body: JSON.stringify({})
-    });
-    await refreshAll();
-    if (byId('previewDialog').open && String(previewActiveBookmarkId || '') === id) {
-      previewMode = openReaderAfter ? 'reader' : previewMode;
-      await load预览ForBookmark(id, { preferredMode: previewMode });
-    }
-    showToast(`正文已提取${out?.article?.title ? `: ${out.article.title}` : ''}`, { timeoutMs: 3500 });
-  } catch (err) {
-    byId('detailArticleInfo').textContent = `article: failed · ${err.message}`;
-    renderDetailFetchStatusSummary({
-      item: state.bookmarks.find((x) => x.id === id) || state.allBookmarks.find((x) => x.id === id) || null,
-      task: { status: 'failed' }
-    });
-    if (byId('previewDialog').open) {
-      byId('previewError').textContent = `正文提取失败：${err.message}`;
-      byId('previewError').classList.remove('hidden');
-      setPreviewUiState('error', '正文提取失败，预览仍可继续使用。');
-    }
-    showToast(err.message || '正文提取失败', { timeoutMs: 5000 });
-  }
-}
 
 async function refreshAll() {
   if (refreshAllInFlight) {
@@ -8039,32 +7827,32 @@ function bindActions() {
   });
 
   byId('previewRefreshBtn').addEventListener('click', async () => {
-    if (!previewActiveBookmarkId) return;
-    await load预览ForBookmark(previewActiveBookmarkId, { preferredMode: previewMode });
+    if (!previewControllerState.activeBookmarkId) return;
+    await load预览ForBookmark(previewControllerState.activeBookmarkId, { preferredMode: previewControllerState.mode });
   });
 
   byId('previewOriginalBtn').addEventListener('click', () => {
-    const p = previewPayload?.preview || previewPayload;
+    const p = previewControllerState.payload?.preview || previewControllerState.payload;
     const url = p?.fallback?.openUrl || p?.sourceUrl;
     if (url) window.open(url, '_blank', 'noopener');
   });
 
   byId('previewReaderBtn').addEventListener('click', async () => {
-    if (!previewActiveBookmarkId) return;
-    previewMode = previewMode === 'reader' ? 'auto' : 'reader';
-    await load预览ForBookmark(previewActiveBookmarkId, { preferredMode: previewMode });
+    if (!previewControllerState.activeBookmarkId) return;
+    previewControllerState.mode = previewControllerState.mode === 'reader' ? 'auto' : 'reader';
+    await load预览ForBookmark(previewControllerState.activeBookmarkId, { preferredMode: previewControllerState.mode });
   });
 
   byId('previewExtractArticleBtn').addEventListener('click', async () => {
-    if (previewActiveBookmarkId) store.setActiveId(previewActiveBookmarkId);
+    if (previewControllerState.activeBookmarkId) store.setActiveId(previewControllerState.activeBookmarkId);
     await extractArticleForActiveBookmark({ openReaderAfter: true });
   });
 
   byId('previewAddHighlightBtn').addEventListener('click', async () => {
-    const bookmarkId = String(previewActiveBookmarkId || state.activeId || '');
+    const bookmarkId = String(previewControllerState.activeBookmarkId || state.activeId || '');
     if (!bookmarkId) return;
     try {
-      if (previewMode !== 'reader') throw new Error('请先切换到阅读模式');
+      if (previewControllerState.mode !== 'reader') throw new Error('请先切换到阅读模式');
       const payload = getReaderSelectionPayload();
       await api(`/api/bookmarks/${bookmarkId}/highlights`, {
         method: 'POST',
@@ -8078,15 +7866,7 @@ function bindActions() {
   });
 
   byId('previewDialog').addEventListener('close', () => {
-    const closingBookmarkId = String(previewActiveBookmarkId || '');
-    previewActiveBookmarkId = null;
-    previewPayload = null;
-    previewMode = 'auto';
-    setPreviewUiState('idle', '选择一个书签以查看预览。');
-    reset预览Surface();
-    if (closingBookmarkId && state.activeId && String(state.activeId) === closingBookmarkId) {
-      renderDetail();
-    }
+    closePreviewDialog();
   });
 
   byId('bulkFavoriteBtn').addEventListener('click', async () => {
