@@ -24,6 +24,8 @@
 
 本轮最新增量：导入/导出任务面板已从 `public/app.mjs` 抽至 `public/js/app/ioTasks.mjs`，入口降至 9,355 行；新增 UI controller 单测 1 项，覆盖导出范围和活动任务状态，保留任务详情、下载、日志、重试、轮询、错误反馈和焦点回收行为，并对任务 ID 做 URL 编码与 DOM attribute escaping。目标测试 1/1、全套 `npm test` 76/76、`ui:check`、`docs:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser` 101/8/16 及 Docker build/start/healthy 均通过；截图已恢复到审阅基线。hosted 验收待推送后复验，BK-AUD-201 继续开放。
 
+本轮额外稳定性修复：托管并行测试偶发将 digest provider failure 用例判为“时间窗为空”，根因是路由与测试直接共享墙上时钟。`registerProductDigestRoutes` 现支持可选 `now` 注入，回归测试使用固定时间，生产默认仍为 `Date.now()`；单测重复运行不再依赖 runner 时序。
+
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
 - [x] **BK-AUD-002 / P0 / 扩展同步预览的零写入契约（已修复并做真实本地回归）**：原文档称 PREVIEW 会写入，且实际 Popup/Options 消息分发调用 `/api/chrome-sync` 时可触发写入。Chrome/Safari 现明确发送 preview；Node/Worker 使用只读内存 repo，认证时间、租户初始化、索引、deviceId、状态和日志均不落盘。VM 消息分发与隔离 SQLite/JSON HTTP 回归均比较持久化快照，Chrome/Safari preview 零写断言通过；扩展同步文档与 OpenAPI 已同步。

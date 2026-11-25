@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { registerProductDigestRoutes } = require('../src/routes/productDigestRoutes');
 
 test('digest route samples and persists only the authenticated tenant data', async () => {
-  const now = Date.now();
+  const now = 1_763_000_000_000;
   const db = {
     aiDigests: [{ id: 'bob-existing', userId: 'bob' }],
     aiSuggestionJobs: [{ id: 'bob-job', userId: 'bob' }]
@@ -39,6 +39,7 @@ test('digest route samples and persists only the authenticated tenant data', asy
       seenBookmarks.push(...input.bookmarks);
       return { summary: 'Alice summary', themes: ['reading'], highlights: [], recommendedActions: [], provider: { name: 'fixture' }, rawText: 'summary' };
     },
+    now: () => now,
     buildAiJobRecord
   });
 
@@ -63,6 +64,7 @@ test('digest route samples and persists only the authenticated tenant data', asy
 
 test('digest provider failure records a tenant-scoped failed job and forwards the error', async () => {
   const db = { aiSuggestionJobs: [{ id: 'bob-job', userId: 'bob' }] };
+  const now = 1_763_000_000_000;
   const app = { post(_path, handler) { this.handler = handler; } };
   const dbRepo = { async read() { return {}; }, async update(mutator) { await mutator(db); } };
   const providerError = new Error('provider unavailable');
@@ -74,9 +76,10 @@ test('digest provider failure records a tenant-scoped failed job and forwards th
     getAiProviderConfig: () => ({}),
     userFolders: () => [],
     folderPathMap: () => ({ pathOf: () => '' }),
-    userBookmarks: () => [{ id: 'alice-bookmark', createdAt: Date.now(), tags: [], url: '' }],
+    userBookmarks: () => [{ id: 'alice-bookmark', createdAt: now, tags: [], url: '' }],
     hostOfBookmarkUrl: () => '',
     async generateBookmarksDigestSummary() { throw providerError; },
+    now: () => now,
     buildAiJobRecord: (input) => ({ userId: input.userId, status: input.status, type: input.type })
   });
 

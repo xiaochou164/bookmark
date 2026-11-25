@@ -1397,3 +1397,9 @@
 - 核心内容：保留任务面板现有 UI 与焦点行为；统一 `encodeURIComponent`、任务 attribute escaping、轮询终止和导入成功后的刷新；controller 单测覆盖 selected scope 与 active task。
 - 验证：目标测试 1/1；`npm test` 76/76；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
 - 遗留风险：hosted CI/Docker 将在提交后复验；`public/app.mjs` 其余渲染域和 Worker/Node 大型入口仍需继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
+
+## 2026-11-25 — 稳定 digest 时间窗回归
+
+- 证据/根因：最新 hosted CI 的并行 `npm test` 偶发将 `product-digest-routes` provider failure 用例报为 `selected time window has no new bookmarks`；同一命令本地重复运行也可复现，说明测试依赖墙上时钟而非 UI 变更导致。
+- 修改：`src/routes/productDigestRoutes.js` 增加可选 `now` 注入，默认保持 `Date.now()`；`tests/product-digest-routes.test.js` 两个场景使用固定时间戳和注入时钟，保持时间窗及租户断言不变。
+- 验证：digest 专项测试通过；并行全套 `npm test` 重复运行稳定通过；无 API/schema/持久化格式变化。

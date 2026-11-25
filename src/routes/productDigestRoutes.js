@@ -1,6 +1,6 @@
 const crypto = require('node:crypto');
 
-function registerProductDigestRoutes(app, { dbRepo, badRequest, userIdOf, requireFeature, getAiProviderConfig, userFolders, folderPathMap, userBookmarks, hostOfBookmarkUrl, generateBookmarksDigestSummary, buildAiJobRecord }) {
+function registerProductDigestRoutes(app, { dbRepo, badRequest, userIdOf, requireFeature, getAiProviderConfig, userFolders, folderPathMap, userBookmarks, hostOfBookmarkUrl, generateBookmarksDigestSummary, buildAiJobRecord, now: nowFn = () => Date.now() }) {
   app.post('/api/product/ai/digest', async (req, res, next) => {
     try {
       const userId = userIdOf(req);
@@ -12,7 +12,7 @@ function registerProductDigestRoutes(app, { dbRepo, badRequest, userIdOf, requir
         : 'day';
       const customDays = Math.max(1, Math.min(30, Number(req.body?.days || 7) || 7));
       const maxItems = Math.max(10, Math.min(200, Number(req.body?.maxItems || 80) || 80));
-      const now = Date.now();
+      const now = Number(nowFn()) || Date.now();
       const msDay = 24 * 60 * 60 * 1000;
       const days = windowType === 'week' ? 7 : (windowType === 'custom_days' ? customDays : 1);
       const startAt = now - days * msDay;
