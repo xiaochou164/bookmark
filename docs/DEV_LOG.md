@@ -1427,3 +1427,11 @@
 - 核心内容：保留失败重试可见性、最多五条历史、请求序列防竞态、活动书签隔离、终态刷新和轮询清理；`resetMetadataTasks` 使详情关闭/切换时失效旧请求。
 - 验证：目标测试 1/1；`npm test` 79/79；`npm run ui:check` 通过（入口 354.5KiB、CSS 176.2KiB）；最终代码头 hosted CI `45555814624` 16/16、Docker `45555814669` 通过；无 API/schema/持久化格式变化。
 - 遗留风险：详情按钮事件以及预览/高亮/搜索/设置等大型域仍需拆分，BK-AUD-201 保持未完成；回退可 revert 本次 controller/test/静态审计提交。
+
+## 2026-11-25 — BK-AUD-201 前端 highlights controller 拆分
+
+- 问题/根因：详情页高亮/注释渲染与 CRUD 监听器原先内联在 `public/app.mjs`，详情切换后的异步响应缺少模块级旧书签隔离测试。
+- 修改文件：新增 `public/js/app/highlights.mjs`；`public/app.mjs` 注入 controller 并保留详情按钮装配；更新 `scripts/ui-static-audit.mjs` 增加 RA-FE-010；新增 `tests/highlights-ui.test.js`。
+- 核心内容：保留编辑/删除高亮、注释新增/编辑/删除、refreshAll 和 Toast；用户内容与 data 属性统一 escaping，controller 通过 active bookmark 和 load sequence 抑制过期结果。
+- 验证：目标测试 1/1；`npm test` 80/80；`npm run ui:check` 通过（入口 347.1KiB、CSS 176.2KiB）；`npm run ui:browser` 101/8/16 通过，截图恢复基线；hosted 验收待本次代码提交后复验。
+- 遗留风险：预览/搜索/设置及详情按钮绑定等其他大型域仍需拆分，BK-AUD-201 保持未完成；无 API/schema/持久化格式变化。

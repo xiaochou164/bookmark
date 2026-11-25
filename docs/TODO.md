@@ -392,6 +392,7 @@
 
 - BK-AUD-201 最新增量（2026-11-25）：插件同步面板的任务轮询、配置、计划、历史、审计、设备和健康加载已从 `public/app.mjs` 抽至 `public/js/app/pluginSync.mjs`，入口降至 9,103 行（358.2KiB）；新增 `tests/plugin-sync-ui.test.js` 1 项回归，覆盖计划字段归一化、配置加载、任务列表和终态轮询刷新；`npm test` 78/78、docs/UI/CF/smoke/extension 门禁、`ui:browser` 101/8/16 及 Docker build/start/healthy 通过，截图已恢复基线；hosted CI `45553778576` 16/16、Docker `45553778536` 通过，BK-AUD-201 保持未完成。
 - BK-AUD-201 最新增量（2026-11-25）：详情页元数据抓取状态、历史、请求序列、轮询和重置逻辑已从 `public/app.mjs` 抽至 `public/js/app/metadataTasks.mjs`，入口降至 9,015 行（354.5KiB）；新增 `tests/metadata-tasks-ui.test.js` 1 项回归，覆盖当前书签隔离、失败重试显示、历史摘要和任务 ID 状态；`npm test` 79/79、`ui:check` 通过，最终代码头 hosted CI `45555814624` 16/16、Docker `45555814669` 通过，BK-AUD-201 保持未完成。
+- BK-AUD-201 最新增量（2026-11-25）：详情页高亮/注释列表、编辑/删除、注释 CRUD、内容 escaping、书签切换和请求序列已从 `public/app.mjs` 抽至 `public/js/app/highlights.mjs`，入口降至 8,850 行（347.1KiB）；新增 `tests/highlights-ui.test.js` 1 项回归，覆盖用户内容 escaping 和旧书签结果抑制；`npm test` 80/80、`ui:check`、`ui:browser` 101/8/16 通过，BK-AUD-201 保持未完成。
 
 - [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理
