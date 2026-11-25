@@ -1396,7 +1396,7 @@
 - 修改文件：新增 `public/js/app/ioTasks.mjs`，在 `public/app.mjs` 中通过 `createIoTaskController` 注入既有 API、状态和渲染 helper；更新 `scripts/ui-static-audit.mjs` 检查模块边界；新增 `tests/io-task-ui.test.js`。
 - 核心内容：保留任务面板现有 UI 与焦点行为；统一 `encodeURIComponent`、任务 attribute escaping、轮询终止和导入成功后的刷新；controller 单测覆盖 selected scope 与 active task。
 - 验证：目标测试 1/1；`npm test` 76/76；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
-- 遗留风险：hosted CI/Docker 将在提交后复验；`public/app.mjs` 其余渲染域和 Worker/Node 大型入口仍需继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
+- 遗留风险：hosted CI `45550791268`（16/16）与 Docker `45550791281` 已通过；`public/app.mjs` 其余渲染域和 Worker/Node 大型入口仍需继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
 
 ## 2026-11-25 — 稳定 digest 时间窗回归
 

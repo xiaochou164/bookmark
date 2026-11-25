@@ -6,7 +6,7 @@
 
 ## 当前状态覆盖
 
-以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`public/app.mjs` 已降至 9,355 行，IO task 增量已通过 CI `45549199061` / Docker `45549199052`。本轮 UI IO task controller 增量已完成本地验证（目标测试 1/1、全套 `npm test` 76/76、浏览器 101/8/16），hosted 验收待推送后复验。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`public/app.mjs` 已降至 9,355 行，IO task 增量已通过 CI `45549199061` / Docker `45549199052`。本轮 UI IO task controller 增量已完成本地及 hosted 验证（目标测试 1/1、全套 `npm test` 76/76、浏览器 101/8/16；CI `45550791268` 16/16、Docker `45550791281`），`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
 
 本轮最新增量：Worker 当前入口降至 6,259 行，插件任务与元数据任务处理器已迁至 `src/worker/taskProcessors.mjs`；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过，BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
@@ -22,7 +22,7 @@
 
 本轮最新增量：Worker IO task 已迁至 `src/worker/taskProcessors.mjs`，入口降至 5,749 行；新增 2 项导出成功、租户参数和跨租户备份对象拒绝回归，目标测试 2/2、全套 `npm test` 75/75、docs/UI/CF/smoke/extension 门禁通过；Docker 本地 build/start/healthy、hosted CI `45549199061`（16/16）和 Docker `45549199052` 均通过。BK-AUD-201 继续开放。
 
-本轮最新增量：导入/导出任务面板已从 `public/app.mjs` 抽至 `public/js/app/ioTasks.mjs`，入口降至 9,355 行；新增 UI controller 单测 1 项，覆盖导出范围和活动任务状态，保留任务详情、下载、日志、重试、轮询、错误反馈和焦点回收行为，并对任务 ID 做 URL 编码与 DOM attribute escaping。目标测试 1/1、全套 `npm test` 76/76、`ui:check`、`docs:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser` 101/8/16 及 Docker build/start/healthy 均通过；截图已恢复到审阅基线。hosted 验收待推送后复验，BK-AUD-201 继续开放。
+本轮最新增量：导入/导出任务面板已从 `public/app.mjs` 抽至 `public/js/app/ioTasks.mjs`，入口降至 9,355 行；新增 UI controller 单测 1 项，覆盖导出范围和活动任务状态，保留任务详情、下载、日志、重试、轮询、错误反馈和焦点回收行为，并对任务 ID 做 URL 编码与 DOM attribute escaping。目标测试 1/1、全套 `npm test` 76/76、`ui:check`、`docs:check`、`cf:check`、`cf:smoke`、`extension:check`、`ui:browser` 101/8/16 及 Docker build/start/healthy 均通过；截图已恢复到审阅基线；hosted CI `45550791268` 16/16、Docker `45550791281` 通过，BK-AUD-201 继续开放。
 
 本轮额外稳定性修复：托管并行测试偶发将 digest provider failure 用例判为“时间窗为空”，根因是路由与测试直接共享墙上时钟。`registerProductDigestRoutes` 现支持可选 `now` 注入，回归测试使用固定时间，生产默认仍为 `Date.now()`；单测重复运行不再依赖 runner 时序。
 
@@ -74,7 +74,7 @@
 - 证据/根因：`public/app.mjs` 原先同时承担导入/导出任务列表渲染、详情/下载/日志/重试事件绑定、轮询、表单组装和任务提交，入口持续膨胀且这些异步状态缺少模块级回归。
 - 修改：新增 `public/js/app/ioTasks.mjs`，通过 `createIoTaskController` 注入 API、状态、渲染 helper 和刷新回调；`public/app.mjs` 仅保留装配与调用。任务 ID 在请求路径中统一 `encodeURIComponent`，列表 `data-*` 属性统一 escaping；新增 `tests/io-task-ui.test.js` 覆盖选中范围导出和活动任务跟踪；静态 UI 审计同步检查新模块边界。
 - 验证：目标测试 1/1；`npm test` 76/76；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101 张页面状态、8 项 E2E、16 张扩展状态），截图恢复基线；Docker build 成功，临时容器 `/api/health` 返回 `ok:true` 且 health 为 `healthy`。
-- 遗留风险：浏览器真实回归仍覆盖现有行为但尚未增加更多 controller 级交互用例；`public/app.mjs` 其余渲染域、Worker/Node 大型入口仍待拆分，hosted CI/Docker 将在本次提交后复验，BK-AUD-201 保持未完成。
+- 遗留风险：浏览器真实回归仍覆盖现有行为但尚未增加更多 controller 级交互用例；`public/app.mjs` 其余渲染域、Worker/Node 大型入口仍待拆分，hosted CI `45550791268`（16/16）与 Docker `45550791281` 已通过，BK-AUD-201 保持未完成。
 
 ## BK-AUD-201 Worker external resources 拆分（2026-11-24）
 
