@@ -19,6 +19,7 @@ import {
   uiPrompt
 } from './js/app/dialogs.mjs';
 import { createPreviewController } from './js/app/previewController.mjs';
+import { createRelatedBookmarksController } from './js/app/relatedBookmarks.mjs';
 import { loadSidebarTagsUi, persistSidebarTagsUi } from './js/app/sidebar.mjs';
 import {
   formatMetadataTaskInfo,
@@ -40,14 +41,6 @@ const SAVED_SEARCHES_UI_ENABLED = false;
 let draggedFolderId = null;
 let toastTimer = null;
 let toastUndoHandler = null;
-let detailRelatedBookmarksState = {
-  bookmarkId: '',
-  loading: false,
-  items: [],
-  summary: '',
-  confidence: 0,
-  error: ''
-};
 let mobileSidebarOpen = false;
 let mobileSidebarReturnFocus = null;
 let detailDrawerReturnFocus = null;
@@ -80,7 +73,6 @@ let detailAiReaderSummaryRunning = false;
 let detailAiHighlightCandidatesRunning = false;
 let detailAiHighlightDigestRunning = false;
 let detailAiFolderRecommendRunning = false;
-let detailAiRelatedRunning = false;
 let detailAiQaRunning = false;
 let bulkAiAutoTagRunning = false;
 let bookmarksLoading = false;
@@ -217,6 +209,29 @@ const {
   openPreviewDialog: open预览Dialog,
   state: previewControllerState
 } = previewController;
+const relatedBookmarksController = createRelatedBookmarksController({
+  api,
+  byId,
+  state,
+  store,
+  escapeHtml,
+  hostFromUrl,
+  bookmarkTimeText,
+  detailAiOperationBusy,
+  isDetailEditMode: () => detailEditMode,
+  renderCards,
+  renderDetail,
+  updateDetailPanelHeadUi,
+  uiConfirm,
+  refreshAll,
+  showToast
+});
+const {
+  clearState: clearRelatedBookmarksState,
+  renderRelatedBookmarksUi,
+  runAiRelatedBookmarksForActiveBookmark,
+  state: relatedBookmarksControllerState
+} = relatedBookmarksController;
 const {
   activateSearchSuggestItem,
   applySearchQueryValue,
@@ -4691,7 +4706,7 @@ function detailAiOperationBusy() {
     || detailAiHighlightCandidatesRunning
     || detailAiHighlightDigestRunning
     || detailAiFolderRecommendRunning
-    || detailAiRelatedRunning
+    || relatedBookmarksControllerState.running
     || detailAiQaRunning
   );
 }
@@ -5383,146 +5398,6 @@ function renderDetailHighlightDigestUi(item = null) {
   `;
 }
 
-function renderDetailRelatedBookmarksUi(item = null) {
-  const infoEl = byId('detailRelatedBookmarksInfo');
-  const listEl = byId('detailRelatedBookmarksList');
-  const btn = byId('refreshRelatedBookmarksBtn');
-  if (!infoEl || !listEl) return;
-
-  const hasItem = Boolean(item && item.id);
-  if (btn) {
-    btn.disabled = !hasItem || Boolean(item?.deletedAt) || detailAiOperationBusy();
-    btn.setAttribute('aria-busy', String(Boolean(detailAiRelatedRunning)));
-    btn.textContent = detailAiRelatedRunning ? 'AI 推荐中…' : 'AI 推荐';
-  }
-
-  if (!hasItem) {
-    infoEl.textContent = '';
-    listEl.innerHTML = '';
-    return;
-  }
-
-  const targetId = String(item.id);
-  if (String(detailRelatedBookmarksState.bookmarkId || '') !== targetId) {
-    infoEl.textContent = '点击“AI 推荐”生成相关书签。';
-    listEl.innerHTML = '<div class="muted">暂无推荐结果。</div>';
-    return;
-  }
-
-  if (detailRelatedBookmarksState.loading || detailAiRelatedRunning) {
-    infoEl.textContent = 'AI 正在分析当前书签并生成相关推荐...';
-    listEl.innerHTML = '<div class="muted">生成中，请稍候…</div>';
-    return;
-  }
-
-  if (detailRelatedBookmarksState.error) {
-    infoEl.textContent = `AI 推荐失败：${detailRelatedBookmarksState.error}`;
-    listEl.innerHTML = '<div class="muted">可点击“AI 推荐”重试。</div>';
-    return;
-  }
-
-  const rows = Array.isArray(detailRelatedBookmarksState.items) ? detailRelatedBookmarksState.items : [];
-  const summary = String(detailRelatedBookmarksState.summary || '').trim();
-  const confidence = Number(detailRelatedBookmarksState.confidence || 0);
-  const bits = [];
-  if (rows.length) bits.push(`${rows.length} 条推荐`);
-  if (summary) bits.push(summary);
-  if (confidence > 0) bits.push(`置信度 ${(confidence * 100).toFixed(0)}%`);
-  infoEl.textContent = bits.join(' · ') || '暂无推荐结果';
-
-  if (!rows.length) {
-    listEl.innerHTML = '<div class="muted">AI 未找到明显相关的书签。</div>';
-    return;
-  }
-
-  listEl.innerHTML = rows.map((r) => {
-    const score = Number(r.score || 0);
-    const host = String(r.host || hostFromUrl(r.url || '') || '');
-    const timeText = (() => {
-      const bm = state.bookmarks.find((x) => String(x.id) === String(r.id)) || state.allBookmarks.find((x) => String(x.id) === String(r.id));
-      return bm ? bookmarkTimeText(bm) : '';
-    })();
-    const meta = [r.folderPath, host, timeText].filter(Boolean).join(' · ');
-    return `<button type="button" class="detail-related-item" data-related-bookmark-open="${escapeHtml(String(r.id))}">
-      <div class="detail-related-item-title-row">
-        <span class="detail-related-item-title">${escapeHtml(r.title || '(untitled)')}</span>
-        ${score > 0 ? `<span class="meta-chip info">${Math.round(score * 100)}%</span>` : ''}
-      </div>
-      <div class="detail-related-item-meta muted">${escapeHtml(meta)}</div>
-      ${r.reason ? `<div class="detail-related-item-reason">${escapeHtml(r.reason)}</div>` : ''}
-    </button>`;
-  }).join('');
-
-  listEl.querySelectorAll('[data-related-bookmark-open]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const id = String(el.dataset.relatedBookmarkOpen || '');
-      if (!id) return;
-      store.setActiveId(id);
-      renderCards();
-      renderDetail();
-    });
-  });
-}
-
-async function runAiRelatedBookmarksForActiveBookmark() {
-  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
-  if (!item || item.deletedAt) return;
-  if (detailAiOperationBusy()) return;
-
-  if (detailEditMode) {
-    const ok = await uiConfirm('当前处于编辑模式，AI 相关推荐会刷新详情区域状态。是否继续？', {
-      title: 'AI 相关书签推荐',
-      confirmText: '继续',
-      cancelText: '取消'
-    });
-    if (!ok) return;
-  }
-
-  detailAiRelatedRunning = true;
-  detailRelatedBookmarksState = {
-    bookmarkId: String(item.id),
-    loading: true,
-    items: [],
-    summary: '',
-    confidence: 0,
-    error: ''
-  };
-  updateDetailPanelHeadUi(item);
-  renderDetailRelatedBookmarksUi(item);
-  try {
-    const out = await api(`/api/product/ai/related/${encodeURIComponent(String(item.id))}`, {
-      method: 'POST',
-      body: JSON.stringify({ limit: 8 })
-    });
-    detailRelatedBookmarksState = {
-      bookmarkId: String(item.id),
-      loading: false,
-      items: Array.isArray(out?.items) ? out.items : [],
-      summary: String(out?.summary || ''),
-      confidence: Math.max(0, Math.min(1, Number(out?.confidence) || 0)),
-      error: ''
-    };
-    renderDetailRelatedBookmarksUi(item);
-    const count = Array.isArray(out?.items) ? out.items.length : 0;
-    showToast(count ? `AI 已生成 ${count} 条相关书签推荐` : 'AI 未找到明显相关的书签', { timeoutMs: 3400 });
-  } catch (err) {
-    detailRelatedBookmarksState = {
-      bookmarkId: String(item.id),
-      loading: false,
-      items: [],
-      summary: '',
-      confidence: 0,
-      error: String(err.message || err)
-    };
-    renderDetailRelatedBookmarksUi(item);
-    showToast(err.message || 'AI 相关书签推荐失败', { timeoutMs: 4200 });
-  } finally {
-    detailAiRelatedRunning = false;
-    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
-    updateDetailPanelHeadUi(latest);
-    if (latest) renderDetailRelatedBookmarksUi(latest);
-  }
-}
 
 async function runAiHighlightCandidatesForActiveBookmark() {
   const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
@@ -6049,7 +5924,7 @@ async function runAiQaFromDialog() {
     detailAiQaRunning = false;
     const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
     updateDetailPanelHeadUi(latest);
-    renderDetailRelatedBookmarksUi(latest);
+    renderRelatedBookmarksUi(latest);
   }
 }
 
@@ -6098,14 +5973,7 @@ function renderDetail() {
     byId('detailHighlightsList').innerHTML = '';
     byId('detailRelatedBookmarksInfo').textContent = '';
     byId('detailRelatedBookmarksList').innerHTML = '';
-    detailRelatedBookmarksState = {
-      bookmarkId: '',
-      loading: false,
-      items: [],
-      summary: '',
-      confidence: 0,
-      error: ''
-    };
+    clearRelatedBookmarksState();
     byId('detailReminderInfo').textContent = '';
     renderDetailFetchStatusSummary({ item: null });
     if (byId('detailSummaryKind')) byId('detailSummaryKind').textContent = '未选择';
@@ -6172,7 +6040,7 @@ function renderDetail() {
   applyDetailSectionUi();
   renderAiQaDialogUi();
   renderAiSideDrawer();
-  renderDetailRelatedBookmarksUi(item);
+  renderRelatedBookmarksUi(item);
   const meta = item.metadata || {};
   const parts = [];
   if (meta.status) parts.push(`metadata: ${meta.status}`);

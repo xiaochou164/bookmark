@@ -119,7 +119,7 @@ async function startServer() {
       DATA_FILE: path.join(tmp, 'empty.json'),
       OBJECT_STORAGE_DIR: path.join(tmp, 'objects'),
       QUEUE_BACKEND: 'memory',
-      RATE_LIMIT_MAX: '5000',
+      RATE_LIMIT_MAX: '500000',
       LOG_LEVEL: 'warn'
     },
     stdio: ['ignore', 'pipe', 'pipe']
@@ -669,11 +669,13 @@ async function main() {
     await setViewport(session, viewports[0]);
     await navigate(session, `${server.baseUrl}/login.html`);
     report.screenshots.push(await captureState(session, server.baseUrl, viewports[0], 'login', ''));
+    for (const viewport of viewports.slice(1)) {
+      report.screenshots.push(await captureState(session, server.baseUrl, viewport, 'login', ''));
+    }
     const seed = await seedSession(session, server.baseUrl);
-    const states = ['login', 'main-list', 'main-card', 'main-headline', 'main-moodboard', 'detail', 'detail-edit', 'bulk', 'ai-drawer', 'bookmark-dialog', 'sidebar', 'search-empty', 'settings', 'settings-account', 'settings-import', 'settings-collab', 'settings-product', 'settings-ai', 'settings-operations', 'settings-security', 'plugin', 'public', 'dark-main', 'dark-settings'];
+    const states = ['main-list', 'main-card', 'main-headline', 'main-moodboard', 'detail', 'detail-edit', 'bulk', 'ai-drawer', 'bookmark-dialog', 'sidebar', 'search-empty', 'settings', 'settings-account', 'settings-import', 'settings-collab', 'settings-product', 'settings-ai', 'settings-operations', 'settings-security', 'plugin', 'public', 'dark-main', 'dark-settings'];
     for (const state of states) {
       for (const viewport of viewports) {
-        if (state === 'login' && viewport.name === 'mobile') continue;
         const result = await captureState(session, server.baseUrl, viewport, state, seed.publicPath);
         report.screenshots.push(result);
         report.overflow.push(result.overflow);

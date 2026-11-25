@@ -67,6 +67,7 @@ const metadataTasksSource = read('public/js/app/metadataTasks.mjs');
 const highlightsSource = read('public/js/app/highlights.mjs');
 const searchSuggestSource = read('public/js/app/searchSuggest.mjs');
 const previewControllerSource = read('public/js/app/previewController.mjs');
+const relatedBookmarksSource = read('public/js/app/relatedBookmarks.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -121,6 +122,9 @@ if (!appSource.includes('createSearchSuggestController') || !searchSuggestSource
 }
 if (!appSource.includes('createPreviewController') || !previewControllerSource.includes('renderPreviewDialog') || !previewControllerSource.includes('loadPreviewForBookmark') || !previewControllerSource.includes('getReaderSelectionPayload')) {
   failures.push('RA-FE-012 preview and reader interactions must use a dedicated controller with stale-response protection');
+}
+if (!appSource.includes('createRelatedBookmarksController') || !relatedBookmarksSource.includes('renderRelatedBookmarksUi') || !relatedBookmarksSource.includes('runAiRelatedBookmarksForActiveBookmark') || !relatedBookmarksSource.includes('requestSequence')) {
+  failures.push('RA-FE-013 related-bookmark recommendations must use a dedicated controller with stale-response protection');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
