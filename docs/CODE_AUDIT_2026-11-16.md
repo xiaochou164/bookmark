@@ -6,7 +6,7 @@
 
 ## 当前状态覆盖
 
-以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`public/app.mjs` 已降至 8,618 行（338.8KiB）。本轮搜索建议/最近搜索 controller 增量已完成本地验证（全套 `npm test` 82/82、UI 静态门禁通过）；元数据、IO task、realtime notification、plugin sync、highlights 增量的浏览器 101/8/16、Docker 和 hosted 验收均通过。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`public/app.mjs` 已降至 8,398 行（330.4KiB）。本轮预览/阅读 controller 增量已完成本地验证（全套 `npm test` 85/85、UI 静态门禁通过）；搜索建议、元数据、IO task、realtime notification、plugin sync、highlights 增量的浏览器 101/8/16、Docker 和 hosted 验收均通过。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
 
 本轮最新增量：Worker 当前入口降至 6,259 行，插件任务与元数据任务处理器已迁至 `src/worker/taskProcessors.mjs`；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过，BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
@@ -33,6 +33,8 @@
 本轮最新增量：详情页高亮/注释列表、编辑/删除、注释 CRUD、内容 escaping、书签切换和请求序列已从 `public/app.mjs` 抽至 `public/js/app/highlights.mjs`，入口降至 8,850 行（347.1KiB）；新增 `tests/highlights-ui.test.js`，覆盖用户内容 escaping 和旧书签结果抑制。静态 UI 审计新增 RA-FE-010，`npm test` 80/80、`ui:check` 和浏览器 101/8/16 通过；最终代码头 hosted CI `45557395256`（16/16）与 Docker `45557395165` 通过，BK-AUD-201 继续开放。
 
 本轮最新增量：搜索建议、token 插入、键盘 roving、最近搜索持久化与 blur 延迟关闭已从 `public/app.mjs` 抽至 `public/js/app/searchSuggest.mjs`，入口降至 8,618 行（338.8KiB）；新增 `tests/search-suggest-ui.test.js` 2 项回归，覆盖 HTML escaping、ARIA active descendant、token 应用、搜索结果刷新和最近搜索恢复。静态 UI 审计新增 RA-FE-011，`npm test` 82/82、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 `ui:browser` 101/8/16 均通过；截图已恢复审阅基线，Docker workflow `45559542765` 与 CI `45559542759` 均成功（16/16）。BK-AUD-201 继续开放。
+
+本轮最新增量：预览/阅读模式、媒体安全降级、选区高亮锚点、正文提取刷新与预览状态反馈已从 `public/app.mjs` 抽至 `public/js/app/previewController.mjs`，入口降至 8,398 行（330.4KiB）；新增 `tests/preview-controller-ui.test.js` 3 项回归，覆盖媒体 URL 安全处理、同书签请求序列抑制、加载/降级状态和选区锚点。静态 UI 审计新增 RA-FE-012，`npm test` 85/85、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 `ui:browser` 101/8/16 均通过；Docker 本地 build/start/healthy 已验证，hosted 验收待本次提交后复验。BK-AUD-201 继续开放。
 
 本轮最新增量：详情页元数据抓取状态、历史、请求序列、轮询和重置逻辑已从 `public/app.mjs` 抽至 `public/js/app/metadataTasks.mjs`，入口降至 9,015 行（354.5KiB）；新增 `tests/metadata-tasks-ui.test.js`，覆盖当前书签隔离、失败重试显示、历史摘要和任务 ID 状态。静态 UI 审计新增 RA-FE-009 controller 边界检查，`npm test` 79/79、`ui:check` 通过；本轮最终代码头 CI `45554317598` 与 Docker `45554317550` 均通过，BK-AUD-201 继续开放。
 
@@ -117,6 +119,15 @@
 - 测试：新增 `tests/search-suggest-ui.test.js` 2 项，覆盖恶意描述 escaping、token 应用后的 `q/page` 状态与刷新、ARIA active descendant、最近搜索恢复。静态审计增加 RA-FE-011 controller 边界检查。
 - 验证：`node --test tests/search-suggest-ui.test.js` 2/2；`npm test` 82/82；`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101 张状态截图、8 项 E2E、16 张扩展截图通过，截图已恢复基线；Docker 本地 build/start/healthy、hosted Docker workflow `45559542765` 和 CI `45559542759`（16/16）均通过。
 - 遗留风险：预览、设置、搜索结果列表和详情按钮绑定仍有大型入口逻辑，BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert 本次 controller/test/静态审计提交。
+
+## BK-AUD-201 / P2 — 前端 preview controller 解耦（2026-11-25）
+
+- 证据/根因：`public/app.mjs` 原先同时维护预览 dialog 状态、iframe/image/video surface 重置、媒体 URL 选择、阅读模式切换、正文提取刷新、选区锚点读取和错误/降级反馈；异步响应没有独立请求序列，重复打开同一书签时旧响应可能覆盖新状态。
+- 修改：新增 `public/js/app/previewController.mjs`，通过 `createPreviewController` 注入 API、DOM、状态、URL 安全函数、详情刷新和 Toast；`public/app.mjs` 仅保留卡片/详情事件装配。controller 统一维护 active bookmark、payload、mode、UI state 和 load sequence，保留媒体类型渲染、frame-restricted 降级、reader 切换、正文提取、高亮锚点和关闭清理。
+- 安全/正确性：预览媒体 URL 继续经 `safeUrl` 过滤；API 路径中的 bookmark ID 使用 `encodeURIComponent`；同一书签重复请求和切换书签时，旧响应按序列号丢弃；选区读取只构造内存 payload，不直接写入 DOM。
+- 测试：新增 `tests/preview-controller-ui.test.js` 3 项，覆盖安全媒体渲染、请求竞态抑制、loading/ready 状态与 reader selection anchors。静态审计增加 RA-FE-012 controller 边界检查。
+- 验证：目标测试 3/3；`npm test` 85/85；`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101 张状态截图、8 项 E2E、16 张扩展截图通过，截图已恢复基线；Docker `rainbow-preview-audit:20261125` 构建成功，临时容器 `/api/health` 返回 `ok:true` 且 health 为 `healthy`，hosted CI/Docker 将在本次提交后复验。
+- 遗留风险：搜索结果列表、设置、详情按钮装配和 Worker/Node 大入口仍需继续拆分；Safari 原生宿主和真实第三方 iframe 策略仍属外部验证边界；BK-AUD-201 保持未完成，无 API/schema/持久化格式变化，可单独 revert 本次 controller/test/静态审计提交。
 
 ## BK-AUD-201 / P2 — 前端 metadata task controller 解耦（2026-11-25）
 

@@ -1443,3 +1443,11 @@
 - 核心修改：保留 token 插入光标恢复、recent 立即提交、advanced saved search 清理、搜索刷新和 blur 关闭时序；建议项/最近搜索统一 escaping，并保持 `role=option` 与 active descendant。
 - 验证：目标测试 2/2；`npm test` 82/82；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图恢复基线。Docker 本地 build/start/healthy、hosted Docker workflow `45559542765` 与 CI `45559542759`（16/16）均通过。
 - 遗留风险：预览、设置、搜索结果列表和详情按钮绑定等大型域仍需拆分，BK-AUD-201 未关闭；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。
+
+## 2026-11-25 — BK-AUD-201 前端 preview controller 拆分
+
+- 问题/根因：`public/app.mjs` 内联预览 dialog、媒体 surface、阅读模式、正文提取刷新、选区高亮锚点和错误/降级状态；同一书签重复请求缺少独立请求序列保护。
+- 修改文件：新增 `public/js/app/previewController.mjs`；`public/app.mjs` 改为装配 controller 并读取其状态；更新 `scripts/ui-static-audit.mjs` 增加 RA-FE-012；新增 `tests/preview-controller-ui.test.js`。
+- 核心修改：统一管理 active bookmark/payload/mode/UI state/load sequence；继续使用 `safeUrl`、URL 编码 bookmark ID、媒体 fallback、reader selection anchors、正文提取和关闭清理。
+- 验证：目标测试 3/3；`npm test` 85/85；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图恢复基线；Docker `rainbow-preview-audit:20261125` build/start/healthy 通过，hosted CI/Docker 待推送后复验。
+- 遗留风险：搜索结果列表、设置、详情按钮装配和 Worker/Node 大入口仍需继续拆分；无 API/schema/持久化格式变化，可单独 revert 本次 controller/test/静态审计提交。
