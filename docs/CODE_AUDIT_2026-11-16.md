@@ -219,3 +219,11 @@
 - **核心修改**：controller 集中管理 `bookmarkId/loading/running/items/summary/confidence/error`；使用 `requestSequence` 丢弃切换书签后的过期响应；请求路径统一 `encodeURIComponent`；推荐标题、来源、原因和 data attribute 统一 escaping；删除/编辑态、忙碌态、失败态和空结果均保留现有反馈；清理详情时使旧请求失效。
 - **验收**：相关推荐专项测试 2/2；全套 `npm test` 87/87；`npm run docs:check`、`npm run ui:check`（入口 325.4KiB / 420KiB、CSS 176.2KiB）、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 通过（101 张页面截图、8 项 E2E、16 张扩展截图），截图已恢复审阅基线；Docker `rainbow-related-audit:20261125` build 成功，临时容器 `/api/health` 返回 `ok:true` 且 health 为 `healthy`。代码提交 `c15a9de`；最终文档头 `479343a` 的 hosted CI `45566651549`（16/16）与 Docker `45566651571` 均成功。
 - **遗留风险**：相关推荐 controller 仍依赖现有详情渲染 helper；设置、详情按钮绑定、搜索结果列表及 Worker/Node 其他大入口仍需继续拆分；无 API/schema/持久化格式变化，可独立 revert 本次 controller、测试、静态审计和浏览器 harness 提交。
+
+## BK-AUD-201 / P2 — AI folder summary controller 解耦（2026-11-25）
+
+- **证据/根因**：`public/app.mjs` 原先内联集合摘要 dialog 的状态、结果渲染、复制/清理、AI 请求和代表书签定位，异步结果边界与工作台入口耦合；集合切换时缺少独立的过期请求回归。
+- **修改**：新增 `public/js/app/folderSummary.mjs`，通过 `createAiFolderSummaryController` 注入 API、DOM、集合状态、刷新和 Toast；`public/app.mjs` 仅保留 controller 装配与按钮事件。新增 `tests/folder-summary-ui.test.js`，静态审计增加 RA-FE-014。
+- **安全/正确性**：摘要、主题、来源、代表书签标题/原因和错误文本统一 HTML escaping；集合 ID 使用 `encodeURIComponent`；未选择集合时阻止请求并提示；清理/关闭/切换集合会使旧请求失效，避免旧摘要覆盖当前集合。
+- **验证**：目标测试 3/3；`npm test` 90/90；`npm run ui:check` 通过（`public/app.mjs` 8,072 行、入口 315.7KiB / 420KiB，CSS 176.2KiB）；`npm run docs:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图已恢复基线；Docker `rainbow-folder-summary-audit:20261125` build/start/healthy 且 `/api/health` 返回 `ok:true`。
+- **遗留风险**：搜索结果、设置、详情按钮装配及 Worker/Node 大入口仍需继续分阶段拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交；hosted CI/Docker workflow 待推送后复验。
