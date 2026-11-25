@@ -1458,4 +1458,4 @@
 - 修改文件：新增 `public/js/app/relatedBookmarks.mjs`、`tests/related-bookmarks-ui.test.js`；更新 `public/app.mjs`、`scripts/ui-static-audit.mjs`（RA-FE-013）和 `scripts/ui-browser-audit.mjs`（登录截图先于账号创建、本地长矩阵限流阈值）。
 - 核心内容：使用 `requestSequence` 抑制过期相关推荐；统一 URL 编码和推荐内容 HTML escaping；保留编辑态确认、忙碌态、失败重试、空结果、详情刷新和焦点/点击行为。
 - 验证：相关推荐测试 2/2；`npm test` 87/87；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 101/8/16 通过；Docker `rainbow-related-audit:20261125` build/start/healthy 且 `/api/health` 返回 ok；截图已恢复基线。
-- 遗留风险：`public/app.mjs` 仍有设置、详情按钮、搜索结果等大型域，Worker/Node 入口也需继续拆分；hosted CI/Docker 待本次文档提交后复验；无 API/schema/持久化格式变化。
+- 遗留风险：`public/app.mjs` 仍有设置、详情按钮、搜索结果等大型域，Worker/Node 入口也需继续拆分；最终文档头 `479343a` 的 hosted CI `45566651549`（16/16）与 Docker `45566651571` 已通过；无 API/schema/持久化格式变化。
