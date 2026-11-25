@@ -31,6 +31,7 @@ import { createRealtimeNotificationsController } from './js/app/realtimeNotifica
 import { createPluginSyncController } from './js/app/pluginSync.mjs';
 import { createMetadataTaskController } from './js/app/metadataTasks.mjs';
 import { createHighlightsController } from './js/app/highlights.mjs';
+import { createSearchSuggestController } from './js/app/searchSuggest.mjs';
 import { SEARCH_RECENT_LIMIT, SEARCH_RECENT_STORAGE_KEY, SEARCH_TOKEN_SUGGESTIONS } from './js/app/search.mjs';
 import './js/uiPreferences.mjs';
 const store = createAppStore();
@@ -164,14 +165,6 @@ let advancedSearchState = {
   lastResultMeta: null,
   lastAiParseMeta: null
 };
-let searchSuggestState = {
-  open: false,
-  activeIndex: -1,
-  items: [],
-  recent: []
-};
-let searchSuggestCloseTimer = null;
-let searchRecentCommitTimer = null;
 let searchInputApplyTimer = null;
 const SEARCH_INPUT_DEBOUNCE_MS = 180;
 const BOOKMARK_LAYOUT_STORAGE_KEY = 'rainbow.bookmarkLayoutMode';
@@ -194,7 +187,31 @@ const DETAIL_WIDTH_LIMITS = Object.freeze({ min: 320, max: 560, fallback: 420 })
 let collapsedFolderIds = loadCollapsedFolderIds();
 let sidebarTagsUi = loadSidebarTagsUi();
 let detailSectionsUi = loadDetailSectionsUi();
-searchSuggestState.recent = loadSearchRecentQueries();
+const searchSuggestController = createSearchSuggestController({
+  byId,
+  state,
+  store,
+  escapeHtml,
+  iconSvg,
+  tokenSuggestions: SEARCH_TOKEN_SUGGESTIONS,
+  recentLimit: SEARCH_RECENT_LIMIT,
+  recentStorageKey: SEARCH_RECENT_STORAGE_KEY,
+  loadBookmarks,
+  renderSidebar,
+  clearAdvancedSavedSearch: () => { advancedSearchState.activeSavedId = ''; }
+});
+const {
+  activateSearchSuggestItem,
+  applySearchQueryValue,
+  clearSearchSuggestCloseTimer,
+  moveSearchSuggestActive,
+  rememberRecentSearch,
+  renderSearchSuggestPopover,
+  scheduleClose: scheduleSearchSuggestClose,
+  setSearchSuggestActiveIndex,
+  setSearchSuggestOpen,
+  state: searchSuggestState
+} = searchSuggestController;
 
 const ioTaskController = createIoTaskController({
   api,
@@ -895,253 +912,6 @@ async function activateSystemView(viewKey) {
   store.clearSelection();
   await loadBookmarks();
   renderSidebar();
-}
-
-function loadSearchRecentQueries() {
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(SEARCH_RECENT_STORAGE_KEY) || '[]');
-    if (!Array.isArray(raw)) return [];
-    return raw
-      .map((x) => String(x || '').trim())
-      .filter(Boolean)
-      .slice(0, SEARCH_RECENT_LIMIT);
-  } catch (_err) {
-    return [];
-  }
-}
-
-function persistSearchRecentQueries() {
-  try {
-    window.localStorage.setItem(SEARCH_RECENT_STORAGE_KEY, JSON.stringify((searchSuggestState.recent || []).slice(0, SEARCH_RECENT_LIMIT)));
-  } catch (_err) {
-    // ignore
-  }
-}
-
-function rememberRecentSearch(term, { immediate = false } = {}) {
-  const value = String(term || '').trim();
-  if (!value || value.length < 2) return;
-
-  const commit = () => {
-    const current = String(byId('searchInput')?.value || '').trim();
-    if (!immediate && current !== value) return;
-    searchSuggestState.recent = [value, ...(searchSuggestState.recent || []).filter((x) => x !== value)].slice(0, SEARCH_RECENT_LIMIT);
-    persistSearchRecentQueries();
-    if (searchSuggestState.open) renderSearchSuggestPopover();
-  };
-
-  if (immediate) {
-    if (searchRecentCommitTimer) {
-      clearTimeout(searchRecentCommitTimer);
-      searchRecentCommitTimer = null;
-    }
-    commit();
-    return;
-  }
-
-  if (searchRecentCommitTimer) clearTimeout(searchRecentCommitTimer);
-  searchRecentCommitTimer = setTimeout(() => {
-    searchRecentCommitTimer = null;
-    commit();
-  }, 800);
-}
-
-function clearSearchSuggestCloseTimer() {
-  if (searchSuggestCloseTimer) {
-    clearTimeout(searchSuggestCloseTimer);
-    searchSuggestCloseTimer = null;
-  }
-}
-
-function setSearchSuggestOpen(open) {
-  searchSuggestState.open = Boolean(open);
-  if (!searchSuggestState.open) searchSuggestState.activeIndex = -1;
-  const popover = byId('searchSuggestPopover');
-  const input = byId('searchInput');
-  if (popover) popover.classList.toggle('hidden', !searchSuggestState.open);
-  if (input) {
-    input.setAttribute('aria-expanded', String(searchSuggestState.open));
-    if (!searchSuggestState.open) input.removeAttribute('aria-activedescendant');
-  }
-  if (searchSuggestState.open) renderSearchSuggestPopover();
-}
-
-function normalizedSearchQuery() {
-  return String(byId('searchInput')?.value || state.filters.q || '').trim();
-}
-
-function buildSearchSuggestItems() {
-  const q = normalizedSearchQuery();
-  const qLower = q.toLowerCase();
-  const items = [];
-
-  const matchedTokens = SEARCH_TOKEN_SUGGESTIONS.filter((s) => {
-    if (!qLower) return true;
-    return s.token.toLowerCase().includes(qLower) || s.label.toLowerCase().includes(qLower) || String(s.desc || '').toLowerCase().includes(qLower);
-  }).slice(0, 8);
-
-  if (matchedTokens.length) {
-    items.push({ kind: 'section', label: '建议的' });
-    for (const token of matchedTokens) {
-      items.push({ kind: 'token', ...token });
-    }
-  }
-
-  const recent = (searchSuggestState.recent || [])
-    .filter((x) => !qLower || x.toLowerCase().includes(qLower))
-    .slice(0, 6);
-  if (recent.length) {
-    items.push({ kind: 'section', label: '最近使用的' });
-    for (const text of recent) {
-      items.push({ kind: 'recent', value: text });
-    }
-  }
-
-  items.push({ kind: 'help' });
-  return items;
-}
-
-function searchSuggestSelectableIndices() {
-  const out = [];
-  (searchSuggestState.items || []).forEach((item, idx) => {
-    if (item.kind === 'token' || item.kind === 'recent') out.push(idx);
-  });
-  return out;
-}
-
-function setSearchSuggestActiveIndex(nextIndex) {
-  const selectable = new Set(searchSuggestSelectableIndices());
-  if (!selectable.size) {
-    searchSuggestState.activeIndex = -1;
-    renderSearchSuggestPopover();
-    return;
-  }
-  const idx = Number(nextIndex);
-  searchSuggestState.activeIndex = Number.isFinite(idx) && selectable.has(idx) ? idx : -1;
-  renderSearchSuggestPopover();
-}
-
-function moveSearchSuggestActive(delta) {
-  const selectable = searchSuggestSelectableIndices();
-  if (!selectable.length) return;
-  if (!searchSuggestState.open) setSearchSuggestOpen(true);
-  const currentPos = selectable.indexOf(searchSuggestState.activeIndex);
-  const base = currentPos >= 0 ? currentPos : (delta > 0 ? -1 : 0);
-  let nextPos = base + (delta > 0 ? 1 : -1);
-  if (nextPos < 0) nextPos = selectable.length - 1;
-  if (nextPos >= selectable.length) nextPos = 0;
-  setSearchSuggestActiveIndex(selectable[nextPos]);
-}
-
-function searchSuggestItemHtml(item, idx) {
-  if (item.kind === 'section') {
-    return `<div class="search-suggest-section">${escapeHtml(item.label || '')}</div>`;
-  }
-  if (item.kind === 'help') {
-    return `<div class="search-suggest-help">
-      <div class="search-suggest-help-icon">${iconSvg('help')}</div>
-      <div class="search-suggest-help-text">
-        <div class="search-suggest-help-title">提示</div>
-        <div class="muted">输入 token（如 <code>tag:</code> / <code>type:</code>）可快速构造搜索，复杂组合推荐用右侧高级搜索。</div>
-      </div>
-    </div>`;
-  }
-  if (item.kind === 'token') {
-    const active = searchSuggestState.activeIndex === idx ? ' active' : '';
-    return `<button type="button" id="searchSuggestOption-${idx}" class="search-suggest-item${active}" role="option" aria-selected="${active ? 'true' : 'false'}" data-search-suggest-index="${idx}">
-      <span class="search-suggest-item-icon" aria-hidden="true">${iconSvg(item.icon || 'search')}</span>
-      <span class="search-suggest-item-main">
-        <span class="search-suggest-item-title">${escapeHtml(item.label || item.token || '')}</span>
-        <span class="search-suggest-item-desc muted">${escapeHtml(item.desc || '')}</span>
-      </span>
-      <span class="search-suggest-item-token">${escapeHtml(item.token || '')}</span>
-    </button>`;
-  }
-  if (item.kind === 'recent') {
-    const active = searchSuggestState.activeIndex === idx ? ' active' : '';
-    return `<button type="button" id="searchSuggestOption-${idx}" class="search-suggest-item${active}" role="option" aria-selected="${active ? 'true' : 'false'}" data-search-suggest-index="${idx}">
-      <span class="search-suggest-item-icon" aria-hidden="true">${iconSvg('search')}</span>
-      <span class="search-suggest-item-main">
-        <span class="search-suggest-item-title">${escapeHtml(item.value || '')}</span>
-        <span class="search-suggest-item-desc muted">最近使用的搜索</span>
-      </span>
-    </button>`;
-  }
-  return '';
-}
-
-function renderSearchSuggestPopover() {
-  const list = byId('searchSuggestList');
-  const popover = byId('searchSuggestPopover');
-  const input = byId('searchInput');
-  if (!list || !popover || !input) return;
-  if (!searchSuggestState.open) {
-    popover.classList.add('hidden');
-    input.setAttribute('aria-expanded', 'false');
-    input.removeAttribute('aria-activedescendant');
-    return;
-  }
-
-  searchSuggestState.items = buildSearchSuggestItems();
-  const selectable = searchSuggestSelectableIndices();
-  if (!selectable.includes(searchSuggestState.activeIndex)) {
-    searchSuggestState.activeIndex = -1;
-  }
-
-  list.innerHTML = searchSuggestState.items.map((item, idx) => searchSuggestItemHtml(item, idx)).join('');
-  popover.classList.toggle('hidden', false);
-  input.setAttribute('aria-expanded', 'true');
-  if (searchSuggestState.activeIndex >= 0) {
-    input.setAttribute('aria-activedescendant', `searchSuggestOption-${searchSuggestState.activeIndex}`);
-    const activeEl = byId(`searchSuggestOption-${searchSuggestState.activeIndex}`);
-    activeEl?.scrollIntoView?.({ block: 'nearest' });
-  } else {
-    input.removeAttribute('aria-activedescendant');
-  }
-}
-
-async function applySearchQueryValue(nextValue, { closeSuggest = true, remember = true } = {}) {
-  const value = String(nextValue || '').trim();
-  const input = byId('searchInput');
-  if (input) input.value = value;
-  store.setFilter('q', value);
-  advancedSearchState.activeSavedId = '';
-  store.setFilter('page', 1);
-  await loadBookmarks();
-  renderSidebar();
-  if (remember) rememberRecentSearch(value, { immediate: true });
-  if (closeSuggest) setSearchSuggestOpen(false);
-}
-
-async function activateSearchSuggestItem(index) {
-  const item = (searchSuggestState.items || [])[Number(index)];
-  if (!item) return false;
-  if (item.kind === 'recent') {
-    await applySearchQueryValue(item.value, { closeSuggest: true, remember: true });
-    return true;
-  }
-  if (item.kind === 'token') {
-    const input = byId('searchInput');
-    if (!input) return false;
-    const current = String(input.value || '').trim();
-    const sep = current && !/\s$/.test(current) ? ' ' : '';
-    const next = `${current}${sep}${item.token}`.trimStart();
-    input.value = next;
-    store.setFilter('q', next.trim());
-    advancedSearchState.activeSavedId = '';
-    store.setFilter('page', 1);
-    await loadBookmarks();
-    renderSidebar();
-    setSearchSuggestOpen(true);
-    input.focus();
-    try {
-      input.setSelectionRange(next.length, next.length);
-    } catch (_err) {
-      // ignore
-    }
-    return true;
-  }
-  return false;
 }
 
 function setListColumnsMenuOpen(open) {
@@ -7367,9 +7137,7 @@ function bindActions() {
 
   byId('searchInput').addEventListener('blur', () => {
     clearSearchSuggestCloseTimer();
-    searchSuggestCloseTimer = setTimeout(() => {
-      setSearchSuggestOpen(false);
-    }, 120);
+    scheduleSearchSuggestClose(120);
     rememberRecentSearch(byId('searchInput')?.value || '');
     if (searchInputApplyTimer) void applySearchInputFilterNow();
   });

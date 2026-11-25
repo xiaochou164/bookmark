@@ -65,6 +65,7 @@ const realtimeNotificationsSource = read('public/js/app/realtimeNotifications.mj
 const pluginSyncSource = read('public/js/app/pluginSync.mjs');
 const metadataTasksSource = read('public/js/app/metadataTasks.mjs');
 const highlightsSource = read('public/js/app/highlights.mjs');
+const searchSuggestSource = read('public/js/app/searchSuggest.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -113,6 +114,9 @@ if (!appSource.includes('createMetadataTaskController') || !metadataTasksSource.
 }
 if (!appSource.includes('createHighlightsController') || !highlightsSource.includes('renderHighlightsList') || !highlightsSource.includes('resetHighlights') || !highlightsSource.includes('data-ann-delete')) {
   failures.push('RA-FE-010 highlights and annotations must use a dedicated controller with safe rendering');
+}
+if (!appSource.includes('createSearchSuggestController') || !searchSuggestSource.includes('renderSearchSuggestPopover') || !searchSuggestSource.includes('activateSearchSuggestItem') || !searchSuggestSource.includes('scheduleClose')) {
+  failures.push('RA-FE-011 search suggestions and recent queries must use a dedicated accessible controller');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
