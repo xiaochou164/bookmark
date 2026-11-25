@@ -21,6 +21,7 @@ import {
 import { createPreviewController } from './js/app/previewController.mjs';
 import { createRelatedBookmarksController } from './js/app/relatedBookmarks.mjs';
 import { createAiFolderSummaryController } from './js/app/folderSummary.mjs';
+import { createAiQaController } from './js/app/aiQa.mjs';
 import { loadSidebarTagsUi, persistSidebarTagsUi } from './js/app/sidebar.mjs';
 import {
   formatMetadataTaskInfo,
@@ -45,19 +46,6 @@ let toastUndoHandler = null;
 let mobileSidebarOpen = false;
 let mobileSidebarReturnFocus = null;
 let detailDrawerReturnFocus = null;
-let aiQaDialogState = {
-  loading: false,
-  question: '',
-  answer: '',
-  sources: [],
-  insufficient: false,
-  confidence: 0,
-  error: '',
-  bookmarkId: '',
-  scope: 'auto',
-  limit: 6
-};
-
 let detailEditMode = false;
 let detailEditBookmarkId = null;
 let detailAiAutoTagRunning = false;
@@ -249,6 +237,31 @@ const {
   handleDialogClose: handleAiFolderSummaryDialogClose,
   run: runAiFolderSummaryForCurrentCollection
 } = folderSummaryController;
+const aiQaController = createAiQaController({
+  api,
+  byId,
+  state,
+  escapeHtml,
+  hostFromUrl,
+  detailAiOperationBusy,
+  setDetailAiQaRunning: (value) => { detailAiQaRunning = Boolean(value); },
+  updateDetailPanelHeadUi,
+  renderRelatedBookmarksUi,
+  store,
+  renderCards,
+  renderDetail,
+  showToast
+});
+const {
+  state: aiQaDialogState,
+  getContextBookmark: getAiQaContextBookmark,
+  drawerContextBookmark: aiDrawerContextBookmark,
+  renderUi: renderAiQaDialogUi,
+  open: openAiQaDialog,
+  close: closeAiQaDialog,
+  clearResult: clearAiQaDialogResult,
+  run: runAiQaFromDialog
+} = aiQaController;
 const {
   activateSearchSuggestItem,
   applySearchQueryValue,
@@ -5492,246 +5505,6 @@ async function runAiHighlightDigestForActiveBookmark() {
     const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
     if (latest) renderDetailHighlightDigestUi(latest);
     updateDetailPanelHeadUi(latest);
-  }
-}
-
-function getAiQaContextBookmark() {
-  const scope = String(aiQaDialogState.scope || 'auto');
-  if (scope === 'all') return null;
-  const preferredId = String(aiQaDialogState.bookmarkId || state.activeId || '').trim();
-  if (!preferredId) return null;
-  return state.bookmarks.find((x) => String(x.id) === preferredId)
-    || state.allBookmarks.find((x) => String(x.id) === preferredId)
-    || null;
-}
-
-function aiDrawerContextBookmark() {
-  const preferredId = String(state.activeId || aiQaDialogState.bookmarkId || '').trim();
-  if (!preferredId) return null;
-  return state.bookmarks.find((x) => String(x.id) === preferredId)
-    || state.allBookmarks.find((x) => String(x.id) === preferredId)
-    || null;
-}
-
-function renderAiQaDialogUi() {
-  const dialog = byId('aiQaDialog');
-  if (!dialog) return;
-  const questionEl = byId('aiQaQuestion');
-  const scopeEl = byId('aiQaScope');
-  const limitEl = byId('aiQaLimit');
-  const askBtn = byId('aiQaAskBtn');
-  const copyBtn = byId('aiQaCopyAnswerBtn');
-  const clearBtn = byId('aiQaClearBtn');
-  const metaEl = byId('aiQaMeta');
-  const answerEl = byId('aiQaAnswer');
-  const sourcesEl = byId('aiQaSources');
-  if (!questionEl || !scopeEl || !limitEl || !askBtn || !copyBtn || !clearBtn || !metaEl || !answerEl || !sourcesEl) return;
-
-  if (questionEl.value !== String(aiQaDialogState.question || '')) {
-    questionEl.value = String(aiQaDialogState.question || '');
-  }
-  scopeEl.value = ['auto', 'all', 'current_only'].includes(String(aiQaDialogState.scope || 'auto'))
-    ? String(aiQaDialogState.scope || 'auto')
-    : 'auto';
-  limitEl.value = String(Math.max(1, Math.min(10, Number(aiQaDialogState.limit) || 6)));
-
-  const ctx = getAiQaContextBookmark();
-  const scope = String(aiQaDialogState.scope || 'auto');
-  const loading = Boolean(aiQaDialogState.loading);
-  const canAsk = !loading && !detailAiOperationBusy() && String(questionEl.value || '').trim().length > 0;
-  askBtn.disabled = !canAsk;
-  askBtn.setAttribute('aria-busy', String(loading));
-  askBtn.textContent = loading ? '问答中…' : '开始问答';
-  copyBtn.disabled = !String(aiQaDialogState.answer || '').trim();
-  clearBtn.disabled = loading && !String(aiQaDialogState.answer || '').trim();
-
-  const metaBits = [];
-  if (scope === 'all') metaBits.push('范围：全部书签');
-  else if (scope === 'current_only') metaBits.push(ctx ? `范围：仅当前书签（${ctx.title || ctx.id}）` : '范围：仅当前书签（未选中）');
-  else metaBits.push(ctx ? `范围：当前书签优先（${ctx.title || ctx.id}）` : '范围：全部书签（当前未选中书签）');
-  if (Number(aiQaDialogState.confidence || 0) > 0) metaBits.push(`置信度 ${(Number(aiQaDialogState.confidence) * 100).toFixed(0)}%`);
-  if (aiQaDialogState.insufficient) metaBits.push('信息可能不足');
-  if (loading) metaBits.unshift('AI 正在分析书签内容...');
-  else if (aiQaDialogState.error) metaBits.unshift(`失败：${aiQaDialogState.error}`);
-  metaEl.textContent = metaBits.filter(Boolean).join(' · ') || '输入问题后点击“开始问答”。';
-
-  if (aiQaDialogState.answer) {
-    answerEl.textContent = String(aiQaDialogState.answer || '');
-    answerEl.classList.remove('muted');
-  } else if (loading) {
-    answerEl.textContent = '正在生成回答，请稍候…';
-    answerEl.classList.add('muted');
-  } else if (aiQaDialogState.error) {
-    answerEl.textContent = `问答失败：${aiQaDialogState.error}`;
-    answerEl.classList.add('muted');
-  } else {
-    answerEl.textContent = '暂无回答。';
-    answerEl.classList.add('muted');
-  }
-
-  const sources = Array.isArray(aiQaDialogState.sources) ? aiQaDialogState.sources : [];
-  if (!sources.length) {
-    sourcesEl.innerHTML = `<div class="muted">${loading ? '等待 AI 返回出处…' : '暂无出处。'}</div>`;
-    return;
-  }
-  sourcesEl.innerHTML = sources.map((src, idx) => {
-    const id = String(src?.id || '');
-    const title = String(src?.title || '(untitled)');
-    const host = String(src?.host || hostFromUrl(src?.url || '') || '');
-    const folderPath = String(src?.folderPath || '');
-    const score = Math.max(0, Math.min(1, Number(src?.score) || 0));
-    const reason = String(src?.reason || '');
-    const excerpt = String(src?.excerpt || '').trim();
-    const meta = [folderPath, host].filter(Boolean).join(' · ');
-    return `<button type="button" class="ai-qa-source-item" data-ai-qa-source-open="${escapeHtml(id)}">
-      <div class="ai-qa-source-row">
-        <span class="ai-qa-source-index">${idx + 1}</span>
-        <span class="ai-qa-source-title">${escapeHtml(title)}</span>
-        ${score > 0 ? `<span class="meta-chip info">${Math.round(score * 100)}%</span>` : ''}
-      </div>
-      ${meta ? `<div class="ai-qa-source-meta muted">${escapeHtml(meta)}</div>` : ''}
-      ${reason ? `<div class="ai-qa-source-reason">${escapeHtml(reason)}</div>` : ''}
-      ${excerpt ? `<div class="ai-qa-source-excerpt">${escapeHtml(excerpt)}</div>` : ''}
-    </button>`;
-  }).join('');
-
-  sourcesEl.querySelectorAll('[data-ai-qa-source-open]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const id = String(el.dataset.aiQaSourceOpen || '').trim();
-      if (!id) return;
-      store.setActiveId(id);
-      aiQaDialogState.bookmarkId = id;
-      renderCards();
-      renderDetail();
-      renderAiQaDialogUi();
-    });
-  });
-}
-
-function openAiQaDialog({ bookmarkId = null, question = '', scope = null } = {}) {
-  const dialog = byId('aiQaDialog');
-  if (!dialog) return;
-  const prevBookmarkId = String(aiQaDialogState.bookmarkId || '');
-  const prevScope = String(aiQaDialogState.scope || 'auto');
-  const incomingBookmarkId = String(bookmarkId || state.activeId || '').trim();
-  if (incomingBookmarkId) aiQaDialogState.bookmarkId = incomingBookmarkId;
-  if (typeof question === 'string' && question) aiQaDialogState.question = question;
-  if (scope) aiQaDialogState.scope = String(scope);
-  if (!String(aiQaDialogState.scope || '').trim()) aiQaDialogState.scope = 'auto';
-  const currentBookmarkId = String(aiQaDialogState.bookmarkId || '');
-  const currentScope = String(aiQaDialogState.scope || 'auto');
-  if (currentBookmarkId !== prevBookmarkId || currentScope !== prevScope) {
-    aiQaDialogState = {
-      ...aiQaDialogState,
-      answer: '',
-      sources: [],
-      insufficient: false,
-      confidence: 0,
-      error: ''
-    };
-  }
-  renderAiQaDialogUi();
-  if (!dialog.open) dialog.showModal();
-  queueMicrotask(() => byId('aiQaQuestion')?.focus?.());
-}
-
-function closeAiQaDialog() {
-  const dialog = byId('aiQaDialog');
-  if (dialog?.open) dialog.close();
-}
-
-function clearAiQaDialogResult({ preserveQuestion = true } = {}) {
-  aiQaDialogState = {
-    ...aiQaDialogState,
-    loading: false,
-    question: preserveQuestion ? String(aiQaDialogState.question || '') : '',
-    answer: '',
-    sources: [],
-    insufficient: false,
-    confidence: 0,
-    error: ''
-  };
-  renderAiQaDialogUi();
-}
-
-async function runAiQaFromDialog() {
-  if (detailAiOperationBusy()) return;
-  const question = String(byId('aiQaQuestion')?.value || '').trim();
-  if (!question) {
-    showToast('请输入问题', { timeoutMs: 2500 });
-    byId('aiQaQuestion')?.focus?.();
-    return;
-  }
-  const scope = String(byId('aiQaScope')?.value || 'auto');
-  const limit = Math.max(1, Math.min(10, Number(byId('aiQaLimit')?.value || 6) || 6));
-  const currentCtxId = String(aiQaDialogState.bookmarkId || state.activeId || '').trim();
-  if (scope === 'current_only' && !currentCtxId) {
-    showToast('“仅当前书签”需要先选中一条书签', { timeoutMs: 3000 });
-    return;
-  }
-
-  aiQaDialogState = {
-    ...aiQaDialogState,
-    loading: true,
-    question,
-    scope,
-    limit,
-    error: '',
-    answer: '',
-    sources: [],
-    insufficient: false,
-    confidence: 0,
-    bookmarkId: currentCtxId || aiQaDialogState.bookmarkId || ''
-  };
-  detailAiQaRunning = true;
-  renderAiQaDialogUi();
-  updateDetailPanelHeadUi(state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null);
-
-  try {
-    const body = {
-      question,
-      scope,
-      limit
-    };
-    if (scope === 'current_only' && currentCtxId) {
-      body.bookmarkId = currentCtxId;
-      body.bookmarkIds = [currentCtxId];
-    } else if (scope === 'auto' && currentCtxId) {
-      body.bookmarkId = currentCtxId;
-    }
-    const out = await api('/api/product/ai/qa', {
-      method: 'POST',
-      body: JSON.stringify(body)
-    });
-    aiQaDialogState = {
-      ...aiQaDialogState,
-      loading: false,
-      answer: String(out?.answer || ''),
-      sources: Array.isArray(out?.sources) ? out.sources : [],
-      insufficient: Boolean(out?.insufficient),
-      confidence: Math.max(0, Math.min(1, Number(out?.confidence) || 0)),
-      error: ''
-    };
-    renderAiQaDialogUi();
-    const sourcesCount = Array.isArray(out?.sources) ? out.sources.length : 0;
-    showToast(sourcesCount ? `AI 已生成回答（引用 ${sourcesCount} 条出处）` : 'AI 已生成回答', { timeoutMs: 3400 });
-  } catch (err) {
-    aiQaDialogState = {
-      ...aiQaDialogState,
-      loading: false,
-      error: String(err.message || err),
-      answer: '',
-      sources: [],
-      insufficient: false,
-      confidence: 0
-    };
-    renderAiQaDialogUi();
-    showToast(err.message || 'AI 书签问答失败', { timeoutMs: 4200 });
-  } finally {
-    detailAiQaRunning = false;
-    const latest = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId) || null;
-    updateDetailPanelHeadUi(latest);
-    renderRelatedBookmarksUi(latest);
   }
 }
 

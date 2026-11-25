@@ -69,6 +69,7 @@ const searchSuggestSource = read('public/js/app/searchSuggest.mjs');
 const previewControllerSource = read('public/js/app/previewController.mjs');
 const relatedBookmarksSource = read('public/js/app/relatedBookmarks.mjs');
 const folderSummarySource = read('public/js/app/folderSummary.mjs');
+const aiQaSource = read('public/js/app/aiQa.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -129,6 +130,9 @@ if (!appSource.includes('createRelatedBookmarksController') || !relatedBookmarks
 }
 if (!appSource.includes('createAiFolderSummaryController') || !folderSummarySource.includes('renderUi') || !folderSummarySource.includes('run') || !folderSummarySource.includes('formatSummaryText')) {
   failures.push('RA-FE-014 AI folder summary must use a dedicated controller');
+}
+if (!appSource.includes('createAiQaController') || !aiQaSource.includes('renderUi') || !aiQaSource.includes('getContextBookmark') || !aiQaSource.includes('requestSequence')) {
+  failures.push('RA-FE-015 AI Q&A dialog must use a dedicated controller with stale-response protection');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
