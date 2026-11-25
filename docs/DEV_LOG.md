@@ -1411,3 +1411,11 @@
 - 核心内容：保留 SSE→5 秒轮询回退、首次快照不提示、签名去重、最多 20 条通知、打开即已读、菜单关闭、任务/提醒刷新和错误静默策略；controller 暴露独立摘要与快照行为供回归。
 - 验证：目标测试 1/1；`npm test` 77/77；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
 - 遗留风险：hosted CI `45552355409`（16/16）与 Docker `45552355425` 已通过；`public/app.mjs` 仍有详情、搜索、插件和设置等大型渲染/事件域，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
+
+## 2026-11-25 — BK-AUD-201 前端 plugin sync controller 拆分
+
+- 问题/根因：`public/app.mjs` 内联 Raindrop sync 任务轮询、配置、计划、历史、审计、设备和健康状态读取，异步插件状态与工作台入口耦合。
+- 修改文件：新增 `public/js/app/pluginSync.mjs`，在 `public/app.mjs` 通过 `createPluginSyncController` 注入 API、DOM、store 配置写入和刷新；更新 `scripts/ui-static-audit.mjs` 增加 RA-FE-008；新增 `tests/plugin-sync-ui.test.js`。
+- 核心内容：保留任务 ID 编码、queued/running 1 秒轮询、终态清理和刷新、计划字段默认归一化与错误输出；成功任务仍触发全局书签刷新。
+- 验证：目标测试 1/1；`npm test` 78/78；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
+- 遗留风险：hosted CI/Docker 将在提交后复验；插件事件装配、详情/搜索/设置等大型入口仍需继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
