@@ -1459,3 +1459,11 @@
 - 核心内容：使用 `requestSequence` 抑制过期相关推荐；统一 URL 编码和推荐内容 HTML escaping；保留编辑态确认、忙碌态、失败重试、空结果、详情刷新和焦点/点击行为。
 - 验证：相关推荐测试 2/2；`npm test` 87/87；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 101/8/16 通过；Docker `rainbow-related-audit:20261125` build/start/healthy 且 `/api/health` 返回 ok；截图已恢复基线。
 - 遗留风险：`public/app.mjs` 仍有设置、详情按钮、搜索结果等大型域，Worker/Node 入口也需继续拆分；最终文档头 `479343a` 的 hosted CI `45566651549`（16/16）与 Docker `45566651571` 已通过；无 API/schema/持久化格式变化。
+
+## 2026-11-25 — BK-AUD-201 前端 AI folder summary controller 拆分
+
+- 问题/根因：集合摘要 dialog 的状态、摘要格式化、结果渲染、复制/清理、AI 请求和代表书签定位全部内联在 `public/app.mjs`，集合切换期间缺少独立的过期响应保护。
+- 修改文件：新增 `public/js/app/folderSummary.mjs`、`tests/folder-summary-ui.test.js`；`public/app.mjs` 注入 controller；`scripts/ui-static-audit.mjs` 增加 RA-FE-014。
+- 核心修改：保留现有摘要 UI/按钮/Toast 行为，统一输出 escaping、集合 ID 编码、无集合提示；关闭/清理/切换集合时失效旧请求，避免旧结果覆盖当前集合。
+- 验证：目标测试 3/3；`npm test` 90/90；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；入口 8,072 行（315.7KiB），浏览器矩阵、Docker 和 hosted workflow 待提交后复验。
+- 遗留风险：设置、搜索结果、详情按钮装配和 Worker/Node 大入口仍需继续拆分；BK-AUD-201 未关闭；无 API/schema/持久化格式变化。
