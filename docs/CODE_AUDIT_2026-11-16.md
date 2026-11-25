@@ -1,12 +1,12 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `50c25c5` 的 GitHub Actions run `44328101550`（16 步）和 Docker build run `44328102056` 均通过。Actions 运行时告警已清零，workflow 固定 Ubuntu 24.04。首次运行的 Chrome user namespace/AppArmor 沙箱故障由 CI 专用启动参数修复。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
+> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `c15a9de` 已完成相关推荐 controller 拆分并等待托管验收。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
 ## 当前状态覆盖
 
-以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`public/app.mjs` 已降至 8,398 行（330.4KiB）。本轮预览/阅读 controller 增量已完成本地验证（全套 `npm test` 85/85、UI 静态门禁通过）；搜索建议、元数据、IO task、realtime notification、plugin sync、highlights 增量的浏览器 101/8/16、Docker 和 hosted 验收均通过。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`src/routes/productRoutes.js` 为 3,088 行，`public/app.mjs` 已降至 8,266 行（325.4KiB）。相关推荐 controller 已从入口抽至 `public/js/app/relatedBookmarks.mjs`，本地 `npm test` 87/87、`ui:check` 和浏览器 101/8/16 通过；`BK-AUD-201` 仍未完成，因为 Worker 余下路由/任务域、Node/Worker 契约覆盖以及前端设置/详情按钮/列表等大型入口仍需继续拆分。
 
 本轮最新增量：Worker 当前入口降至 6,259 行，插件任务与元数据任务处理器已迁至 `src/worker/taskProcessors.mjs`；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过，BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
@@ -211,3 +211,11 @@
 - **BK-AUD-205 / P2 证据补充（2026-11-18）**：Worker/Node AI evaluation defaults parity 回归和 Worker AI governance module 一并加入本轮提交；本地 `node --test tests/worker-ai-governance.test.js` 4/4、`npm test` 61/61、docs/UI/CF/extension、Docker healthy 均通过。hosted CI 尚在运行，故该附加发现保留 `[ ]`，不提前结项。
 
 - **BK-AUD-201 Worker task summaries 拆分（2026-11-18）**：`src/worker.mjs` 中任务失败/DLQ 汇总、实时任务状态与提醒快照是独立汇总逻辑，但与 API 分发和 Worker 流程同处入口。迁移至 `src/worker/taskSummaries.mjs`，repo 仍通过调用参数注入，保持原 userId 查询边界；显式提供 `now` 以便稳定测试。新增 `tests/worker-task-summaries.test.js` 两项测试，覆盖重试与 DLQ 分类、租户参数传递、活动任务、已删除/已完成提醒过滤和签名。Worker 主文件从 6,514 行降至 6,433 行。目标测试 2/2、全套 `npm test` 63/63、`cf:check`、`cf:smoke`、docs/UI/extension 门禁通过；Docker build/start/healthy `/api/health` 返回 200；GitHub CI run `44327200479`（16 步）与 Docker PR build run `44327200197` 均成功。无 API/schema/data-format 改动，BK-AUD-201 继续开放。
+
+## BK-AUD-201 / P2 — 前端 related bookmarks controller 拆分（2026-11-25）
+
+- **问题/根因**：详情页相关推荐的状态、AI 请求、结果渲染和书签切换点击事件原先内联在 `public/app.mjs`，与详情页其他 AI 操作共享入口状态；旧书签请求完成后可能覆盖当前详情，推荐标题/原因也需要统一 HTML escaping。
+- **修改文件**：新增 `public/js/app/relatedBookmarks.mjs`；`public/app.mjs` 装配 `createRelatedBookmarksController`；`scripts/ui-static-audit.mjs` 增加 RA-FE-013 边界检查；新增 `tests/related-bookmarks-ui.test.js`；`scripts/ui-browser-audit.mjs` 将登录截图提前到本地账号创建前，并把临时测试服务 `RATE_LIMIT_MAX` 提高到 500000，避免四档长矩阵被本地限流。
+- **核心修改**：controller 集中管理 `bookmarkId/loading/running/items/summary/confidence/error`；使用 `requestSequence` 丢弃切换书签后的过期响应；请求路径统一 `encodeURIComponent`；推荐标题、来源、原因和 data attribute 统一 escaping；删除/编辑态、忙碌态、失败态和空结果均保留现有反馈；清理详情时使旧请求失效。
+- **验收**：相关推荐专项测试 2/2；全套 `npm test` 87/87；`npm run docs:check`、`npm run ui:check`（入口 325.4KiB / 420KiB、CSS 176.2KiB）、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 通过（101 张页面截图、8 项 E2E、16 张扩展截图），截图已恢复审阅基线；Docker `rainbow-related-audit:20261125` build 成功，临时容器 `/api/health` 返回 `ok:true` 且 health 为 `healthy`。代码提交 `c15a9de`，hosted CI/Docker 待提交后验收。
+- **遗留风险**：相关推荐 controller 仍依赖现有详情渲染 helper；设置、详情按钮绑定、搜索结果列表及 Worker/Node 其他大入口仍需继续拆分；无 API/schema/持久化格式变化，可独立 revert 本次 controller、测试、静态审计和浏览器 harness 提交。

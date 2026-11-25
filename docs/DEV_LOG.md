@@ -1451,3 +1451,11 @@
 - 核心修改：统一管理 active bookmark/payload/mode/UI state/load sequence；继续使用 `safeUrl`、URL 编码 bookmark ID、媒体 fallback、reader selection anchors、正文提取和关闭清理。
 - 验证：目标测试 3/3；`npm test` 85/85；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图恢复基线；Docker `rainbow-preview-audit:20261125` build/start/healthy、hosted CI `45561713899`（16/16）与 Docker `45561713835` 均通过。
 - 遗留风险：搜索结果列表、设置、详情按钮装配和 Worker/Node 大入口仍需继续拆分；无 API/schema/持久化格式变化，可单独 revert 本次 controller/test/静态审计提交。
+
+## 2026-11-25 — BK-AUD-201 前端 related bookmarks controller 拆分
+
+- 问题/根因：相关推荐的 AI 请求、loading/error/empty 状态、结果 escaping 和点击打开详情逻辑内联在 `public/app.mjs`，详情切换时旧响应缺少独立的失效边界。
+- 修改文件：新增 `public/js/app/relatedBookmarks.mjs`、`tests/related-bookmarks-ui.test.js`；更新 `public/app.mjs`、`scripts/ui-static-audit.mjs`（RA-FE-013）和 `scripts/ui-browser-audit.mjs`（登录截图先于账号创建、本地长矩阵限流阈值）。
+- 核心内容：使用 `requestSequence` 抑制过期相关推荐；统一 URL 编码和推荐内容 HTML escaping；保留编辑态确认、忙碌态、失败重试、空结果、详情刷新和焦点/点击行为。
+- 验证：相关推荐测试 2/2；`npm test` 87/87；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 101/8/16 通过；Docker `rainbow-related-audit:20261125` build/start/healthy 且 `/api/health` 返回 ok；截图已恢复基线。
+- 遗留风险：`public/app.mjs` 仍有设置、详情按钮、搜索结果等大型域，Worker/Node 入口也需继续拆分；hosted CI/Docker 待本次文档提交后复验；无 API/schema/持久化格式变化。
