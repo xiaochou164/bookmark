@@ -1435,3 +1435,11 @@
 - 核心内容：保留编辑/删除高亮、注释新增/编辑/删除、refreshAll 和 Toast；用户内容与 data 属性统一 escaping，controller 通过 active bookmark 和 load sequence 抑制过期结果。
 - 验证：目标测试 1/1；`npm test` 80/80；`npm run ui:check` 通过（入口 347.1KiB、CSS 176.2KiB）；`npm run ui:browser` 101/8/16 通过，截图恢复基线；最终代码头 hosted CI `45557395256` 16/16、Docker `45557395165` 通过。
 - 遗留风险：预览/搜索/设置及详情按钮绑定等其他大型域仍需拆分，BK-AUD-201 保持未完成；无 API/schema/持久化格式变化。
+
+## 2026-11-25 — BK-AUD-201 前端 search suggestion controller 拆分
+
+- 问题/根因：`public/app.mjs` 内联搜索建议条目构造、token/recent HTML、键盘 roving、ARIA active descendant、最近搜索 localStorage、blur 延迟关闭和查询应用，短生命周期状态与工作台入口耦合。
+- 修改文件：新增 `public/js/app/searchSuggest.mjs`；`public/app.mjs` 改为装配 `createSearchSuggestController`；更新 `scripts/ui-static-audit.mjs` 增加 RA-FE-011；新增 `tests/search-suggest-ui.test.js`。
+- 核心修改：保留 token 插入光标恢复、recent 立即提交、advanced saved search 清理、搜索刷新和 blur 关闭时序；建议项/最近搜索统一 escaping，并保持 `role=option` 与 active descendant。
+- 验证：目标测试 2/2；`npm test` 82/82；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图恢复基线。Docker 本地 build/start/healthy 与 hosted CI/Docker 待推送后复验。
+- 遗留风险：预览、设置、搜索结果列表和详情按钮绑定等大型域仍需拆分，BK-AUD-201 未关闭；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。
