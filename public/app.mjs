@@ -29,6 +29,7 @@ import {
 import { createIoTaskController } from './js/app/ioTasks.mjs';
 import { createRealtimeNotificationsController } from './js/app/realtimeNotifications.mjs';
 import { createPluginSyncController } from './js/app/pluginSync.mjs';
+import { createMetadataTaskController } from './js/app/metadataTasks.mjs';
 import { SEARCH_RECENT_LIMIT, SEARCH_RECENT_STORAGE_KEY, SEARCH_TOKEN_SUGGESTIONS } from './js/app/search.mjs';
 import './js/uiPreferences.mjs';
 
@@ -38,10 +39,6 @@ const SAVED_SEARCHES_UI_ENABLED = false;
 let draggedFolderId = null;
 let toastTimer = null;
 let toastUndoHandler = null;
-let metadataTaskPollTimer = null;
-let detailMetadataTaskBookmarkId = null;
-let detailMetadataTaskLatestId = null;
-let metadataTaskLoadSeq = 0;
 let previewActiveBookmarkId = null;
 let previewPayload = null;
 let previewMode = 'auto';
@@ -225,6 +222,28 @@ const {
   queueIoExportTask,
   setActiveTaskId
 } = ioTaskController;
+
+const metadataTaskController = createMetadataTaskController({
+  api,
+  byId,
+  state,
+  formatMetadataTaskInfo,
+  isMetadataTaskTerminal,
+  renderDetailFetchStatusSummary,
+  getCurrentItem: (activeBookmarkId) => state.bookmarks.find((x) => x.id === activeBookmarkId) || state.allBookmarks.find((x) => x.id === activeBookmarkId) || null,
+  refreshAll
+});
+const {
+  getBookmarkId: getMetadataTaskBookmarkId,
+  getLatestTaskId: getMetadataTaskLatestId,
+  loadLatestMetadataTaskForBookmark,
+  loadMetadataTaskHistoryForBookmark,
+  renderMetadataTaskHistory,
+  renderMetadataTaskUi,
+  resetMetadataTasks,
+  startMetadataTaskPoll,
+  stopMetadataTaskPoll
+} = metadataTaskController;
 
 const realtimeNotificationsController = createRealtimeNotificationsController({
   api,
@@ -4672,13 +4691,6 @@ function renderDialogsFolderOptions() {
   populateIoFolderSelects();
 }
 
-function stopMetadataTaskPoll() {
-  if (metadataTaskPollTimer) {
-    clearInterval(metadataTaskPollTimer);
-    metadataTaskPollTimer = null;
-  }
-}
-
 function renderDetailFetchStatusSummary({ item = null, task = null } = {}) {
   const chipsEl = byId('detailFetchSummaryChips');
   const detailsEl = byId('detailFetchDetails');
@@ -5408,42 +5420,6 @@ async function runDetailPanelMoreAction(action) {
     byId('detailHeaderRestoreBtn')?.click();
     return;
   }
-}
-
-function renderMetadataTaskUi(task, { bookmarkId = null } = {}) {
-  const infoEl = byId('detailMetaTaskInfo');
-  const retryBtn = byId('retryMetaTaskBtn');
-  if (!infoEl || !retryBtn) return;
-  const activeBookmarkId = state.activeId ? String(state.activeId) : '';
-  if (bookmarkId && activeBookmarkId && String(bookmarkId) !== activeBookmarkId) return;
-
-  detailMetadataTaskLatestId = task ? String(task.id || '') : null;
-  if (bookmarkId) detailMetadataTaskBookmarkId = String(bookmarkId);
-  infoEl.textContent = formatMetadataTaskInfo(task);
-  retryBtn.classList.toggle('hidden', !(task && String(task.status) === 'failed'));
-  const item = state.bookmarks.find((x) => x.id === activeBookmarkId) || state.allBookmarks.find((x) => x.id === activeBookmarkId) || null;
-  renderDetailFetchStatusSummary({ item, task });
-}
-
-function renderMetadataTaskHistory(tasks = [], { bookmarkId = null } = {}) {
-  const el = byId('detailFetchHistory');
-  if (!el) return;
-  const activeBookmarkId = state.activeId ? String(state.activeId) : '';
-  if (bookmarkId && activeBookmarkId && String(bookmarkId) !== activeBookmarkId) return;
-  if (!tasks.length) {
-    el.textContent = '抓取历史：无';
-    const detailsEl = byId('detailFetchDetails');
-    if (detailsEl && !String(byId('detailMetaTaskInfo')?.textContent || '').includes('错误')) detailsEl.open = false;
-    return;
-  }
-  const rows = tasks.slice(0, 5).map((t) => {
-    const status = String(t.status || 'unknown');
-    const attempt = `${Number(t.attempt || 0)}/${Number(t.maxAttempts || 0) || '?'}`;
-    const ts = Number(t.updatedAt || t.createdAt || 0);
-    const msg = String(t.error?.message || t.lastError?.message || '');
-    return `${status} (尝试 ${attempt}) @ ${ts ? new Date(ts).toLocaleTimeString() : '-'}${msg ? ` · ${msg}` : ''}`;
-  });
-  el.textContent = `抓取历史：\n${rows.join('\n')}`;
 }
 
 function highlightColorLabel(color = '') {
@@ -6490,68 +6466,6 @@ async function loadHighlightsForBookmark(bookmarkId, { force = false } = {}) {
   return highlights;
 }
 
-async function loadLatestMetadataTaskForBookmark(bookmarkId, { force = false } = {}) {
-  const activeBookmarkId = state.activeId ? String(state.activeId) : '';
-  const targetBookmarkId = String(bookmarkId || activeBookmarkId || '');
-  if (!targetBookmarkId) {
-    renderMetadataTaskUi(null);
-    return null;
-  }
-
-  if (!force && detailMetadataTaskBookmarkId === targetBookmarkId && detailMetadataTaskLatestId) {
-    return null;
-  }
-
-  const seq = ++metadataTaskLoadSeq;
-  const out = await api(`/api/bookmarks/${targetBookmarkId}/metadata/tasks?limit=1`);
-  if (seq !== metadataTaskLoadSeq) return null;
-  const task = Array.isArray(out?.tasks) ? out.tasks[0] : null;
-  renderMetadataTaskUi(task, { bookmarkId: targetBookmarkId });
-  if (task && !isMetadataTaskTerminal(task.status)) {
-    startMetadataTaskPoll(task.id, targetBookmarkId);
-  } else if (task) {
-    stopMetadataTaskPoll();
-  }
-  return task;
-}
-
-async function loadMetadataTaskHistoryForBookmark(bookmarkId) {
-  const targetBookmarkId = String(bookmarkId || state.activeId || '');
-  if (!targetBookmarkId) {
-    renderMetadataTaskHistory([]);
-    return [];
-  }
-  const out = await api(`/api/bookmarks/${targetBookmarkId}/metadata/tasks?limit=5`);
-  const tasks = Array.isArray(out?.tasks) ? out.tasks : [];
-  renderMetadataTaskHistory(tasks, { bookmarkId: targetBookmarkId });
-  return tasks;
-}
-
-function startMetadataTaskPoll(taskId, bookmarkId) {
-  stopMetadataTaskPoll();
-  const targetTaskId = String(taskId || '');
-  const targetBookmarkId = String(bookmarkId || state.activeId || '');
-  if (!targetTaskId || !targetBookmarkId) return;
-  metadataTaskPollTimer = setInterval(async () => {
-    try {
-      if (!state.activeId || String(state.activeId) !== targetBookmarkId) {
-        stopMetadataTaskPoll();
-        return;
-      }
-      const out = await api(`/api/metadata/tasks/${targetTaskId}`);
-      const task = out?.task || null;
-      renderMetadataTaskUi(task, { bookmarkId: targetBookmarkId });
-      if (!task || isMetadataTaskTerminal(task.status)) {
-        stopMetadataTaskPoll();
-        await loadMetadataTaskHistoryForBookmark(targetBookmarkId);
-        await refreshAll();
-      }
-    } catch (_err) {
-      stopMetadataTaskPoll();
-    }
-  }, 1500);
-}
-
 function closeDetailPanel({ restoreFocus = true } = {}) {
   const previousId = String(state.activeId || '');
   if (!previousId) return;
@@ -6581,9 +6495,7 @@ function renderDetail() {
     byId('detailMetaInfo').textContent = '';
     renderMetadataTaskUi(null);
     renderMetadataTaskHistory([]);
-    stopMetadataTaskPoll();
-    detailMetadataTaskBookmarkId = null;
-    detailMetadataTaskLatestId = null;
+    resetMetadataTasks();
     detailHighlightsBookmarkId = null;
     byId('detailArticleInfo').textContent = '';
     byId('detailReaderSummaryInfo').textContent = '';
@@ -6696,9 +6608,8 @@ function renderDetail() {
     detailHighlightsBookmarkId = '';
     void loadHighlightsForBookmark(item.id, { force: true });
   }
-  if (detailMetadataTaskBookmarkId !== String(item.id)) {
-    detailMetadataTaskBookmarkId = String(item.id);
-    detailMetadataTaskLatestId = null;
+  if (getMetadataTaskBookmarkId() !== String(item.id)) {
+    resetMetadataTasks();
     renderMetadataTaskUi(null, { bookmarkId: item.id });
     void loadLatestMetadataTaskForBookmark(item.id, { force: true });
     void loadMetadataTaskHistoryForBookmark(item.id);
@@ -8445,10 +8356,11 @@ function bindActions() {
   });
 
   byId('retryMetaTaskBtn').addEventListener('click', async () => {
-    if (!detailMetadataTaskLatestId) return;
+    const latestTaskId = getMetadataTaskLatestId();
+    if (!latestTaskId) return;
     try {
       byId('detailMetaTaskInfo').textContent = '元数据任务：重试排队中...';
-      const out = await api(`/api/metadata/tasks/${detailMetadataTaskLatestId}/retry`, {
+      const out = await api(`/api/metadata/tasks/${latestTaskId}/retry`, {
         method: 'POST',
         body: JSON.stringify({})
       });

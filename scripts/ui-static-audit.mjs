@@ -63,6 +63,7 @@ const aiDrawerSource = read('public/js/app/aiDrawer.mjs');
 const ioTasksSource = read('public/js/app/ioTasks.mjs');
 const realtimeNotificationsSource = read('public/js/app/realtimeNotifications.mjs');
 const pluginSyncSource = read('public/js/app/pluginSync.mjs');
+const metadataTasksSource = read('public/js/app/metadataTasks.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -105,6 +106,9 @@ if (!(appSource + realtimeNotificationsSource).includes('new EventSource') || !r
 }
 if (!appSource.includes('createPluginSyncController') || !pluginSyncSource.includes('pollPluginTask') || !pluginSyncSource.includes('pluginSchedulePayload') || !pluginSyncSource.includes('loadPluginHealth')) {
   failures.push('RA-FE-008 plugin sync task, schedule and health state must use a dedicated controller');
+}
+if (!appSource.includes('createMetadataTaskController') || !metadataTasksSource.includes('startMetadataTaskPoll') || !metadataTasksSource.includes('loadMetadataTaskHistoryForBookmark') || !metadataTasksSource.includes('resetMetadataTasks')) {
+  failures.push('RA-FE-009 metadata task detail state must use a dedicated controller with polling reset');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');

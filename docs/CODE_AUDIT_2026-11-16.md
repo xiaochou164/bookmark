@@ -6,7 +6,7 @@
 
 ## 当前状态覆盖
 
-以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`public/app.mjs` 已降至 9,103 行（358.2KiB），IO task 增量已通过 CI `45549199061` / Docker `45549199052`。UI IO task、realtime notification 和 plugin sync controller 增量已完成本地验证（全套 `npm test` 78/78、浏览器 101/8/16）；新提交的 hosted 验收待推送后复验，`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`public/app.mjs` 已降至 9,015 行（354.5KiB）。本轮元数据任务 controller 增量已完成本地验证（全套 `npm test` 79/79、UI 静态门禁通过）；前序 IO task、realtime notification、plugin sync 增量的浏览器 101/8/16、Docker 和 hosted 验收均通过，最新代码头的 CI `45554317598` 与 Docker `45554317550` 也已通过。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
 
 本轮最新增量：Worker 当前入口降至 6,259 行，插件任务与元数据任务处理器已迁至 `src/worker/taskProcessors.mjs`；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过，BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
@@ -29,6 +29,8 @@
 本轮最新增量：实时通知中心的 SSE/轮询连接、任务快照汇总、通知去重/已读、Toast 和刷新调度已从 `public/app.mjs` 抽至 `public/js/app/realtimeNotifications.mjs`，入口降至 9,209 行（371.4KiB）；新增 `tests/realtime-notifications-ui.test.js`，覆盖任务活跃/失败摘要、初始快照去重和轮询通知。`ui-static-audit` 已改为检查新模块边界，`npm test` 77/77、docs/UI/CF/smoke/extension 门禁、浏览器 101/8/16 和 Docker build/start/healthy 通过；hosted CI `45552355409` 16/16、Docker `45552355425` 通过，BK-AUD-201 继续开放。
 
 本轮最新增量：插件同步面板的任务轮询、配置、计划、历史、审计、设备和健康状态加载已从 `public/app.mjs` 抽至 `public/js/app/pluginSync.mjs`，入口降至 9,103 行（358.2KiB）；新增 `tests/plugin-sync-ui.test.js`，覆盖计划字段归一化、配置加载、任务列表和终态轮询刷新。静态 UI 审计新增 plugin controller 边界检查，`npm test` 78/78、docs/UI/CF/smoke/extension 门禁、浏览器 101/8/16 和 Docker build/start/healthy 通过；hosted CI `45553778576` 16/16、Docker `45553778536` 通过，BK-AUD-201 继续开放。
+
+本轮最新增量：详情页元数据抓取状态、历史、请求序列、轮询和重置逻辑已从 `public/app.mjs` 抽至 `public/js/app/metadataTasks.mjs`，入口降至 9,015 行（354.5KiB）；新增 `tests/metadata-tasks-ui.test.js`，覆盖当前书签隔离、失败重试显示、历史摘要和任务 ID 状态。静态 UI 审计新增 RA-FE-009 controller 边界检查，`npm test` 79/79、`ui:check` 通过；本轮最终代码头 CI `45554317598` 与 Docker `45554317550` 均通过，BK-AUD-201 继续开放。
 
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
@@ -95,6 +97,14 @@
 - 核心内容：保留任务 ID URL 编码、queued/running 定时轮询、终态清理并刷新审计/设备/健康/历史、成功任务刷新书签、计划字段默认值及错误输出。
 - 验证：目标测试 1/1；`npm test` 78/78；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`npm run ui:browser` 通过（101/8/16），截图恢复基线；Docker build/start/healthy 通过。
 - 遗留风险：hosted CI `45553778576`（16/16）与 Docker `45553778536` 已通过；插件页面事件装配仍位于 `bindActions`，详情/搜索/设置等其他大型域继续拆分，BK-AUD-201 未关闭。无 API/schema/持久化格式变化。
+
+## BK-AUD-201 / P2 — 前端 metadata task controller 解耦（2026-11-25）
+
+- 证据/根因：`public/app.mjs` 原先内联详情页元数据任务状态、抓取历史、请求序列、1.5 秒轮询和详情切换清理；这些异步状态与详情渲染入口耦合，缺少 controller 级当前书签隔离回归。
+- 修改：新增 `public/js/app/metadataTasks.mjs`，通过 `createMetadataTaskController` 注入 API、DOM、store 状态、任务格式化、终态判断、详情状态摘要和全局刷新；`public/app.mjs` 保留按钮事件装配，并通过 getter/reset API 读取任务状态。静态审计新增 RA-FE-009；新增 `tests/metadata-tasks-ui.test.js`。
+- 核心内容：保留失败重试可见性、最近任务与最多五条历史、请求序列防竞态、切换书签时停止轮询/失效旧请求、终态后刷新，以及错误时停止轮询；无 API/schema/持久化格式变化。
+- 验证：目标测试 1/1；`npm test` 79/79；`npm run ui:check` 通过（入口 354.5KiB / 420KiB，CSS 176.2KiB）；本轮最终代码头 CI `45554317598` 与 Docker `45554317550` 均通过，BK-AUD-201 继续开放。
+- 遗留风险：详情按钮事件、预览/高亮/搜索/设置等其他大型域仍在 `public/app.mjs`；本次未关闭 BK-AUD-201。回退可单独 revert 本次 controller/test/静态审计提交，无数据迁移。
 
 ## BK-AUD-201 Worker external resources 拆分（2026-11-24）
 
