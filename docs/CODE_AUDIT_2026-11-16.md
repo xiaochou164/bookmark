@@ -227,3 +227,11 @@
 - **安全/正确性**：摘要、主题、来源、代表书签标题/原因和错误文本统一 HTML escaping；集合 ID 使用 `encodeURIComponent`；未选择集合时阻止请求并提示；清理/关闭/切换集合会使旧请求失效，避免旧摘要覆盖当前集合。
 - **验证**：目标测试 3/3；`npm test` 90/90；`npm run ui:check` 通过（`public/app.mjs` 8,072 行、入口 315.7KiB / 420KiB，CSS 176.2KiB）；`npm run docs:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图已恢复基线；Docker `rainbow-folder-summary-audit:20261125` build/start/healthy 且 `/api/health` 返回 `ok:true`。
 - **遗留风险**：搜索结果、设置、详情按钮装配及 Worker/Node 大入口仍需继续分阶段拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。代码 head `92e3637` 的 hosted CI `45568954972`（16/16）与 Docker workflow `45568955075` 均成功。
+
+## BK-AUD-201 / P2 — AI Q&A controller 解耦（2026-11-25）
+
+- **证据/根因**：`public/app.mjs` 原先内联 AI 问答 dialog 的上下文选择、答案/出处渲染、请求体组装、loading/error 和过期结果处理；详情页切换与 AI drawer 共用状态，旧请求可能覆盖当前问答。
+- **修改**：新增 `public/js/app/aiQa.mjs`，通过 `createAiQaController` 注入 API、DOM、书签上下文、详情忙碌态和渲染 helper；`public/app.mjs` 仅保留 controller 装配及输入事件。新增 `tests/ai-qa-ui.test.js`，静态审计增加 RA-FE-015。
+- **安全/正确性**：答案使用 `textContent`，出处标题、目录、原因、摘录和 data attribute 统一 escaping；问答 scope/limit 保持既有边界，空问题与 current-only 无上下文时阻止请求；请求序列抑制旧书签结果，并在过期请求结束时释放全局 busy 状态。
+- **验证**：目标测试 3/3；`npm test` 93/93；`npm run docs:check`、`npm run ui:check`（入口 306.7KiB / 420KiB）、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图已恢复基线；Docker 和 hosted workflow 待本轮提交后复验。
+- **遗留风险**：设置、搜索结果、详情按钮装配以及 Worker/Node 大入口仍需继续拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。
