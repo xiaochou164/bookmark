@@ -1465,5 +1465,5 @@
 - 问题/根因：集合摘要 dialog 的状态、摘要格式化、结果渲染、复制/清理、AI 请求和代表书签定位全部内联在 `public/app.mjs`，集合切换期间缺少独立的过期响应保护。
 - 修改文件：新增 `public/js/app/folderSummary.mjs`、`tests/folder-summary-ui.test.js`；`public/app.mjs` 注入 controller；`scripts/ui-static-audit.mjs` 增加 RA-FE-014。
 - 核心修改：保留现有摘要 UI/按钮/Toast 行为，统一输出 escaping、集合 ID 编码、无集合提示；关闭/清理/切换集合时失效旧请求，避免旧结果覆盖当前集合。
-- 验证：目标测试 3/3；`npm test` 90/90；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；入口 8,072 行（315.7KiB），浏览器矩阵、Docker 和 hosted workflow 待提交后复验。
+- 验证：目标测试 3/3；`npm test` 90/90；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；入口 8,072 行（315.7KiB），`ui:browser` 101/8/16、Docker build/start/healthy 通过；代码 head `92e3637` 的 hosted CI `45568954972`（16/16）与 Docker workflow `45568955075` 均成功。
 - 遗留风险：设置、搜索结果、详情按钮装配和 Worker/Node 大入口仍需继续拆分；BK-AUD-201 未关闭；无 API/schema/持久化格式变化。

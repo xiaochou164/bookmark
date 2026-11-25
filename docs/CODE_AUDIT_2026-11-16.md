@@ -226,4 +226,4 @@
 - **修改**：新增 `public/js/app/folderSummary.mjs`，通过 `createAiFolderSummaryController` 注入 API、DOM、集合状态、刷新和 Toast；`public/app.mjs` 仅保留 controller 装配与按钮事件。新增 `tests/folder-summary-ui.test.js`，静态审计增加 RA-FE-014。
 - **安全/正确性**：摘要、主题、来源、代表书签标题/原因和错误文本统一 HTML escaping；集合 ID 使用 `encodeURIComponent`；未选择集合时阻止请求并提示；清理/关闭/切换集合会使旧请求失效，避免旧摘要覆盖当前集合。
 - **验证**：目标测试 3/3；`npm test` 90/90；`npm run ui:check` 通过（`public/app.mjs` 8,072 行、入口 315.7KiB / 420KiB，CSS 176.2KiB）；`npm run docs:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图已恢复基线；Docker `rainbow-folder-summary-audit:20261125` build/start/healthy 且 `/api/health` 返回 `ok:true`。
-- **遗留风险**：搜索结果、设置、详情按钮装配及 Worker/Node 大入口仍需继续分阶段拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交；hosted CI/Docker workflow 待推送后复验。
+- **遗留风险**：搜索结果、设置、详情按钮装配及 Worker/Node 大入口仍需继续分阶段拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。代码 head `92e3637` 的 hosted CI `45568954972`（16/16）与 Docker workflow `45568955075` 均成功。
