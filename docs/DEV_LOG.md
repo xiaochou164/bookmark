@@ -1425,5 +1425,5 @@
 - 问题/根因：详情页元数据抓取任务状态、历史、请求序列、轮询和书签切换清理原先内联在 `public/app.mjs`，异步状态边界不清晰。
 - 修改文件：新增 `public/js/app/metadataTasks.mjs`；`public/app.mjs` 改为注入 controller 并保留按钮事件装配；更新 `scripts/ui-static-audit.mjs` 增加 RA-FE-009；新增 `tests/metadata-tasks-ui.test.js`。
 - 核心内容：保留失败重试可见性、最多五条历史、请求序列防竞态、活动书签隔离、终态刷新和轮询清理；`resetMetadataTasks` 使详情关闭/切换时失效旧请求。
-- 验证：目标测试 1/1；`npm test` 79/79；`npm run ui:check` 通过（入口 354.5KiB、CSS 176.2KiB）；最终代码头 hosted CI `45554317598` 16/16、Docker `45554317550` 通过；无 API/schema/持久化格式变化。
+- 验证：目标测试 1/1；`npm test` 79/79；`npm run ui:check` 通过（入口 354.5KiB、CSS 176.2KiB）；最终代码头 hosted CI `45555814624` 16/16、Docker `45555814669` 通过；无 API/schema/持久化格式变化。
 - 遗留风险：详情按钮事件以及预览/高亮/搜索/设置等大型域仍需拆分，BK-AUD-201 保持未完成；回退可 revert 本次 controller/test/静态审计提交。
