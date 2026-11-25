@@ -1473,5 +1473,5 @@
 - 问题/根因：AI 问答 dialog 的上下文选择、答案/出处渲染、请求体、loading/error 与详情 busy 状态原先内联在 `public/app.mjs`，切换书签后旧响应缺少 controller 级失效边界。
 - 修改文件：新增 `public/js/app/aiQa.mjs`、`tests/ai-qa-ui.test.js`；`public/app.mjs` 注入 controller；`scripts/ui-static-audit.mjs` 增加 RA-FE-015。
 - 核心修改：保持 auto/all/current-only scope、limit 约束、空问题提示、出处定位和 AI drawer 入口；答案用 `textContent`，出处字段 escaping；请求序列抑制旧结果，过期请求仍释放全局 busy 状态。
-- 验证：目标测试 3/3；`npm test` 93/93；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；入口 7,845 行（306.7KiB）；`ui:browser` 101/8/16 通过，截图已恢复基线；Docker/hosted 待提交后复验。
+- 验证：目标测试 3/3；`npm test` 93/93；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；入口 7,845 行（306.7KiB）；`ui:browser` 101/8/16 通过，截图已恢复基线；Docker build/start/healthy 通过；代码 head `0581c1f` 的 hosted CI `45570660662`（16/16）与 Docker workflow `45570660649` 均成功。
 - 遗留风险：设置、搜索结果、详情按钮和 Worker/Node 大入口仍需拆分；BK-AUD-201 未关闭；无 API/schema/持久化格式变化。

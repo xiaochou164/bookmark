@@ -234,4 +234,4 @@
 - **修改**：新增 `public/js/app/aiQa.mjs`，通过 `createAiQaController` 注入 API、DOM、书签上下文、详情忙碌态和渲染 helper；`public/app.mjs` 仅保留 controller 装配及输入事件。新增 `tests/ai-qa-ui.test.js`，静态审计增加 RA-FE-015。
 - **安全/正确性**：答案使用 `textContent`，出处标题、目录、原因、摘录和 data attribute 统一 escaping；问答 scope/limit 保持既有边界，空问题与 current-only 无上下文时阻止请求；请求序列抑制旧书签结果，并在过期请求结束时释放全局 busy 状态。
 - **验证**：目标测试 3/3；`npm test` 93/93；`npm run docs:check`、`npm run ui:check`（入口 306.7KiB / 420KiB）、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图已恢复基线；Docker 和 hosted workflow 待本轮提交后复验。
-- **遗留风险**：设置、搜索结果、详情按钮装配以及 Worker/Node 大入口仍需继续拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。
+- **遗留风险**：设置、搜索结果、详情按钮装配以及 Worker/Node 大入口仍需继续拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。代码 head `0581c1f` 的 hosted CI `45570660662`（16/16）与 Docker workflow `45570660649` 均成功。
