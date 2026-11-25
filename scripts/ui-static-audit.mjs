@@ -62,6 +62,7 @@ const aiDrawerHistorySource = read('public/js/app/aiDrawerHistory.mjs');
 const aiDrawerSource = read('public/js/app/aiDrawer.mjs');
 const ioTasksSource = read('public/js/app/ioTasks.mjs');
 const realtimeNotificationsSource = read('public/js/app/realtimeNotifications.mjs');
+const pluginSyncSource = read('public/js/app/pluginSync.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -101,6 +102,9 @@ for (const id of ['realtimeNotificationsBtn', 'realtimeNotificationsBadge', 'rea
 }
 if (!(appSource + realtimeNotificationsSource).includes('new EventSource') || !realtimeNotificationsSource.includes('/api/events') || !realtimeNotificationsSource.includes('startPolling') || !realtimeNotificationsSource.includes('handleSnapshot')) {
   failures.push('RA-FE-005 workbench must subscribe to realtime SSE with polling fallback');
+}
+if (!appSource.includes('createPluginSyncController') || !pluginSyncSource.includes('pollPluginTask') || !pluginSyncSource.includes('pluginSchedulePayload') || !pluginSyncSource.includes('loadPluginHealth')) {
+  failures.push('RA-FE-008 plugin sync task, schedule and health state must use a dedicated controller');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');

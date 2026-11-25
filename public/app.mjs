@@ -28,6 +28,7 @@ import {
 } from './js/app/tasks.mjs';
 import { createIoTaskController } from './js/app/ioTasks.mjs';
 import { createRealtimeNotificationsController } from './js/app/realtimeNotifications.mjs';
+import { createPluginSyncController } from './js/app/pluginSync.mjs';
 import { SEARCH_RECENT_LIMIT, SEARCH_RECENT_STORAGE_KEY, SEARCH_TOKEN_SUGGESTIONS } from './js/app/search.mjs';
 import './js/uiPreferences.mjs';
 
@@ -37,7 +38,6 @@ const SAVED_SEARCHES_UI_ENABLED = false;
 let draggedFolderId = null;
 let toastTimer = null;
 let toastUndoHandler = null;
-let pluginTaskPollTimer = null;
 let metadataTaskPollTimer = null;
 let detailMetadataTaskBookmarkId = null;
 let detailMetadataTaskLatestId = null;
@@ -246,6 +246,26 @@ const {
   stop: stopRealtimeEvents,
   toggleOpen: toggleRealtimeNotifications
 } = realtimeNotificationsController;
+
+const pluginSyncController = createPluginSyncController({
+  api,
+  byId,
+  setPluginConfig: (config) => store.setPluginConfig(config),
+  refreshAll
+});
+const {
+  applyPluginScheduleToForm,
+  fetchPluginTasks,
+  loadPluginAudit,
+  loadPluginConfig,
+  loadPluginDevices,
+  loadPluginHealth,
+  loadPluginRuns,
+  loadPluginSchedule,
+  pluginSchedulePayload,
+  pollPluginTask,
+  stopPluginTaskPolling
+} = pluginSyncController;
 
 function setSavedSearchesUiVisible(visible) {
   const on = Boolean(visible);
@@ -7098,48 +7118,6 @@ async function reorderFolder(folderId, parentId, position) {
   await refreshAll();
 }
 
-function stopPluginTaskPolling() {
-  if (pluginTaskPollTimer) {
-    clearTimeout(pluginTaskPollTimer);
-    pluginTaskPollTimer = null;
-  }
-}
-
-async function pollPluginTask(taskId) {
-  stopPluginTaskPolling();
-  const tick = async () => {
-    try {
-      const task = await api(`/api/plugins/raindropSync/tasks/${encodeURIComponent(taskId)}`);
-      byId('pluginOutput').textContent = JSON.stringify({ task }, null, 2);
-      if (task.status === 'queued' || task.status === 'running') {
-        pluginTaskPollTimer = setTimeout(() => {
-          tick().catch((err) => {
-            byId('pluginOutput').textContent = err.message;
-          });
-        }, 1000);
-        return;
-      }
-      stopPluginTaskPolling();
-      await loadPluginAudit();
-      await loadPluginDevices();
-      await loadPluginHealth();
-      await loadPluginRuns();
-      if (task.status === 'succeeded') {
-        await refreshAll();
-      }
-    } catch (err) {
-      stopPluginTaskPolling();
-      byId('pluginOutput').textContent = err.message;
-    }
-  };
-  await tick();
-}
-
-async function fetchPluginTasks(limit = 20) {
-  const resp = await api(`/api/plugins/raindropSync/tasks?limit=${Number(limit) || 20}`);
-  return Array.isArray(resp?.items) ? resp.items : [];
-}
-
 function bindActions() {
   bindSplitResizeHandle(byId('sidebarResizeHandle'), {
     storageKey: SIDEBAR_WIDTH_STORAGE_KEY,
@@ -9071,90 +9049,6 @@ function bindActions() {
       showToast(err.message || 'AI 标签本地化失败', { timeoutMs: 4200 });
     }
   });
-}
-
-async function loadPluginConfig() {
-  try {
-    const config = await api('/api/plugins/raindropSync/config');
-    store.setPluginConfig(config);
-    if (byId('pluginToken')) byId('pluginToken').value = config.raindropToken || '';
-    if (byId('pluginTopLevel')) byId('pluginTopLevel').checked = Boolean(config.topLevelAutoSync);
-    if (byId('pluginMappings')) byId('pluginMappings').value = JSON.stringify(config.mappings || [], null, 2);
-    if (byId('pluginOutput')) byId('pluginOutput').textContent = '就绪';
-  } catch (err) {
-    if (byId('pluginOutput')) byId('pluginOutput').textContent = err.message;
-  }
-}
-
-function pluginSchedulePayload() {
-  return {
-    enabled: byId('pluginScheduleEnabled')?.checked ?? false,
-    paused: byId('pluginSchedulePaused')?.checked ?? false,
-    intervalMinutes: Number(byId('pluginScheduleInterval')?.value || 15),
-    maxConcurrent: Number(byId('pluginScheduleMaxConcurrent')?.value || 1),
-    windowEnabled: byId('pluginScheduleWindowEnabled')?.checked ?? false,
-    windowStartHour: Number(byId('pluginScheduleWindowStart')?.value || 0),
-    windowEndHour: Number(byId('pluginScheduleWindowEnd')?.value || 24)
-  };
-}
-
-function applyPluginScheduleToForm(schedule = {}) {
-  if (byId('pluginScheduleEnabled')) byId('pluginScheduleEnabled').checked = Boolean(schedule.enabled);
-  if (byId('pluginSchedulePaused')) byId('pluginSchedulePaused').checked = Boolean(schedule.paused);
-  if (byId('pluginScheduleInterval')) byId('pluginScheduleInterval').value = String(Number(schedule.intervalMinutes || 15));
-  if (byId('pluginScheduleMaxConcurrent')) byId('pluginScheduleMaxConcurrent').value = String(Number(schedule.maxConcurrent || 1));
-  if (byId('pluginScheduleWindowEnabled')) byId('pluginScheduleWindowEnabled').checked = Boolean(schedule.windowEnabled);
-  if (byId('pluginScheduleWindowStart')) byId('pluginScheduleWindowStart').value = String(Number(schedule.windowStartHour ?? 0));
-  if (byId('pluginScheduleWindowEnd')) byId('pluginScheduleWindowEnd').value = String(Number(schedule.windowEndHour ?? 24));
-}
-
-async function loadPluginSchedule() {
-  try {
-    const schedule = await api('/api/plugins/raindropSync/schedule');
-    applyPluginScheduleToForm(schedule);
-    if (byId('pluginScheduleOutput')) byId('pluginScheduleOutput').textContent = JSON.stringify(schedule, null, 2);
-  } catch (err) {
-    if (byId('pluginScheduleOutput')) byId('pluginScheduleOutput').textContent = err.message;
-  }
-}
-
-async function loadPluginRuns() {
-  try {
-    const [runs, tasks] = await Promise.all([
-      api('/api/plugins/raindropSync/runs?limit=20'),
-      api('/api/plugins/raindropSync/tasks?limit=20')
-    ]);
-    if (byId('pluginHistory')) byId('pluginHistory').textContent = JSON.stringify({ tasks, runs }, null, 2);
-  } catch (err) {
-    if (byId('pluginHistory')) byId('pluginHistory').textContent = err.message;
-  }
-}
-
-async function loadPluginAudit() {
-  try {
-    const audit = await api('/api/plugins/raindropSync/audit');
-    if (byId('pluginAudit')) byId('pluginAudit').textContent = JSON.stringify(audit, null, 2);
-  } catch (err) {
-    if (byId('pluginAudit')) byId('pluginAudit').textContent = err.message;
-  }
-}
-
-async function loadPluginDevices() {
-  try {
-    const devices = await api('/api/plugins/raindropSync/devices?limit=20');
-    if (byId('pluginDevices')) byId('pluginDevices').textContent = JSON.stringify(devices, null, 2);
-  } catch (err) {
-    if (byId('pluginDevices')) byId('pluginDevices').textContent = err.message;
-  }
-}
-
-async function loadPluginHealth() {
-  try {
-    const health = await api('/api/plugins/raindropSync/health');
-    if (byId('pluginHealth')) byId('pluginHealth').textContent = JSON.stringify(health, null, 2);
-  } catch (err) {
-    if (byId('pluginHealth')) byId('pluginHealth').textContent = err.message;
-  }
 }
 
 async function init() {
