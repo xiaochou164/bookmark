@@ -394,7 +394,7 @@
 - BK-AUD-201 最新增量（2026-11-25）：详情页元数据抓取状态、历史、请求序列、轮询和重置逻辑已从 `public/app.mjs` 抽至 `public/js/app/metadataTasks.mjs`，入口降至 9,015 行（354.5KiB）；新增 `tests/metadata-tasks-ui.test.js` 1 项回归，覆盖当前书签隔离、失败重试显示、历史摘要和任务 ID 状态；`npm test` 79/79、`ui:check` 通过，最终代码头 hosted CI `45555814624` 16/16、Docker `45555814669` 通过，BK-AUD-201 保持未完成。
 - BK-AUD-201 最新增量（2026-11-25）：详情页高亮/注释列表、编辑/删除、注释 CRUD、内容 escaping、书签切换和请求序列已从 `public/app.mjs` 抽至 `public/js/app/highlights.mjs`，入口降至 8,850 行（347.1KiB）；新增 `tests/highlights-ui.test.js` 1 项回归，覆盖用户内容 escaping 和旧书签结果抑制；`npm test` 80/80、`ui:check`、`ui:browser` 101/8/16 通过，最终代码头 hosted CI `45557395256` 16/16、Docker `45557395165` 通过，BK-AUD-201 保持未完成。
 
-- BK-AUD-201 最新增量（2026-11-25）：搜索建议、token 插入、键盘 roving、最近搜索持久化与 blur 延迟关闭已从 `public/app.mjs` 抽至 `public/js/app/searchSuggest.mjs`，入口降至 8,618 行（338.8KiB）；新增 `tests/search-suggest-ui.test.js` 2 项回归，覆盖 escaping、ARIA active descendant、token 应用和最近搜索恢复；`npm test` 82/82、docs/UI/CF/smoke/extension 门禁及 `ui:browser` 101/8/16 通过，截图已恢复基线；Docker 本地 build/start/healthy 与 hosted CI/Docker 待本次提交后复验，BK-AUD-201 保持未完成。
+- BK-AUD-201 最新增量（2026-11-25）：搜索建议、token 插入、键盘 roving、最近搜索持久化与 blur 延迟关闭已从 `public/app.mjs` 抽至 `public/js/app/searchSuggest.mjs`，入口降至 8,618 行（338.8KiB）；新增 `tests/search-suggest-ui.test.js` 2 项回归，覆盖 escaping、ARIA active descendant、token 应用和最近搜索恢复；`npm test` 82/82、docs/UI/CF/smoke/extension 门禁及 `ui:browser` 101/8/16 通过，截图已恢复基线；Docker 本地 build/start/healthy、hosted Docker workflow `45559542765` 与 CI `45559542759`（16/16）均通过，BK-AUD-201 保持未完成。
 
 - [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理

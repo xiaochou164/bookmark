@@ -32,7 +32,7 @@
 
 本轮最新增量：详情页高亮/注释列表、编辑/删除、注释 CRUD、内容 escaping、书签切换和请求序列已从 `public/app.mjs` 抽至 `public/js/app/highlights.mjs`，入口降至 8,850 行（347.1KiB）；新增 `tests/highlights-ui.test.js`，覆盖用户内容 escaping 和旧书签结果抑制。静态 UI 审计新增 RA-FE-010，`npm test` 80/80、`ui:check` 和浏览器 101/8/16 通过；最终代码头 hosted CI `45557395256`（16/16）与 Docker `45557395165` 通过，BK-AUD-201 继续开放。
 
-本轮最新增量：搜索建议、token 插入、键盘 roving、最近搜索持久化与 blur 延迟关闭已从 `public/app.mjs` 抽至 `public/js/app/searchSuggest.mjs`，入口降至 8,618 行（338.8KiB）；新增 `tests/search-suggest-ui.test.js` 2 项回归，覆盖 HTML escaping、ARIA active descendant、token 应用、搜索结果刷新和最近搜索恢复。静态 UI 审计新增 RA-FE-011，`npm test` 82/82、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 `ui:browser` 101/8/16 均通过；截图已恢复审阅基线，Docker 本地 build/start/healthy 及 hosted 验收待本次提交后复验。BK-AUD-201 继续开放。
+本轮最新增量：搜索建议、token 插入、键盘 roving、最近搜索持久化与 blur 延迟关闭已从 `public/app.mjs` 抽至 `public/js/app/searchSuggest.mjs`，入口降至 8,618 行（338.8KiB）；新增 `tests/search-suggest-ui.test.js` 2 项回归，覆盖 HTML escaping、ARIA active descendant、token 应用、搜索结果刷新和最近搜索恢复。静态 UI 审计新增 RA-FE-011，`npm test` 82/82、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 `ui:browser` 101/8/16 均通过；截图已恢复审阅基线，Docker workflow `45559542765` 与 CI `45559542759` 均成功（16/16）。BK-AUD-201 继续开放。
 
 本轮最新增量：详情页元数据抓取状态、历史、请求序列、轮询和重置逻辑已从 `public/app.mjs` 抽至 `public/js/app/metadataTasks.mjs`，入口降至 9,015 行（354.5KiB）；新增 `tests/metadata-tasks-ui.test.js`，覆盖当前书签隔离、失败重试显示、历史摘要和任务 ID 状态。静态 UI 审计新增 RA-FE-009 controller 边界检查，`npm test` 79/79、`ui:check` 通过；本轮最终代码头 CI `45554317598` 与 Docker `45554317550` 均通过，BK-AUD-201 继续开放。
 
@@ -115,7 +115,7 @@
 - 证据/根因：`public/app.mjs` 原先同时维护搜索建议条目构造、token/recent HTML、键盘 roving、ARIA active descendant、localStorage 最近搜索、blur 延迟关闭和查询应用；这些短生命周期状态与工作台入口耦合，缺少 controller 级 XSS/键盘/搜索刷新回归。
 - 修改：新增 `public/js/app/searchSuggest.mjs`，通过 `createSearchSuggestController` 注入 DOM、store、搜索刷新和渲染依赖；`public/app.mjs` 仅保留事件装配。保留 token 插入时的光标恢复、recent 立即提交、输入 debounce 配合、advanced saved search 清理和 blur 延迟关闭；建议项和最近搜索标题统一 HTML escaping，并维持 `role=option`、`aria-expanded`、`aria-activedescendant`。
 - 测试：新增 `tests/search-suggest-ui.test.js` 2 项，覆盖恶意描述 escaping、token 应用后的 `q/page` 状态与刷新、ARIA active descendant、最近搜索恢复。静态审计增加 RA-FE-011 controller 边界检查。
-- 验证：`node --test tests/search-suggest-ui.test.js` 2/2；`npm test` 82/82；`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101 张状态截图、8 项 E2E、16 张扩展截图通过，截图已恢复基线；Docker 本地 build/start/healthy 与 hosted CI/Docker 将在本次提交后复验。
+- 验证：`node --test tests/search-suggest-ui.test.js` 2/2；`npm test` 82/82；`npm run docs:check`、`npm run ui:check`、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101 张状态截图、8 项 E2E、16 张扩展截图通过，截图已恢复基线；Docker 本地 build/start/healthy、hosted Docker workflow `45559542765` 和 CI `45559542759`（16/16）均通过。
 - 遗留风险：预览、设置、搜索结果列表和详情按钮绑定仍有大型入口逻辑，BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert 本次 controller/test/静态审计提交。
 
 ## BK-AUD-201 / P2 — 前端 metadata task controller 解耦（2026-11-25）
