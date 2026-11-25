@@ -26,6 +26,7 @@ import {
   isIoTaskTerminal,
   isMetadataTaskTerminal
 } from './js/app/tasks.mjs';
+import { createIoTaskController } from './js/app/ioTasks.mjs';
 import { SEARCH_RECENT_LIMIT, SEARCH_RECENT_STORAGE_KEY, SEARCH_TOKEN_SUGGESTIONS } from './js/app/search.mjs';
 import './js/uiPreferences.mjs';
 
@@ -96,8 +97,6 @@ let detailAiFolderRecommendRunning = false;
 let detailAiRelatedRunning = false;
 let detailAiQaRunning = false;
 let bulkAiAutoTagRunning = false;
-let ioTaskPollTimer = null;
-let ioActiveTaskId = null;
 let bookmarksLoading = false;
 let bookmarksLoadError = '';
 let listVirtualRenderRaf = 0;
@@ -207,6 +206,31 @@ let collapsedFolderIds = loadCollapsedFolderIds();
 let sidebarTagsUi = loadSidebarTagsUi();
 let detailSectionsUi = loadDetailSectionsUi();
 searchSuggestState.recent = loadSearchRecentQueries();
+
+const ioTaskController = createIoTaskController({
+  api,
+  byId,
+  state,
+  escapeHtml,
+  stateBlockHtml,
+  taskProgressHtml,
+  folderParentOptionsHtml,
+  isIoTaskTerminal,
+  refreshAll,
+  showToast
+});
+const {
+  stopIoTaskPoll,
+  renderIoTaskList,
+  loadIoTasks,
+  openIoTaskPanel,
+  startIoTaskPoll,
+  populateIoFolderSelects,
+  ioExportOptionsFromUi,
+  queueIoImportTask,
+  queueIoExportTask,
+  setActiveTaskId
+} = ioTaskController;
 
 function setSavedSearchesUiVisible(visible) {
   const on = Boolean(visible);
@@ -8888,10 +8912,10 @@ function bindActions() {
     const failed = tasks.find((t) => t.status === 'failed');
     if (!failed) return showToast('没有失败的 IO 任务');
     const out = await api(`/api/io/tasks/${failed.id}/retry`, { method: 'POST', body: JSON.stringify({}) });
-    ioActiveTaskId = out?.task?.id || null;
+    setActiveTaskId(out?.task?.id);
     byId('ioTaskOutput').textContent = JSON.stringify(out, null, 2);
     await loadIoTasks();
-    startIoTaskPoll(ioActiveTaskId);
+    startIoTaskPoll(out?.task?.id);
     showToast('重试任务已入队', { timeoutMs: 2500 });
   });
 
@@ -9277,227 +9301,6 @@ async function loadPluginHealth() {
   } catch (err) {
     if (byId('pluginHealth')) byId('pluginHealth').textContent = err.message;
   }
-}
-
-function stopIoTaskPoll() {
-  if (ioTaskPollTimer) {
-    clearInterval(ioTaskPollTimer);
-    ioTaskPollTimer = null;
-  }
-}
-
-function renderIoTaskList(tasks = []) {
-  const listEl = byId('ioTaskList');
-  if (!listEl) return;
-  if (!Array.isArray(tasks) || !tasks.length) {
-    listEl.innerHTML = stateBlockHtml({
-      state: 'empty',
-      eyebrow: '任务状态',
-      title: '暂无导入/导出任务',
-      message: '新建导入或导出任务后，这里会显示队列状态、进度和结果。'
-    });
-    return;
-  }
-  listEl.innerHTML = tasks
-    .map((t) => {
-      const active = ioActiveTaskId && ioActiveTaskId === t.id ? 'active' : '';
-      const resultText = t.result ? JSON.stringify(t.result) : (t.error?.message || '');
-      const startedLabel = t.startedAt || t.createdAt ? new Date(Number(t.startedAt || t.createdAt)).toLocaleString() : '-';
-      const updatedLabel = t.updatedAt ? new Date(Number(t.updatedAt)).toLocaleString() : '-';
-      return `<div class="io-task-item ${active}" data-io-task="${t.id}">
-        <div class="io-task-row">
-          <strong>${escapeHtml(String(t.type || 'task'))}</strong>
-        </div>
-        ${taskProgressHtml({
-          status: String(t.status || 'unknown'),
-          progress: `${t.progress?.percent ?? 0}% · ${t.progress?.step || ''}`,
-          startedAt: startedLabel,
-          updatedAt: updatedLabel,
-          detail: resultText ? resultText.slice(0, 180) : ''
-        })}
-        <div class="io-task-row">
-          <div class="detail-inline-actions">
-            <button type="button" class="ghost" data-io-open="${t.id}">详情</button>
-            ${t.outputFile?.url ? `<button type="button" data-io-download="${t.id}">下载</button>` : ''}
-            ${t.reportFile?.url ? `<button type="button" class="ghost" data-io-report="${t.id}">日志</button>` : ''}
-            ${t.status === 'failed' ? `<button type="button" class="ghost danger" data-io-retry="${t.id}">重试</button>` : ''}
-          </div>
-        </div>
-      </div>`;
-    })
-    .join('');
-
-  const showTaskOutput = async (taskId) => {
-    const out = await api(`/api/io/tasks/${taskId}`);
-    ioActiveTaskId = taskId;
-    byId('ioTaskOutput').textContent = JSON.stringify(out, null, 2);
-    const task = out?.task || null;
-    if (task && !isIoTaskTerminal(task.status)) startIoTaskPoll(task.id);
-    const latest = await api('/api/io/tasks?limit=20');
-    renderIoTaskList(latest?.tasks || []);
-  };
-
-  listEl.querySelectorAll('[data-io-open]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      await showTaskOutput(el.dataset.ioOpen);
-    });
-  });
-
-  listEl.querySelectorAll('[data-io-download]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const out = await api(`/api/io/tasks/${el.dataset.ioDownload}`);
-      const url = out?.task?.outputFile?.url;
-      if (url) {
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = '';
-        a.target = '_blank';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-    });
-  });
-
-  listEl.querySelectorAll('[data-io-report]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const out = await api(`/api/io/tasks/${el.dataset.ioReport}`);
-      const url = out?.task?.reportFile?.url;
-      if (url) window.open(url, '_blank', 'noopener');
-    });
-  });
-
-  listEl.querySelectorAll('[data-io-retry]').forEach((el) => {
-    el.addEventListener('click', async () => {
-      const out = await api(`/api/io/tasks/${el.dataset.ioRetry}/retry`, {
-        method: 'POST',
-        body: JSON.stringify({})
-      });
-      ioActiveTaskId = out?.task?.id || null;
-      byId('ioTaskOutput').textContent = JSON.stringify(out, null, 2);
-      startIoTaskPoll(ioActiveTaskId);
-      showToast('重试任务已入队', { timeoutMs: 2500 });
-    });
-  });
-}
-
-async function loadIoTasks() {
-  try {
-    const out = await api('/api/io/tasks?limit=30');
-    const tasks = out?.tasks || [];
-    renderIoTaskList(tasks);
-    if (!ioActiveTaskId && tasks.length) ioActiveTaskId = tasks[0].id;
-    return tasks;
-  } catch (err) {
-    byId('ioTaskList').innerHTML = `<div class="muted">${escapeHtml(err.message || '加载任务失败')}</div>`;
-    return [];
-  }
-}
-
-async function openIoTaskPanel({ output = '就绪' } = {}) {
-  populateIoFolderSelects();
-  await loadIoTasks();
-  if (byId('ioTaskOutput')) byId('ioTaskOutput').textContent = output;
-  const dialog = byId('exportDialog');
-  if (dialog && !dialog.open) dialog.showModal();
-  queueMicrotask(() => byId('ioRefreshTasksBtn')?.focus?.());
-}
-
-function startIoTaskPoll(taskId) {
-  stopIoTaskPoll();
-  const id = String(taskId || '');
-  if (!id) return;
-  ioTaskPollTimer = setInterval(async () => {
-    try {
-      const out = await api(`/api/io/tasks/${id}`);
-      byId('ioTaskOutput').textContent = JSON.stringify(out, null, 2);
-      const task = out?.task || null;
-      await loadIoTasks();
-      if (!task || isIoTaskTerminal(task.status)) {
-        stopIoTaskPoll();
-        if (task?.type?.startsWith?.('import_') && task.status === 'succeeded') {
-          await refreshAll();
-        }
-      }
-    } catch (_err) {
-      stopIoTaskPoll();
-    }
-  }, 1200);
-}
-
-function populateIoFolderSelects() {
-  const target = byId('ioImportTargetFolder');
-  if (!target) return;
-  target.innerHTML = folderParentOptionsHtml('root');
-}
-
-function ioExportOptionsFromUi() {
-  const scope = byId('ioExportScope').value;
-  const options = {
-    includeTrash: byId('ioExportIncludeTrash').checked
-  };
-  if (scope === 'currentFolder' && state.filters.folderId && state.filters.folderId !== 'all') {
-    options.folderId = state.filters.folderId;
-  }
-  if (scope === 'selected') {
-    options.ids = [...state.selected];
-  }
-  return options;
-}
-
-async function queueIoImportTask() {
-  const type = byId('ioImportFormat').value;
-  const content = byId('ioImportContent').value;
-  if (!String(content || '').trim()) {
-    showToast('导入内容为空', { timeoutMs: 3000 });
-    return;
-  }
-  let mapping = null;
-  if (type === 'import_csv') {
-    const raw = byId('ioImportCsvMapping').value.trim();
-    if (raw) {
-      try {
-        mapping = JSON.parse(raw);
-      } catch (err) {
-        showToast(`CSV 映射 JSON 无效：${err.message}`, { timeoutMs: 4000 });
-        return;
-      }
-    }
-  }
-  const out = await api('/api/io/tasks', {
-    method: 'POST',
-    body: JSON.stringify({
-      type,
-      input: {
-        content,
-        targetFolderId: byId('ioImportTargetFolder').value || 'root',
-        conflictStrategy: byId('ioImportConflict').value || 'skip',
-        mapping
-      }
-    })
-  });
-  ioActiveTaskId = out?.task?.id || null;
-  if (byId('importDialog')?.open) byId('importDialog').close();
-  await openIoTaskPanel({ output: JSON.stringify(out, null, 2) });
-  startIoTaskPoll(ioActiveTaskId);
-  showToast('导入任务已入队', { timeoutMs: 2500 });
-}
-
-async function queueIoExportTask() {
-  const type = byId('ioExportFormat').value;
-  const out = await api('/api/io/tasks', {
-    method: 'POST',
-    body: JSON.stringify({
-      type,
-      input: {
-        options: ioExportOptionsFromUi()
-      }
-    })
-  });
-  ioActiveTaskId = out?.task?.id || null;
-  await openIoTaskPanel({ output: JSON.stringify(out, null, 2) });
-  startIoTaskPoll(ioActiveTaskId);
-  showToast('导出任务已入队', { timeoutMs: 2500 });
 }
 
 async function init() {

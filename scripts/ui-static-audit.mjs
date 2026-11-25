@@ -60,6 +60,7 @@ const indexHtml = read('public/index.html');
 const appSource = read('public/app.mjs');
 const aiDrawerHistorySource = read('public/js/app/aiDrawerHistory.mjs');
 const aiDrawerSource = read('public/js/app/aiDrawer.mjs');
+const ioTasksSource = read('public/js/app/ioTasks.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -126,7 +127,7 @@ if (!componentsCss.includes('.ai-side-drawer') || !componentsCss.includes('.ai-d
 if (!indexHtml.includes('id="exportDialog"') || !indexHtml.includes('id="ioTaskList"') || !indexHtml.includes('id="ioTaskOutput"')) {
   failures.push('RA-FE-007 import/export task panel DOM must be available in the main workbench');
 }
-if (!appSource.includes('openIoTaskPanel') || !appSource.includes('data-io-download') || !appSource.includes('data-io-report') || !appSource.includes('data-io-retry')) {
+if (!(appSource + ioTasksSource).includes('openIoTaskPanel') || !ioTasksSource.includes('data-io-download') || !ioTasksSource.includes('data-io-report') || !ioTasksSource.includes('data-io-retry')) {
   failures.push('RA-FE-007 import/export tasks must use unified panel with download, log, retry, and error details');
 }
 if (!aiProviderSource.includes('providerRouting') || !aiProviderSource.includes('preferCloudflareFree') || !aiProviderSource.includes('fallbackChain') || !aiProviderSource.includes('providerFailures')) {
