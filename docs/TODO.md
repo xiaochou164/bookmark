@@ -384,7 +384,7 @@
 
 - BK-AUD-201 最新增量（2026-11-24）：Worker semantic dedupe task 已从 `src/worker.mjs` 抽至 `src/worker/aiTaskProcessors.mjs`，入口降至 5,826 行；新增 `tests/worker-semantic-dedupe-task.test.js` 1 项回归，覆盖租户 userId、exact-URL 聚类和 job 结果写回。目标测试 1/1、`npm test` 73/73、docs/UI/CF/smoke/extension 门禁及 Docker build/start/healthy 通过；GitHub CI `45393042687` 16/16、Docker PR build `45393043028` 通过，BK-AUD-201 保持未完成。
 
-- BK-AUD-201 最新增量（2026-11-25）：Worker IO task 已从 `src/worker.mjs` 抽至 `src/worker/taskProcessors.mjs`，入口降至 5,749 行；新增 `tests/worker-io-task-processors.test.js` 2 项回归，覆盖 JSON 导出、租户参数和跨租户备份对象拒绝。目标测试 2/2、`npm test` 75/75、docs/UI/CF/smoke/extension 门禁及 Docker build/start/healthy 通过；本轮 hosted CI/Docker 待提交后复验，BK-AUD-201 保持未完成。
+- BK-AUD-201 最新增量（2026-11-25）：Worker IO task 已从 `src/worker.mjs` 抽至 `src/worker/taskProcessors.mjs`，入口降至 5,749 行；新增 `tests/worker-io-task-processors.test.js` 2 项回归，覆盖 JSON 导出、租户参数和跨租户备份对象拒绝。目标测试 2/2、`npm test` 75/75、docs/UI/CF/smoke/extension 门禁及 Docker build/start/healthy 通过；GitHub CI `45549199061` 16/16、Docker PR build `45549199052` 通过，BK-AUD-201 保持未完成。
 
 - [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
 - [x] **P2** `BK-AUD-203` 文档实现漂移治理

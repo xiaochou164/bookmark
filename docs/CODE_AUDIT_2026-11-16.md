@@ -6,7 +6,7 @@
 
 ## 当前状态覆盖
 
-以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，最近 semantic dedupe 增量的 hosted 验收已通过 CI `45393042687` / Docker `45393043028`。IO task 增量的 hosted 验收待本次提交后复验。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,826 行，最近 semantic dedupe 增量的 hosted 验收已通过 CI `45393042687` / Docker `45393043028`。`BK-AUD-201` 仍未完成，因为 `public/app.mjs`、Worker 余下路由/任务域和部分 Node 产品路由仍未完成拆分及 Node/Worker 契约覆盖。
 
 本轮最新增量：Worker 当前入口降至 6,259 行，插件任务与元数据任务处理器已迁至 `src/worker/taskProcessors.mjs`；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过，BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
@@ -19,8 +19,6 @@
 本轮最新增量：AI batch/backfill processors 已迁至 `src/worker/aiTaskProcessors.mjs`，Worker 入口降至 5,956 行；新增 2 项租户边界、部分失败进度与 summary 候选筛选回归，目标测试 2/2、全套 `npm test` 72/72、docs/UI/CF/smoke/extension 门禁通过；`npm run ui:browser` 通过（101 张页面状态、8 项 E2E、16 张扩展截图），生成截图已恢复到已审阅基线。BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
 本轮最新增量：Worker semantic dedupe task 已迁至 `src/worker/aiTaskProcessors.mjs`，入口降至 5,826 行；新增 1 项租户边界与 exact-URL 聚类回归，目标测试 1/1、全套 `npm test` 73/73、docs/UI/CF/smoke/extension 门禁通过；Docker 本地 build/start/healthy 及 hosted CI `45393042687`（16/16）/Docker `45393043028` 均通过。BK-AUD-201 继续开放。
-
-本轮最新增量：Worker IO task 已迁至 `src/worker/taskProcessors.mjs`，入口降至 5,749 行；新增 2 项导出成功、租户参数和跨租户备份对象拒绝回归，目标测试 2/2、全套 `npm test` 75/75、docs/UI/CF/smoke/extension 门禁通过；Docker 本地 build/start/healthy 通过。BK-AUD-201 继续开放，待本次提交后进行 hosted 验收。
 
 ## P0：正确性与高风险
 - [x] **BK-AUD-001 / P0 / 部署入口一致性（已修复并以镜像验证）**：根因是 `Dockerfile` 以 `npm start` 启动，但 `package.json` 的 start 为 `wrangler dev --local`，且镜像仅安装生产依赖、Wrangler 又属于 devDependencies；健康检查端口为 3789。本轮切换到 `start:node`，统一 `PORT` 和健康检查，并同步 Compose、dockerignore 与 README。`docker build`、隔离容器启动及 `/api/health` 返回 ok 已验证；托管 CI 同样构建并健康检查通过。
@@ -57,13 +55,6 @@
 - 修改：将 `processSemanticDedupeTask` 迁至 `src/worker/aiTaskProcessors.mjs`，通过注入 `createRepo`、`buildStateForUser` 与哈希函数保留阈值（0.7–0.995）、聚类上限、软删除过滤、exact URL/semantic edges 及结果格式；`src/worker.mjs` 仅保留队列分发。新增 `tests/worker-semantic-dedupe-task.test.js`，验证 state/job 读写均使用认证用户且聚类结果稳定。
 - 验证：目标测试 1/1；`npm test` 73/73；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；Docker build 成功，临时容器 `/api/health` 返回 `ok:true` 且 health 为 `healthy`；GitHub CI `45393042687`（16/16）和 Docker `45393043028` 均通过。
 - 风险：无 API、schema 或持久化格式变化；IO task、`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 保持未完成。
-
-## BK-AUD-201 / P2 — Worker IO task 解耦（2026-11-25）
-
-- 证据/根因：导入、导出和备份恢复任务原先内联在 `src/worker.mjs`，同时负责任务领取、格式编解码、R2 文件写入、跨租户备份校验和状态更新，缺少直接任务级回归。
-- 修改：将 `processIoTask` 迁至 `src/worker/taskProcessors.mjs`，注入 `createRepo`、`buildStateForUser`、R2 写入、条件领取、JSON 解析和标签归一化；保留 JSON/CSV/HTML 导入导出、restore backup 的 owner key 校验、report 文件和 queued→running→succeeded/failed 状态格式。新增 `tests/worker-io-task-processors.test.js`，覆盖 JSON 导出与跨租户备份对象拒绝。
-- 验证：目标测试 2/2；`npm test` 75/75；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；Docker build 成功，临时容器 `/api/health` 返回 `ok:true` 且 health 为 `healthy`。Hosted CI/Docker 将在本次提交后复验。
-- 风险：无 API、schema 或持久化格式变化；`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 保持未完成。
 
 ## BK-AUD-201 Worker external resources 拆分（2026-11-24）
 

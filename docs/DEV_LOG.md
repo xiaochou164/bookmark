@@ -1388,4 +1388,4 @@
 - 修改文件：将 `processIoTask` 迁移至 `src/worker/taskProcessors.mjs`；入口通过依赖注入传入 repo、状态读取、R2 写入、条件 UPDATE、JSON 解析和标签归一化；新增 `tests/worker-io-task-processors.test.js`。
 - 核心内容：保持 JSON/CSV/HTML 导入导出、restore backup owner key 校验、report 文件及 queued/running/succeeded/failed 状态格式；所有状态读取、备份列表和 bookmark 写入继续使用 message.userId。
 - 验证：目标测试 2/2；`npm test` 75/75；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；Docker build 成功，临时容器 `/api/health` 为 `ok:true` 且 health 为 `healthy`。
-- 遗留风险：hosted CI/Docker 将在提交后复验；`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 继续开放。无 API/schema/持久化格式变化。
+- 遗留风险：hosted CI `45549199061`（16/16）与 Docker `45549199052` 已通过；`public/app.mjs` 和其他大型 Worker/Node 入口仍需拆分，BK-AUD-201 继续开放。无 API/schema/持久化格式变化。
