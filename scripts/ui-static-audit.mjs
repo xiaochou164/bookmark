@@ -64,6 +64,7 @@ const ioTasksSource = read('public/js/app/ioTasks.mjs');
 const realtimeNotificationsSource = read('public/js/app/realtimeNotifications.mjs');
 const pluginSyncSource = read('public/js/app/pluginSync.mjs');
 const metadataTasksSource = read('public/js/app/metadataTasks.mjs');
+const highlightsSource = read('public/js/app/highlights.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -109,6 +110,9 @@ if (!appSource.includes('createPluginSyncController') || !pluginSyncSource.inclu
 }
 if (!appSource.includes('createMetadataTaskController') || !metadataTasksSource.includes('startMetadataTaskPoll') || !metadataTasksSource.includes('loadMetadataTaskHistoryForBookmark') || !metadataTasksSource.includes('resetMetadataTasks')) {
   failures.push('RA-FE-009 metadata task detail state must use a dedicated controller with polling reset');
+}
+if (!appSource.includes('createHighlightsController') || !highlightsSource.includes('renderHighlightsList') || !highlightsSource.includes('resetHighlights') || !highlightsSource.includes('data-ann-delete')) {
+  failures.push('RA-FE-010 highlights and annotations must use a dedicated controller with safe rendering');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
