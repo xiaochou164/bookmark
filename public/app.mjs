@@ -27,6 +27,7 @@ import {
   isMetadataTaskTerminal
 } from './js/app/tasks.mjs';
 import { createIoTaskController } from './js/app/ioTasks.mjs';
+import { createRealtimeNotificationsController } from './js/app/realtimeNotifications.mjs';
 import { SEARCH_RECENT_LIMIT, SEARCH_RECENT_STORAGE_KEY, SEARCH_TOKEN_SUGGESTIONS } from './js/app/search.mjs';
 import './js/uiPreferences.mjs';
 
@@ -36,13 +37,6 @@ const SAVED_SEARCHES_UI_ENABLED = false;
 let draggedFolderId = null;
 let toastTimer = null;
 let toastUndoHandler = null;
-let realtimeEventsSource = null;
-let realtimePollTimer = null;
-let realtimeNotificationsOpen = false;
-let realtimeLastSignature = '';
-let realtimeInitialSnapshotSeen = false;
-let realtimeRefreshTimer = null;
-let realtimeNotifications = [];
 let pluginTaskPollTimer = null;
 let metadataTaskPollTimer = null;
 let detailMetadataTaskBookmarkId = null;
@@ -231,6 +225,27 @@ const {
   queueIoExportTask,
   setActiveTaskId
 } = ioTaskController;
+
+const realtimeNotificationsController = createRealtimeNotificationsController({
+  api,
+  byId,
+  escapeHtml,
+  getAuthenticated: () => authState.authenticated,
+  getActiveBookmarkId: () => state.activeId,
+  loadSidebarSyncHealth,
+  loadIoTasks,
+  loadLatestMetadataTaskForBookmark,
+  refreshAll,
+  showToast
+});
+const {
+  isOpen: isRealtimeNotificationsOpen,
+  render: renderRealtimeNotifications,
+  setOpen: setRealtimeNotificationsOpen,
+  start: startRealtimeEvents,
+  stop: stopRealtimeEvents,
+  toggleOpen: toggleRealtimeNotifications
+} = realtimeNotificationsController;
 
 function setSavedSearchesUiVisible(visible) {
   const on = Boolean(visible);
@@ -7062,160 +7077,6 @@ function showToast(message, { undoHandler = null, timeoutMs = 5000 } = {}) {
   }, timeoutMs);
 }
 
-function realtimeTaskActiveCount(snapshot) {
-  return Object.values(snapshot?.tasks || {}).reduce((sum, section) => sum + Number(section?.active || 0), 0);
-}
-
-function realtimeTaskFailureCount(snapshot) {
-  return Object.values(snapshot?.tasks || {}).reduce((sum, section) => (
-    sum + Number(section?.counts?.failed || 0) + Number(section?.counts?.partial || 0)
-  ), 0);
-}
-
-function realtimeSnapshotMessage(snapshot) {
-  const active = realtimeTaskActiveCount(snapshot);
-  const failed = realtimeTaskFailureCount(snapshot);
-  const due = Number(snapshot?.reminders?.due || 0);
-  const parts = [];
-  if (active) parts.push(`${active} 个任务进行中`);
-  if (failed) parts.push(`${failed} 个任务需关注`);
-  if (due) parts.push(`${due} 个提醒到期`);
-  return parts.length ? parts.join(' · ') : '实时状态已更新';
-}
-
-function addRealtimeNotification(title, message) {
-  realtimeNotifications.unshift({
-    id: `rt_${Date.now()}_${Math.random().toString(16).slice(2)}`,
-    title: String(title || '实时更新'),
-    message: String(message || ''),
-    createdAt: Date.now(),
-    unread: true
-  });
-  realtimeNotifications = realtimeNotifications.slice(0, 20);
-  renderRealtimeNotifications();
-}
-
-function renderRealtimeNotifications() {
-  const btn = byId('realtimeNotificationsBtn');
-  const badge = byId('realtimeNotificationsBadge');
-  const headerBadge = byId('headerNotificationsBadge');
-  const menu = byId('realtimeNotificationsMenu');
-  if (btn) btn.setAttribute('aria-expanded', String(realtimeNotificationsOpen));
-  if (menu) menu.classList.toggle('hidden', !realtimeNotificationsOpen);
-  const unread = realtimeNotifications.filter((item) => item.unread).length;
-  if (badge) {
-    badge.textContent = String(Math.min(99, unread));
-    badge.classList.toggle('hidden', unread <= 0);
-  }
-  if (headerBadge) {
-    headerBadge.textContent = String(Math.min(99, unread));
-    headerBadge.classList.toggle('hidden', unread <= 0);
-  }
-  if (!menu) return;
-  if (!realtimeNotifications.length) {
-    menu.innerHTML = '<div class="realtime-notification-item"><div class="realtime-notification-title">暂无通知</div><div class="realtime-notification-meta">实时任务和提醒更新会显示在这里。</div></div>';
-    return;
-  }
-  menu.innerHTML = realtimeNotifications
-    .map((item) => `<div class="realtime-notification-item" role="menuitem">
-      <div class="realtime-notification-title">${escapeHtml(item.title)}</div>
-      <div class="realtime-notification-meta">${escapeHtml(item.message)} · ${new Date(item.createdAt).toLocaleTimeString()}</div>
-    </div>`)
-    .join('');
-}
-
-function scheduleRealtimeUiRefresh(snapshot) {
-  if (realtimeRefreshTimer) return;
-  realtimeRefreshTimer = setTimeout(() => {
-    realtimeRefreshTimer = null;
-    loadSidebarSyncHealth({ force: true }).catch(() => {});
-    loadIoTasks().catch(() => {});
-    if (state.activeId) {
-      loadLatestMetadataTaskForBookmark(state.activeId, { force: true }).catch(() => {});
-    }
-    if (Number(snapshot?.reminders?.due || 0) > 0 || realtimeTaskActiveCount(snapshot) === 0) {
-      refreshAll().catch(() => {});
-    }
-  }, 700);
-}
-
-function handleRealtimeSnapshot(snapshot, { source = 'sse' } = {}) {
-  const signature = String(snapshot?.signature || JSON.stringify(snapshot || {}));
-  if (!signature || signature === realtimeLastSignature) return;
-  const wasInitial = !realtimeInitialSnapshotSeen;
-  realtimeInitialSnapshotSeen = true;
-  realtimeLastSignature = signature;
-  if (!wasInitial) {
-    const message = realtimeSnapshotMessage(snapshot);
-    addRealtimeNotification(source === 'poll' ? '状态轮询更新' : '实时状态更新', message);
-    showToast(message, { timeoutMs: 3200 });
-    scheduleRealtimeUiRefresh(snapshot);
-  }
-}
-
-async function pollRealtimeSnapshot() {
-  try {
-    const snapshot = await api('/api/events-snapshot');
-    handleRealtimeSnapshot(snapshot, { source: 'poll' });
-  } catch (_err) {
-    try {
-      const health = await api('/api/product/task-health?limit=100');
-      handleRealtimeSnapshot({
-        generatedAt: health.generatedAt || Date.now(),
-        tasks: health.sections || {},
-        reminders: { due: 0 },
-        signature: JSON.stringify(health.sections || {})
-      }, { source: 'poll' });
-    } catch (__err) {
-      // Keep the realtime fallback quiet; normal manual refresh still works.
-    }
-  }
-}
-
-function stopRealtimeEvents() {
-  if (realtimeEventsSource) {
-    realtimeEventsSource.close();
-    realtimeEventsSource = null;
-  }
-  if (realtimePollTimer) {
-    clearInterval(realtimePollTimer);
-    realtimePollTimer = null;
-  }
-}
-
-function startRealtimePolling() {
-  if (realtimePollTimer) return;
-  pollRealtimeSnapshot().catch(() => {});
-  realtimePollTimer = setInterval(() => {
-    pollRealtimeSnapshot().catch(() => {});
-  }, 5000);
-}
-
-function startRealtimeEvents() {
-  stopRealtimeEvents();
-  if (!authState.authenticated) return;
-  if (!('EventSource' in window)) {
-    startRealtimePolling();
-    return;
-  }
-  try {
-    realtimeEventsSource = new EventSource('/api/events');
-    realtimeEventsSource.addEventListener('rainbow:update', (event) => {
-      try {
-        handleRealtimeSnapshot(JSON.parse(event.data || '{}'), { source: 'sse' });
-      } catch (_err) {
-        // Ignore malformed transient event payloads.
-      }
-    });
-    realtimeEventsSource.onerror = () => {
-      stopRealtimeEvents();
-      startRealtimePolling();
-    };
-  } catch (_err) {
-    startRealtimePolling();
-  }
-}
-
 async function runToastUndo() {
   if (!toastUndoHandler) return;
   const fn = toastUndoHandler;
@@ -7389,9 +7250,7 @@ function bindActions() {
     const action = String(item.dataset.headerMoreAction || '');
     setHeaderMoreMenuOpen(false);
     if (action === 'notifications') {
-      realtimeNotificationsOpen = true;
-      realtimeNotifications = realtimeNotifications.map((notification) => ({ ...notification, unread: false }));
-      renderRealtimeNotifications();
+      setRealtimeNotificationsOpen(true);
     }
     if (action === 'export') byId('exportBtn')?.click();
     if (action === 'ai-folder-summary') openAiFolderSummaryDialog();
@@ -7596,11 +7455,10 @@ function bindActions() {
       const menu = byId('tagContextMenu');
       if (menu && !menu.contains(e.target)) setTagContextMenuOpen(false);
     }
-    if (realtimeNotificationsOpen) {
+    if (isRealtimeNotificationsOpen()) {
       const area = byId('realtimeNotificationsWrap');
       if (area && !area.contains(e.target)) {
-        realtimeNotificationsOpen = false;
-        renderRealtimeNotifications();
+        setRealtimeNotificationsOpen(false);
       }
     }
     if (!sidebarAccountMenuOpen) return;
@@ -7619,7 +7477,7 @@ function bindActions() {
     if (quickFiltersMenuOpen) setQuickFiltersMenuOpen(true);
     if (quickFilterContextMenuState.open) setQuickFilterContextMenuOpen(false);
     if (tagContextMenuState.open) setTagContextMenuOpen(false);
-    if (realtimeNotificationsOpen) { realtimeNotificationsOpen = false; renderRealtimeNotifications(); }
+    if (isRealtimeNotificationsOpen()) setRealtimeNotificationsOpen(false);
     if (detailPanelMoreMenuOpen) setDetailPanelMoreMenuOpen(false);
     scheduleListVirtualRender();
     scheduleCollectionsTreeVirtualRender();
@@ -7632,7 +7490,7 @@ function bindActions() {
     if (quickFiltersMenuOpen) setQuickFiltersMenuOpen(false);
     if (quickFilterContextMenuState.open) setQuickFilterContextMenuOpen(false);
     if (tagContextMenuState.open) setTagContextMenuOpen(false);
-    if (realtimeNotificationsOpen) { realtimeNotificationsOpen = false; renderRealtimeNotifications(); }
+    if (isRealtimeNotificationsOpen()) setRealtimeNotificationsOpen(false);
     if (detailPanelMoreMenuOpen) setDetailPanelMoreMenuOpen(false);
     scheduleListVirtualRender();
     scheduleCollectionsTreeVirtualRender();
@@ -7668,7 +7526,7 @@ function bindActions() {
       if (quickFiltersMenuOpen) { setQuickFiltersMenuOpen(false); closedTransient = true; }
       if (quickFilterContextMenuState.open) { setQuickFilterContextMenuOpen(false); closedTransient = true; }
       if (tagContextMenuState.open) { setTagContextMenuOpen(false); closedTransient = true; }
-      if (realtimeNotificationsOpen) { realtimeNotificationsOpen = false; renderRealtimeNotifications(); closedTransient = true; }
+      if (isRealtimeNotificationsOpen()) { setRealtimeNotificationsOpen(false); closedTransient = true; }
       if (aiSideDrawerState.open) { setAiSideDrawerOpen(false); closedTransient = true; }
       if (detailPanelMoreMenuOpen) { setDetailPanelMoreMenuOpen(false); closedTransient = true; }
       if (!closedTransient && !hasModalOpen() && state.activeId && !isTypingContext(e.target)) {
@@ -8110,11 +7968,7 @@ function bindActions() {
   byId('realtimeNotificationsBtn')?.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
-    realtimeNotificationsOpen = !realtimeNotificationsOpen;
-    if (realtimeNotificationsOpen) {
-      realtimeNotifications = realtimeNotifications.map((item) => ({ ...item, unread: false }));
-    }
-    renderRealtimeNotifications();
+    toggleRealtimeNotifications();
   });
   byId('authBtn').addEventListener('click', async () => {
     setSidebarAccountMenuOpen(false);

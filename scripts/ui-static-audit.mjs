@@ -61,6 +61,7 @@ const appSource = read('public/app.mjs');
 const aiDrawerHistorySource = read('public/js/app/aiDrawerHistory.mjs');
 const aiDrawerSource = read('public/js/app/aiDrawer.mjs');
 const ioTasksSource = read('public/js/app/ioTasks.mjs');
+const realtimeNotificationsSource = read('public/js/app/realtimeNotifications.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -98,7 +99,7 @@ if (!componentsCss.includes('.sidebar-aux-virtual-spacer') || !componentsCss.inc
 for (const id of ['realtimeNotificationsBtn', 'realtimeNotificationsBadge', 'realtimeNotificationsMenu']) {
   if (!indexHtml.includes(`id="${id}"`)) failures.push(`RA-FE-005 realtime notification center missing #${id}`);
 }
-if (!appSource.includes('new EventSource') || !appSource.includes('/api/events') || !appSource.includes('startRealtimePolling') || !appSource.includes('handleRealtimeSnapshot')) {
+if (!(appSource + realtimeNotificationsSource).includes('new EventSource') || !realtimeNotificationsSource.includes('/api/events') || !realtimeNotificationsSource.includes('startPolling') || !realtimeNotificationsSource.includes('handleSnapshot')) {
   failures.push('RA-FE-005 workbench must subscribe to realtime SSE with polling fallback');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
