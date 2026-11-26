@@ -419,3 +419,11 @@ BK-AUD-201 最新增量（2026-11-18）：Worker task health/realtime snapshot h
 BK-AUD-201 最新增量（2026-11-25）：AI 集合摘要 dialog 的状态、结果渲染、复制/清理、请求和代表书签定位已从 `public/app.mjs` 抽至 `public/js/app/folderSummary.mjs`，入口降至 8,072 行（315.7KiB）；新增 `tests/folder-summary-ui.test.js` 3 项回归，覆盖 escaping、无集合提示和切换集合后的旧响应抑制；静态审计新增 RA-FE-014。`npm test` 90/90、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过，`ui:browser` 101/8/16 与 Docker build/start/healthy 通过；代码 head `92e3637` 的 hosted CI `45568954972`（16/16）与 Docker workflow `45568955075` 均成功，BK-AUD-201 保持未完成。
 
 BK-AUD-201 最新增量（2026-11-25）：AI 书签问答 dialog 的上下文、答案/出处渲染、请求和详情忙碌态已从 `public/app.mjs` 抽至 `public/js/app/aiQa.mjs`，入口降至 7,845 行（306.7KiB）；新增 `tests/ai-qa-ui.test.js` 3 项回归，覆盖答案/出处 escaping、切换书签后的旧响应抑制和空问题提示；静态审计新增 RA-FE-015。`npm test` 93/93、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 `ui:browser` 101/8/16 通过，Docker build/start/healthy 通过；代码 head `0581c1f` 的 hosted CI `45570660662`（16/16）与 Docker workflow `45570660649` 均成功，BK-AUD-201 保持未完成。
+
+## 2026-11-26 本轮续作记录
+
+- **已完成**：继续完成前端 AI 交互域整改；新增 `public/js/app/folderSummary.mjs` 与 `public/js/app/aiQa.mjs`，分别拆分 AI 集合摘要和 AI 书签问答；新增 `RA-FE-014`、`RA-FE-015` 静态审计规则及 6 项 UI 单测。
+- **已验证**：`npm test` 93/93；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 101 张页面截图、8 项 E2E、16 张扩展截图通过；Docker build/start/healthy 通过；hosted CI `45571148122`、Docker `45571148109` 成功。
+- **提交**：`12b7589`、`5ca7ea3`、`92e3637`、`0f27d36`、`cff67f0`、`0581c1f`、`683a291`。
+- **未完成**：`BK-AUD-201` 仍保持 `[ ]`。剩余前端高耦合域包括设置页、搜索结果渲染、详情按钮/AI 操作装配，以及部分 `public/app.mjs` 大型入口；不得将本轮记录误解为全项目审计完成。
+- **继续要求**：新对话从当前分支和最新提交 `683a291` 继续，先读取本文件最新记录，再继续拆分并验证剩余前端域。
