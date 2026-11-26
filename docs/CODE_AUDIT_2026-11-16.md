@@ -1,12 +1,12 @@
 # Bookmark 代码与前端体验复核整改清单（2026-11-16）
 
-> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮最新代码提交 `c15a9de` 已完成相关推荐 controller 拆分并等待托管验收。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
+> 状态：P0/P1 和 P2-202/203/204 已完成本地及托管验收；P2-201 的大入口逐域拆分尚未完成。本轮继续完成详情操作、搜索结果和设置任务 controller 拆分；hosted CI/Docker 仍待本轮提交后复验。历史 `[x]` 只表示既往收口，不作为本次验收证据。截图与机器报告位于 `docs/screenshots/audit-2026-11-16/{before,after}`。
 >
 > 范围：master 分支的 Web 工作台、登录/设置/插件/公开分享页、Chrome/Safari 扩展、Node/Worker API、CI、部署与测试。原则：先保证数据安全与正确性，再调整视觉；尊重现有 Raindrop 风格与功能，不做无依据的整体重设计。
 
 ## 当前状态覆盖
 
-以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成并通过 CI `44327200479` / Docker `44327200197`；Worker 当前入口为 5,749 行，`src/routes/productRoutes.js` 为 3,088 行，`public/app.mjs` 已降至 8,266 行（325.4KiB）。相关推荐 controller 已从入口抽至 `public/js/app/relatedBookmarks.mjs`，本地 `npm test` 87/87、`ui:check` 和浏览器 101/8/16 通过；`BK-AUD-201` 仍未完成，因为 Worker 余下路由/任务域、Node/Worker 契约覆盖以及前端设置/详情按钮/列表等大型入口仍需继续拆分。
+以下当前状态覆盖下方按时间记录的历史快照：`BK-AUD-205` 已完成；Worker 当前入口为 5,749 行，`src/routes/productRoutes.js` 为 3,088 行；本轮详情操作、搜索结果和设置任务 controller 已完成本地验证，`public/app.mjs` 降至 7,589 行（306,216 bytes），`public/settings.mjs` 为 1,678 行（70,483 bytes）。本地 `npm test` 102/102、`ui:check` 和浏览器 101/8/16 通过；`BK-AUD-201` 仍未完成，因为设置页剩余主渲染/事件装配、搜索/详情残余入口、Worker/Node 其他大型入口仍需继续拆分。
 
 本轮最新增量：Worker 当前入口降至 6,259 行，插件任务与元数据任务处理器已迁至 `src/worker/taskProcessors.mjs`；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过，BK-AUD-201 继续开放，待本次提交后进行 Docker/hosted 验收。
 
@@ -235,3 +235,12 @@
 - **安全/正确性**：答案使用 `textContent`，出处标题、目录、原因、摘录和 data attribute 统一 escaping；问答 scope/limit 保持既有边界，空问题与 current-only 无上下文时阻止请求；请求序列抑制旧书签结果，并在过期请求结束时释放全局 busy 状态。
 - **验证**：目标测试 3/3；`npm test` 93/93；`npm run docs:check`、`npm run ui:check`（入口 306.7KiB / 420KiB）、`npm run cf:check`、`npm run cf:smoke`、`npm run extension:check` 通过；`npm run ui:browser` 101/8/16 通过，截图已恢复基线；Docker 和 hosted workflow 待本轮提交后复验。
 - **遗留风险**：设置、搜索结果、详情按钮装配以及 Worker/Node 大入口仍需继续拆分；BK-AUD-201 保持未完成；无 API/schema/持久化格式变化，可单独 revert controller/test/静态审计提交。代码 head `0581c1f` 的 hosted CI `45570660662`（16/16）与 Docker workflow `45570660649` 均成功。
+
+## BK-AUD-201 / P2 — 前端详情操作、搜索结果与设置任务域解耦（2026-11-26）
+
+- **证据/根因**：`public/app.mjs` 仍内联详情 header/More 菜单与 AI 动作装配、基础/高级搜索结果分页状态，以及结果 loading/error/选择清理；`public/settings.mjs` 仍内联设置任务确认、进度和结果输出。入口职责混杂，且搜索建议控制器在抽离后暴露了初始化阶段引用 `loadBookmarks` 的 TDZ 风险。
+- **修改**：新增 `public/js/app/detailActions.mjs`、`public/js/app/searchResults.mjs`、`public/js/settingsDialogs.mjs`；`public/app.mjs` 与 `public/settings.mjs` 改为依赖注入 controller；`scripts/ui-static-audit.mjs` 增加 `RA-FE-016`/`RA-FE-017`/`RA-FE-018`；新增三组 UI 单测，共 9 项回归。
+- **正确性/安全**：详情 AI/菜单动作继续使用当前活动书签；搜索结果按页去重并在刷新后清理失效选择/活动项，错误状态可恢复；设置任务输出沿用 escaping、进度、失败重试和确认 listener 清理；修复建议词 controller 通过惰性 wrapper 调用搜索 controller，避免初始化 TDZ。
+- **入口变化**：`public/app.mjs` 由 7,845 行降至 7,589 行（306,216 bytes）；`public/settings.mjs` 为 1,678 行（70,483 bytes）。
+- **验证**：目标测试 9/9；`npm test` 102/102；`npm run ui:check` 通过（入口 299.0KiB / 420KiB、CSS 176.2KiB、index DOM 730/750、settings DOM 556/560）；`npm run ui:browser` 通过（101 张页面截图、8 项 E2E、16 张扩展截图）；Docker build/start/healthy 通过，隔离容器 `/api/health` 返回 `ok:true`；本轮 hosted CI `45784164584`（16/16）与 Docker workflow `45784164590` 均成功。截图已恢复既有审阅基线。
+- **遗留风险**：设置页剩余主渲染/事件装配、搜索/详情残余入口耦合，以及 Worker/Node 其他大型入口仍需继续拆分；`BK-AUD-201` 保持未完成；无 API/schema/持久化格式变化，可独立 revert 本轮 controller、测试和静态审计改动。

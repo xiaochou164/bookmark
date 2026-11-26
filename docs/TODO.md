@@ -427,3 +427,12 @@ BK-AUD-201 最新增量（2026-11-25）：AI 书签问答 dialog 的上下文、
 - **提交**：`12b7589`、`5ca7ea3`、`92e3637`、`0f27d36`、`cff67f0`、`0581c1f`、`683a291`。
 - **未完成**：`BK-AUD-201` 仍保持 `[ ]`。剩余前端高耦合域包括设置页、搜索结果渲染、详情按钮/AI 操作装配，以及部分 `public/app.mjs` 大型入口；不得将本轮记录误解为全项目审计完成。
 - **继续要求**：新对话从当前分支和最新提交 `683a291` 继续，先读取本文件最新记录，再继续拆分并验证剩余前端域。
+
+## 2026-11-26 BK-AUD-201 前端续作：详情、搜索结果与设置任务域
+
+- **已完成**：详情页保存/编辑/删除/恢复、预览/阅读、详情 header 与 More 菜单、AI 自动标签/标题清洗/摘要/阅读摘要/高亮摘要/文件夹建议/问答/相关推荐及详情导航已抽至 `public/js/app/detailActions.mjs`；新增 `tests/detail-actions-ui.test.js` 3 项回归。
+- **已完成**：基础/高级搜索结果请求、分页与 load-more、元数据、loading/error、结果去重、活动书签/选择清理已抽至 `public/js/app/searchResults.mjs`；新增 `tests/search-results-ui.test.js` 3 项回归，并修复建议词控制器初始化时的 `loadBookmarks` TDZ。
+- **已完成**：设置页任务确认、进度、成功/失败输出、重试和 HTML escaping 已抽至 `public/js/settingsDialogs.mjs`；新增 `tests/settings-dialogs-ui.test.js` 3 项回归。
+- **验证**：本轮目标测试 9/9；全套 `npm test` 102/102；`npm run ui:check` 通过（入口 299.0KiB / 420KiB，CSS 176.2KiB，index DOM 730/750，settings DOM 556/560）；`npm run ui:browser` 通过（101/8/16）；Docker build/start/healthy 通过，隔离容器 `/api/health` 返回 `ok:true`；本轮 hosted CI `45784164584`（16/16）与 Docker workflow `45784164590` 均成功。浏览器审计生成的截图已恢复既有审阅基线。
+- **入口变化**：`public/app.mjs` 降至 7,589 行（306,216 bytes），`public/settings.mjs` 降至 1,678 行（70,483 bytes）；静态审计新增 `RA-FE-016`、`RA-FE-017`、`RA-FE-018`。
+- **未完成**：`BK-AUD-201` 继续保持 `[ ]`；设置页剩余主渲染/事件装配、搜索/详情残余入口耦合，以及 Worker/Node 其他大型入口仍需后续分阶段拆分。本轮不合并、不部署生产、不访问真实用户数据。

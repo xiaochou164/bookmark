@@ -1475,3 +1475,12 @@
 - 核心修改：保持 auto/all/current-only scope、limit 约束、空问题提示、出处定位和 AI drawer 入口；答案用 `textContent`，出处字段 escaping；请求序列抑制旧结果，过期请求仍释放全局 busy 状态。
 - 验证：目标测试 3/3；`npm test` 93/93；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；入口 7,845 行（306.7KiB）；`ui:browser` 101/8/16 通过，截图已恢复基线；Docker build/start/healthy 通过；代码 head `0581c1f` 的 hosted CI `45570660662`（16/16）与 Docker workflow `45570660649` 均成功。
 - 遗留风险：设置、搜索结果、详情按钮和 Worker/Node 大入口仍需拆分；BK-AUD-201 未关闭；无 API/schema/持久化格式变化。
+
+## 2026-11-26 — BK-AUD-201 前端详情、搜索结果与设置任务域拆分
+
+- **问题/根因**：`public/app.mjs` 继续承载详情按钮/More 菜单及多项 AI 动作、搜索结果分页和选择状态；`public/settings.mjs` 继续承载设置任务确认、进度和输出渲染。异步状态与入口装配耦合，难以单独回归。
+- **修改**：新增 `public/js/app/detailActions.mjs`，集中详情保存/编辑/删除/恢复、预览/阅读、详情导航、More 菜单和 AI 动作分发；新增 `public/js/app/searchResults.mjs`，集中基础/高级查询、分页、load-more、loading/error、去重和选择清理；新增 `public/js/settingsDialogs.mjs`，集中设置任务确认、进度、成功/失败输出和重试。
+- **测试保护**：新增详情、搜索结果、设置任务 UI 单测各 3 项，共 9 项；静态审计增加 `RA-FE-016`、`RA-FE-017`、`RA-FE-018`。搜索 controller 抽离后首次浏览器启动发现建议词 controller 提前引用 `loadBookmarks` 的 TDZ，改为惰性 wrapper 后复测通过。
+- **验证**：目标测试 9/9；`npm test` 102/102；`npm run ui:check` 通过；`npm run ui:browser` 通过（101/8/16）；Docker `rainbow-audit-local` build 成功，隔离容器 `/api/health` 返回 `ok:true` 且 Docker health 为 `healthy`；本轮 hosted CI `45784164584`（16/16）与 Docker workflow `45784164590` 均成功。浏览器生成的截图/报告已恢复仓库既有审阅基线。
+- **入口变化**：`public/app.mjs` 7,845 → 7,589 行（306,216 bytes）；`public/settings.mjs` 当前 1,678 行（70,483 bytes）。无 API、schema、持久化格式或生产配置变化；未访问真实用户数据。
+- **遗留风险**：`BK-AUD-201` 未关闭；设置页剩余主渲染/事件装配、搜索与详情残余耦合、Worker/Node 其他大型入口仍需后续拆分。Draft PR 继续保持不合并、不部署生产。

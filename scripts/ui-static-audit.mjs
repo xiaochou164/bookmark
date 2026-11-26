@@ -70,6 +70,9 @@ const previewControllerSource = read('public/js/app/previewController.mjs');
 const relatedBookmarksSource = read('public/js/app/relatedBookmarks.mjs');
 const folderSummarySource = read('public/js/app/folderSummary.mjs');
 const aiQaSource = read('public/js/app/aiQa.mjs');
+const detailActionsSource = read('public/js/app/detailActions.mjs');
+const searchResultsSource = read('public/js/app/searchResults.mjs');
+const settingsDialogsSource = read('public/js/settingsDialogs.mjs');
 const sidebarModuleSource = read('public/js/app/sidebar.mjs');
 const layoutCss = read('public/css/layout.css');
 const responsiveCssSource = read('public/css/responsive.css');
@@ -133,6 +136,16 @@ if (!appSource.includes('createAiFolderSummaryController') || !folderSummarySour
 }
 if (!appSource.includes('createAiQaController') || !aiQaSource.includes('renderUi') || !aiQaSource.includes('getContextBookmark') || !aiQaSource.includes('requestSequence')) {
   failures.push('RA-FE-015 AI Q&A dialog must use a dedicated controller with stale-response protection');
+}
+if (!appSource.includes('createDetailActionsController') || !detailActionsSource.includes('runDetailPanelMoreAction') || !detailActionsSource.includes('data-detail-panel-more-action') || !detailActionsSource.includes('runAiAutoTag')) {
+  failures.push('RA-FE-016 detail buttons and AI menu actions must use a dedicated controller');
+}
+if (!appSource.includes('createSearchResultsController') || !searchResultsSource.includes('loadMoreListPage') || !searchResultsSource.includes('setAdvancedSearchResultMeta') || !searchResultsSource.includes('store.setBookmarksPage')) {
+  failures.push('RA-FE-017 search result loading, pagination, and result metadata must use a dedicated controller');
+}
+const settingsEntrySource = read('public/settings.mjs');
+if (!settingsEntrySource.includes('createSettingsDialogController') || !settingsDialogsSource.includes('confirmSettingsAction') || !settingsDialogsSource.includes('runSettingsTask') || !settingsDialogsSource.includes('data-settings-task-retry')) {
+  failures.push('RA-FE-018 settings confirmation dialog and task feedback must use a dedicated controller');
 }
 const systemRoutesSource = read('src/routes/systemRoutes.js');
 const workerSource = read('src/worker.mjs');
@@ -358,7 +371,7 @@ for (const [file, marker] of [
 }
 
 const appEntry = read('public/app.mjs');
-for (const moduleName of ['a11y', 'auth', 'bookmarks', 'detail', 'dialogs', 'preview', 'search', 'sidebar', 'tasks']) {
+for (const moduleName of ['a11y', 'auth', 'bookmarks', 'detail', 'detailActions', 'dialogs', 'preview', 'search', 'searchResults', 'sidebar', 'tasks']) {
   const file = `public/js/app/${moduleName}.mjs`;
   const source = read(file);
   const importedByApp = appEntry.includes(`./js/app/${moduleName}.mjs`);

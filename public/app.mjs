@@ -8,6 +8,7 @@ import { aiSideDrawerState, bindAiDrawerEvents, initializeAiDrawer, renderAiSide
 import { currentAppPath, redirectToLoginPage } from './js/app/auth.mjs';
 import { inferItemKind, kindLabel } from './js/app/bookmarks.mjs';
 import { loadDetailSectionsUi, persistDetailSectionsUi } from './js/app/detail.mjs';
+import { createDetailActionsController } from './js/app/detailActions.mjs';
 import {
   bindActionDialog,
   bindInlineValidation,
@@ -35,6 +36,7 @@ import { createPluginSyncController } from './js/app/pluginSync.mjs';
 import { createMetadataTaskController } from './js/app/metadataTasks.mjs';
 import { createHighlightsController } from './js/app/highlights.mjs';
 import { createSearchSuggestController } from './js/app/searchSuggest.mjs';
+import { createSearchResultsController } from './js/app/searchResults.mjs';
 import { SEARCH_RECENT_LIMIT, SEARCH_RECENT_STORAGE_KEY, SEARCH_TOKEN_SUGGESTIONS } from './js/app/search.mjs';
 import './js/uiPreferences.mjs';
 const store = createAppStore();
@@ -57,8 +59,6 @@ let detailAiHighlightDigestRunning = false;
 let detailAiFolderRecommendRunning = false;
 let detailAiQaRunning = false;
 let bulkAiAutoTagRunning = false;
-let bookmarksLoading = false;
-let bookmarksLoadError = '';
 let listVirtualRenderRaf = 0;
 let collectionsTreeVirtualRenderRaf = 0;
 let sidebarAuxVirtualRenderRaf = 0;
@@ -66,15 +66,6 @@ let refreshAllInFlight = null;
 let refreshAllQueued = false;
 let folderDragAutoExpandTimer = null;
 let folderDragHoverState = { targetId: '', mode: '' };
-let listLoadMoreState = {
-  key: '',
-  basePage: 1,
-  lastLoadedPage: 1,
-  total: 0,
-  hasNext: false,
-  pageSize: 24,
-  loading: false
-};
 const LIST_VIRTUAL_THRESHOLD = 120;
 const LIST_VIRTUAL_ROW_HEIGHT = 70;
 const LIST_VIRTUAL_OVERSCAN = 8;
@@ -166,7 +157,7 @@ const searchSuggestController = createSearchSuggestController({
   tokenSuggestions: SEARCH_TOKEN_SUGGESTIONS,
   recentLimit: SEARCH_RECENT_LIMIT,
   recentStorageKey: SEARCH_RECENT_STORAGE_KEY,
-  loadBookmarks,
+  loadBookmarks: (...args) => searchResultsController.loadBookmarks(...args),
   renderSidebar,
   clearAdvancedSavedSearch: () => { advancedSearchState.activeSavedId = ''; }
 });
@@ -379,6 +370,61 @@ const {
   pollPluginTask,
   stopPluginTaskPolling
 } = pluginSyncController;
+
+const detailActionsController = createDetailActionsController({
+  byId,
+  state,
+  getActiveBookmark: () => state.bookmarks.find((item) => String(item.id) === String(state.activeId))
+    || state.allBookmarks.find((item) => String(item.id) === String(state.activeId))
+    || null,
+  isEditMode: () => detailEditMode,
+  setEditMode: setDetailEditMode,
+  saveDetail,
+  deleteDetail: deleteActiveDetailBookmark,
+  restoreDetail: restoreActiveDetailBookmark,
+  openLink: openActiveBookmarkLink,
+  openPreview: (id) => open预览Dialog(id, { preferredMode: 'auto' }),
+  openReader: (id) => open预览Dialog(id, { preferredMode: 'reader' }),
+  copyLink: copyActiveBookmarkLink,
+  runAiAutoTag: runAiAutoTagForActiveBookmark,
+  runAiTitleClean: runAiTitleCleanForActiveBookmark,
+  runAiSummary: runAiSummaryForActiveBookmark,
+  runAiReaderSummary: runAiReaderSummaryForActiveBookmark,
+  runAiHighlightDigest: runAiHighlightDigestForActiveBookmark,
+  runAiFolderRecommend: runAiFolderRecommendForActiveBookmark,
+  openAiQa: openAiQaDialog,
+  runAiRelated: runAiRelatedBookmarksForActiveBookmark,
+  moveActiveBookmark,
+  closeDetail: closeDetailPanel,
+  toggleDetailSection: toggleDetailSectionCollapsed,
+  isMoreMenuOpen: () => detailPanelMoreMenuOpen,
+  setMoreMenuOpen: setDetailPanelMoreMenuOpen,
+  showToast
+});
+const { bind: bindDetailActions } = detailActionsController;
+
+const searchResultsController = createSearchResultsController({
+  api,
+  queryString,
+  state,
+  store,
+  isAdvancedSearchActive,
+  currentAdvancedSearchQueryPayload,
+  setAdvancedSearchResultMeta: (meta) => { advancedSearchState.lastResultMeta = meta; },
+  currentQueryKey: currentBookmarksQueryKey,
+  getLayoutMode: () => bookmarkLayoutMode,
+  renderHeader,
+  renderCards,
+  renderPager,
+  renderLoadMoreBar: renderListLoadMoreBar,
+  renderDetail,
+  syncAdvancedSearchInputs
+});
+const {
+  loadBookmarks,
+  loadMoreListPage,
+  state: searchResultsState
+} = searchResultsController;
 
 function setSavedSearchesUiVisible(visible) {
   const on = Boolean(visible);
@@ -2229,31 +2275,6 @@ function currentBookmarksQueryKey() {
   });
 }
 
-function resetListLoadMoreState() {
-  listLoadMoreState = {
-    key: '',
-    basePage: Number(state.filters.page || 1),
-    lastLoadedPage: Number(state.filters.page || 1),
-    total: Number(state.page?.total || 0),
-    hasNext: Boolean(state.page?.hasNext),
-    pageSize: Number(state.filters.pageSize || 24),
-    loading: false
-  };
-}
-
-function syncListLoadMoreBaselineFromPage() {
-  const page = state.page || {};
-  listLoadMoreState = {
-    key: currentBookmarksQueryKey(),
-    basePage: Number(page.page || state.filters.page || 1),
-    lastLoadedPage: Number(page.page || state.filters.page || 1),
-    total: Number(page.total || state.bookmarks.length || 0),
-    hasNext: Boolean(page.hasNext),
-    pageSize: Number(page.pageSize || state.filters.pageSize || 24),
-    loading: false
-  };
-}
-
 function isAdvancedSearchActive() {
   return Boolean(advancedSearchState.enabled) && String(state.filters.view || 'all') !== 'trash';
 }
@@ -2797,40 +2818,6 @@ async function loadSidebarSyncHealth({ force = false } = {}) {
   }
 }
 
-async function fetchBookmarksPagePayload({ page = state.filters.page, pageSize = state.filters.pageSize } = {}) {
-  if (isAdvancedSearchActive()) {
-    const qs = queryString({
-      ...currentAdvancedSearchQueryPayload(),
-      page: Number(page || 1),
-      pageSize: Number(pageSize || state.filters.pageSize || 24)
-    });
-    const payload = await api(`/api/product/search/query${qs ? `?${qs}` : ''}`);
-    advancedSearchState.lastResultMeta = {
-      usedFullText: Boolean(payload?.usedFullText),
-      usedSemantic: Boolean(payload?.usedSemantic),
-      semanticMode: String(payload?.semanticMode || ''),
-      semanticProvider: payload?.semanticProvider && typeof payload.semanticProvider === 'object' ? payload.semanticProvider : null,
-      semanticIndexUpdated: Number(payload?.semanticIndexUpdated || 0) || 0,
-      semanticFallbackLocal: Boolean(payload?.semanticFallbackLocal),
-      usedAiRerank: Boolean(payload?.usedAiRerank),
-      rerankProvider: payload?.rerankProvider && typeof payload.rerankProvider === 'object' ? payload.rerankProvider : null,
-      rerankTopK: Number(payload?.rerankTopK || 0) || 0,
-      rerankAppliedCount: Number(payload?.rerankAppliedCount || 0) || 0,
-      rerankSummary: String(payload?.rerankSummary || ''),
-      total: Number(payload?.total || 0)
-    };
-    return payload;
-  }
-  const qs = queryString({
-    ...state.filters,
-    page: Number(page || 1),
-    pageSize: Number(pageSize || state.filters.pageSize || 24)
-  });
-  const payload = await api(`/api/bookmarks${qs ? `?${qs}` : ''}`);
-  advancedSearchState.lastResultMeta = null;
-  return payload;
-}
-
 function renderListLoadMoreBar() {
   const bar = byId('listLoadMoreBar');
   const btn = byId('listLoadMoreBtn');
@@ -2839,106 +2826,20 @@ function renderListLoadMoreBar() {
 
   const page = state.page || {};
   const inList = bookmarkLayoutMode === 'list';
-  const sameQuery = listLoadMoreState.key && listLoadMoreState.key === currentBookmarksQueryKey();
+  const loadMoreState = searchResultsState.listLoadMore;
+  const sameQuery = loadMoreState.key && loadMoreState.key === currentBookmarksQueryKey();
   const displayedCount = Number((state.bookmarks || []).length || 0);
-  const total = Number((sameQuery ? listLoadMoreState.total : page.total) || page.total || displayedCount || 0);
-  const hasNext = Boolean(sameQuery ? listLoadMoreState.hasNext : page.hasNext);
-  const loadedPages = sameQuery ? Math.max(1, Number(listLoadMoreState.lastLoadedPage || page.page || 1) - Number(listLoadMoreState.basePage || page.page || 1) + 1) : 1;
+  const total = Number((sameQuery ? loadMoreState.total : page.total) || page.total || displayedCount || 0);
+  const hasNext = Boolean(sameQuery ? loadMoreState.hasNext : page.hasNext);
+  const loadedPages = sameQuery ? Math.max(1, Number(loadMoreState.lastLoadedPage || page.page || 1) - Number(loadMoreState.basePage || page.page || 1) + 1) : 1;
   const canShow = inList && displayedCount > 0 && hasNext;
 
   bar.classList.toggle('hidden', !canShow);
   if (!canShow) return;
 
-  btn.disabled = listLoadMoreState.loading;
-  btn.textContent = listLoadMoreState.loading ? '加载中…' : '更多…';
+  btn.disabled = loadMoreState.loading;
+  btn.textContent = loadMoreState.loading ? '加载中…' : '更多…';
   meta.textContent = `已显示 ${displayedCount} / ${total} 条 · 已加载 ${loadedPages} 页`;
-}
-
-async function loadBookmarks() {
-  bookmarksLoading = true;
-  bookmarksLoadError = '';
-  renderCards();
-  renderPager();
-  renderListLoadMoreBar();
-  let payload;
-  try {
-    payload = await fetchBookmarksPagePayload();
-  } catch (err) {
-    bookmarksLoading = false;
-    bookmarksLoadError = err?.message || '加载书签失败';
-    resetListLoadMoreState();
-    renderCards();
-    renderPager();
-    renderListLoadMoreBar();
-    throw err;
-  }
-  bookmarksLoading = false;
-  store.setBookmarksPage(payload || {});
-  syncListLoadMoreBaselineFromPage();
-
-  for (const id of [...state.selected]) {
-    if (!state.bookmarks.some((x) => x.id === id)) {
-      store.setSelected(id, false);
-    }
-  }
-
-  if (state.activeId && !state.bookmarks.some((x) => x.id === state.activeId)) {
-    store.setActiveId(null);
-  }
-
-  renderHeader();
-  renderCards();
-  renderPager();
-  renderListLoadMoreBar();
-  renderDetail();
-  syncAdvancedSearchInputs();
-}
-
-async function loadMoreListPage() {
-  if (bookmarkLayoutMode !== 'list') return;
-  if (bookmarksLoading || listLoadMoreState.loading) return;
-  const queryKey = currentBookmarksQueryKey();
-  const page = state.page || {};
-  if (!listLoadMoreState.key || listLoadMoreState.key !== queryKey) {
-    syncListLoadMoreBaselineFromPage();
-  }
-  if (!listLoadMoreState.hasNext) return;
-
-  const nextPage = Number(listLoadMoreState.lastLoadedPage || page.page || 1) + 1;
-  listLoadMoreState = { ...listLoadMoreState, loading: true };
-  renderListLoadMoreBar();
-
-  let payload;
-  try {
-    payload = await fetchBookmarksPagePayload({
-      page: nextPage,
-      pageSize: listLoadMoreState.pageSize || page.pageSize || state.filters.pageSize
-    });
-  } catch (err) {
-    listLoadMoreState = { ...listLoadMoreState, loading: false };
-    renderListLoadMoreBar();
-    throw err;
-  }
-
-  const existing = Array.isArray(state.bookmarks) ? state.bookmarks : [];
-  const incoming = Array.isArray(payload?.items) ? payload.items : [];
-  state.bookmarks = [...existing, ...incoming.filter((x) => !existing.some((e) => String(e.id) === String(x.id)))];
-
-  listLoadMoreState = {
-    ...listLoadMoreState,
-    key: queryKey,
-    total: Number(payload?.total || listLoadMoreState.total || state.bookmarks.length),
-    hasNext: Boolean(payload?.hasNext),
-    lastLoadedPage: Number(payload?.page || nextPage),
-    pageSize: Number(payload?.pageSize || listLoadMoreState.pageSize || state.filters.pageSize || 24),
-    loading: false
-  };
-
-  renderHeader();
-  renderCards();
-  renderPager();
-  renderListLoadMoreBar();
-  renderDetail();
 }
 
 function inferredBookmarkKindForStats(item) {
@@ -4066,12 +3967,12 @@ function stateBlockHtml({
 }
 
 function emptyCardsStateHtml() {
-  if (bookmarksLoadError) {
+  if (searchResultsState.error) {
     return stateBlockHtml({
       state: 'error',
       eyebrow: '加载状态',
       title: '加载书签失败',
-      message: bookmarksLoadError,
+      message: searchResultsState.error,
       actions: '<button type="button" class="ghost" id="cardsRetryBtn">重试</button>'
     });
   }
@@ -4099,7 +4000,7 @@ function emptyCardsStateHtml() {
 function canUseListVirtualization(root = byId('cards')) {
   if (!root) return false;
   if (bookmarkLayoutMode !== 'list') return false;
-  if (bookmarksLoading || bookmarksLoadError) return false;
+  if (searchResultsState.loading || searchResultsState.error) return false;
   if (window.innerWidth <= 920) return false;
   return (state.bookmarks || []).length >= LIST_VIRTUAL_THRESHOLD;
 }
@@ -4195,8 +4096,8 @@ function renderCards() {
   const root = byId('cards');
   if (!root) return;
   root.className = `cards layout-${bookmarkLayoutMode}`;
-  root.classList.toggle('is-loading', bookmarksLoading);
-  if (bookmarksLoading) {
+  root.classList.toggle('is-loading', searchResultsState.loading);
+  if (searchResultsState.loading) {
     root.innerHTML = skeletonCardsHtml();
     return;
   }
@@ -5159,81 +5060,6 @@ async function maybeRunAiAutoClassifyForCreatedBookmark(createdBookmark) {
   return { ran: true, changed, summary, errors };
 }
 
-async function runDetailPanelMoreAction(action) {
-  const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
-  if (!item) return;
-  const act = String(action || '');
-  if (act === 'open-current') {
-    window.open(item.url, '_self');
-    return;
-  }
-  if (act === 'open-new') {
-    window.open(item.url, '_blank', 'noopener');
-    return;
-  }
-  if (act === 'copy-link') {
-    try {
-      await navigator.clipboard.writeText(String(item.url || ''));
-      showToast('链接已复制', { timeoutMs: 2000 });
-    } catch (_err) {
-      showToast('复制失败', { timeoutMs: 2500 });
-    }
-    return;
-  }
-  if (act === 'ai-autotag') {
-    await runAiAutoTagForActiveBookmark();
-    return;
-  }
-  if (act === 'ai-title-clean') {
-    await runAiTitleCleanForActiveBookmark();
-    return;
-  }
-  if (act === 'ai-summary') {
-    await runAiSummaryForActiveBookmark();
-    return;
-  }
-  if (act === 'ai-reader-summary') {
-    await runAiReaderSummaryForActiveBookmark();
-    return;
-  }
-  if (act === 'ai-highlight-digest') {
-    await runAiHighlightDigestForActiveBookmark();
-    return;
-  }
-  if (act === 'ai-folder-recommend') {
-    await runAiFolderRecommendForActiveBookmark();
-    return;
-  }
-  if (act === 'ai-qa') {
-    openAiQaDialog({ bookmarkId: item.id, scope: 'auto' });
-    return;
-  }
-  if (act === 'ai-related') {
-    await runAiRelatedBookmarksForActiveBookmark();
-    return;
-  }
-  if (act === 'preview-web') {
-    await open预览Dialog(item.id, { preferredMode: 'auto' });
-    return;
-  }
-  if (act === 'preview-reader') {
-    await open预览Dialog(item.id, { preferredMode: 'reader' });
-    return;
-  }
-  if (act === 'toggle-edit') {
-    setDetailEditMode(!detailEditMode);
-    return;
-  }
-  if (act === 'delete') {
-    byId('detailHeaderDeleteBtn')?.click();
-    return;
-  }
-  if (act === 'restore') {
-    byId('detailHeaderRestoreBtn')?.click();
-    return;
-  }
-}
-
 function renderDetailHighlightCandidatesUi(item = null) {
   const infoEl = byId('detailHighlightCandidatesInfo');
   const listEl = byId('detailHighlightCandidatesList');
@@ -5784,6 +5610,48 @@ async function saveDetail() {
   await refreshAll();
 }
 
+async function deleteActiveDetailBookmark() {
+  const id = String(state.activeId || '');
+  if (!id) return;
+  await api(`/api/bookmarks/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  store.setActiveId(null);
+  await refreshAll();
+}
+
+async function restoreActiveDetailBookmark() {
+  const id = String(state.activeId || '');
+  if (!id) return;
+  await api(`/api/bookmarks/${encodeURIComponent(id)}/restore`, { method: 'POST' });
+  await refreshAll();
+}
+
+async function openActiveBookmarkLink({ item, target = '_blank', markOpened = true } = {}) {
+  const bookmark = item || state.bookmarks.find((entry) => String(entry.id) === String(state.activeId))
+    || state.allBookmarks.find((entry) => String(entry.id) === String(state.activeId));
+  if (!bookmark) return;
+  const url = safeUrl(bookmark.url);
+  if (url.startsWith('unsafe:')) {
+    showToast('无法打开不安全的链接', { timeoutMs: 3000 });
+    return;
+  }
+  window.open(url, target, target === '_blank' ? 'noopener' : undefined);
+  if (!markOpened) return;
+  await api(`/api/bookmarks/${encodeURIComponent(bookmark.id)}/opened`, { method: 'POST' });
+  await refreshAll();
+}
+
+async function copyActiveBookmarkLink(item = null) {
+  const bookmark = item || state.bookmarks.find((entry) => String(entry.id) === String(state.activeId))
+    || state.allBookmarks.find((entry) => String(entry.id) === String(state.activeId));
+  if (!bookmark) return;
+  try {
+    await navigator.clipboard.writeText(String(bookmark.url || ''));
+    showToast('链接已复制', { timeoutMs: 2000 });
+  } catch (_err) {
+    showToast('复制失败', { timeoutMs: 2500 });
+  }
+}
+
 
 async function refreshAll() {
   if (refreshAllInFlight) {
@@ -5890,6 +5758,7 @@ function bindActions() {
   bindActionDialog();
   bindInlineValidation('bookmarkForm', { errorId: 'bookmarkFormError' });
   bindInlineValidation('collectionForm', { errorId: 'collectionFormError' });
+  bindDetailActions();
   byId('bookmarkDialog')?.addEventListener('close', () => clearFormValidation('bookmarkForm', 'bookmarkFormError'));
   byId('collectionDialog')?.addEventListener('close', () => clearFormValidation('collectionForm', 'collectionFormError'));
 
@@ -7000,131 +6869,6 @@ function bindActions() {
     } catch (err) {
       setFormBannerError('collectionFormError', err.message || '创建集合失败');
     }
-  });
-
-  byId('saveDetailBtn').addEventListener('click', saveDetail);
-  byId('enableDetailEditBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    setDetailEditMode(true);
-  });
-  byId('cancelDetailEditBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    setDetailEditMode(false);
-  });
-  byId('detailHeaderEditBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    setDetailEditMode(true);
-  });
-  byId('detailHeaderCancelEditBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    setDetailEditMode(false);
-  });
-
-  byId('deleteDetailBtn').addEventListener('click', async () => {
-    if (!state.activeId) return;
-    await api(`/api/bookmarks/${state.activeId}`, { method: 'DELETE' });
-    store.setActiveId(null);
-    await refreshAll();
-  });
-  byId('detailHeaderDeleteBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    byId('deleteDetailBtn')?.click();
-  });
-
-  byId('restoreDetailBtn').addEventListener('click', async () => {
-    if (!state.activeId) return;
-    await api(`/api/bookmarks/${state.activeId}/restore`, { method: 'POST' });
-    await refreshAll();
-  });
-  byId('detailHeaderRestoreBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    byId('restoreDetailBtn')?.click();
-  });
-
-  byId('openLinkBtn').addEventListener('click', async () => {
-    if (!state.activeId) return;
-    const item = state.bookmarks.find((x) => x.id === state.activeId) || state.allBookmarks.find((x) => x.id === state.activeId);
-    if (!item) return;
-    window.open(item.url, '_blank', 'noopener');
-    await api(`/api/bookmarks/${item.id}/opened`, { method: 'POST' });
-    await refreshAll();
-  });
-
-  byId('openPreviewBtn').addEventListener('click', async () => {
-    if (!state.activeId) return;
-    await open预览Dialog(state.activeId, { preferredMode: 'auto' });
-  });
-  byId('detailHeaderOpenBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    byId('openLinkBtn')?.click();
-  });
-  byId('detailHeaderPreviewBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    byId('openPreviewBtn')?.click();
-  });
-  byId('detailHeaderAiTagBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    await runAiAutoTagForActiveBookmark();
-  });
-  byId('refreshRelatedBookmarksBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    await runAiRelatedBookmarksForActiveBookmark();
-  });
-  byId('detailPrevBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    moveActiveBookmark(-1);
-  });
-  byId('detailNextBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    moveActiveBookmark(1);
-  });
-  byId('detailPanelViewModeBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    setDetailEditMode(false);
-  });
-  byId('detailPanelEditModeBtn')?.addEventListener('click', () => {
-    if (!state.activeId) return;
-    setDetailEditMode(true);
-  });
-  byId('detailPanelWebBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    await open预览Dialog(state.activeId, { preferredMode: 'auto' });
-  });
-  byId('detailPanelReaderBtn')?.addEventListener('click', async () => {
-    if (!state.activeId) return;
-    await open预览Dialog(state.activeId, { preferredMode: 'reader' });
-  });
-  byId('detailPanelMoreBtn')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!state.activeId) return;
-    setDetailPanelMoreMenuOpen(!detailPanelMoreMenuOpen);
-  });
-  byId('detailPanelMoreMenu')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-detail-panel-more-action]');
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const action = String(btn.getAttribute('data-detail-panel-more-action') || '');
-    setDetailPanelMoreMenuOpen(false);
-    runDetailPanelMoreAction(action).catch((err) => {
-      showToast(err.message || '详情菜单操作失败', { timeoutMs: 4000 });
-    });
-  });
-  byId('detailCloseBtn')?.addEventListener('click', () => {
-    closeDetailPanel();
-  });
-  byId('detailPanelBackdrop')?.addEventListener('click', () => {
-    closeDetailPanel();
-  });
-  byId('detailForm')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-detail-section-toggle]');
-    if (!btn) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const key = String(btn.getAttribute('data-detail-section-toggle') || '');
-    if (!key) return;
-    toggleDetailSectionCollapsed(key);
   });
 
   byId('snoozeReminderBtn').addEventListener('click', async () => {
