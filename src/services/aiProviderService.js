@@ -1,3 +1,7 @@
+const { isSafeUrl } = require('../utils/urlPolicy');
+const { readBodyWithLimit } = require('../utils/http');
+let aiHttpTransport = (...args) => globalThis.fetch(...args);
+function setAiHttpTransport(transport) { aiHttpTransport = transport; }
 const crypto = require('node:crypto');
 
 const DEFAULT_AI_CONFIG = {
@@ -893,20 +897,19 @@ function contentFromOpenAICompatResponse(payload = {}) {
 }
 
 async function httpJson(url, { method = 'GET', headers = {}, body = null, timeoutMs = 30_000 } = {}) {
+  if (!isSafeUrl(url)) throw Object.assign(new Error('AI endpoint must use a public HTTP(S) URL'), { status: 400, code: 'UNSAFE_AI_URL' });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 30_000));
   let res;
   try {
-    res = await fetch(url, {
+    res = await aiHttpTransport(url, {
+      redirect: 'error',
       method,
       headers,
       body: body == null ? undefined : JSON.stringify(body),
       signal: controller.signal
     });
-  } finally {
-    clearTimeout(timer);
-  }
-  const text = await res.text();
+  const text = await readBodyWithLimit(res, 2 * 1024 * 1024, { encoding: 'utf8' });
   let data = null;
   try {
     data = text ? JSON.parse(text) : null;
@@ -921,6 +924,7 @@ async function httpJson(url, { method = 'GET', headers = {}, body = null, timeou
     throw err;
   }
   return { status: res.status, data, text };
+  } finally { clearTimeout(timer); }
 }
 
 function joinUrl(baseUrl, pathName) {
@@ -1978,6 +1982,7 @@ function buildAiJobRecord({ userId, bookmarkId, type = 'bookmark_auto_tag', stat
 }
 
 module.exports = {
+  setAiHttpTransport,
   DEFAULT_AI_CONFIG,
   ensureAiProviderConfigsStore,
   getAiProviderConfig,

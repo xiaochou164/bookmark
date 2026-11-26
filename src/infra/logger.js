@@ -8,8 +8,9 @@ const LEVELS = {
 function redactValue(value) {
   if (value === null || typeof value === 'undefined') return value;
   if (typeof value === 'string') {
-    if (value.length > 180) return `${value.slice(0, 177)}...`;
-    return value;
+    const safe = value.replace(/(?:rbpat|rbsess)\.[\w-]+\.[\w-]+/g, '[REDACTED]').replace(/Bearer\s+[^\s"']+/gi, 'Bearer [REDACTED]');
+    if (safe.length > 180) return `${safe.slice(0, 177)}...`;
+    return safe;
   }
   if (Array.isArray(value)) return value.map(redactValue);
   if (typeof value !== 'object') return value;

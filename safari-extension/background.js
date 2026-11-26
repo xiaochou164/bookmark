@@ -30,6 +30,8 @@ const chrome = (() => {
   return wrapper;
 })();
 
+// Keep credentials inaccessible to content scripts (Safari may not expose this API).
+chrome.storage.local.setAccessLevel?.({ accessLevel: 'TRUSTED_CONTEXTS' });
 const DEFAULT_CLOUD_API_BASE = 'https://bookmark.sundays.ink';
 const LEGACY_CLOUD_API_BASE = 'https://rainbow.82fr9qxfqc8554.workers.dev';
 const TRASH_FOLDER = 'Raindrop Sync Trash';
@@ -1080,7 +1082,7 @@ async function syncWithRainbow({ preview = false } = {}) {
   if (!token) {
     throw new Error('请先在插件设置中配置云端 API Token');
   }
-  const deviceId = await ensureDeviceId(cfg);
+  const deviceId = preview ? String(cfg.deviceId || '') : await ensureDeviceId(cfg);
   const mirrorIndex = normalizeRainbowMirrorIndex(cfg.rainbowMirrorIndex || {});
 
   // 1. Collect Chrome bookmarks grouped by folder
@@ -1101,6 +1103,7 @@ async function syncWithRainbow({ preview = false } = {}) {
     headers,
     body: JSON.stringify({
       folders,
+      preview,
       deviceId,
       mirrorIndex,
       deleteSync: true  // 以云端删除记录为准，删除 Chrome 中对应的书签

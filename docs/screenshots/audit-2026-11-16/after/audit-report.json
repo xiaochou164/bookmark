@@ -1,0 +1,2575 @@
+{
+  "createdAt": "2026-11-18T10:39:41.955Z",
+  "baseUrl": "http://127.0.0.1:55162",
+  "viewports": [
+    {
+      "name": "mobile",
+      "width": 360,
+      "height": 780
+    },
+    {
+      "name": "small",
+      "width": 640,
+      "height": 900
+    },
+    {
+      "name": "tablet",
+      "width": 920,
+      "height": 900
+    },
+    {
+      "name": "desktop",
+      "width": 1280,
+      "height": 900
+    }
+  ],
+  "screenshots": [
+    {
+      "state": "login",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/login-mobile-360.png",
+      "overflow": {
+        "path": "/login.html",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "login",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/login-small-640.png",
+      "overflow": {
+        "path": "/login.html",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "login",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/login-tablet-920.png",
+      "overflow": {
+        "path": "/login.html",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "login",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/login-desktop-1280.png",
+      "overflow": {
+        "path": "/login.html",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-list-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-list-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-list-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-list",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-list-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-card-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-card-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-card-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-card",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-card-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-headline",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-headline-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-headline",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-headline-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-headline",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-headline-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-headline",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-headline-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-moodboard",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-moodboard-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-moodboard",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-moodboard-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-moodboard",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-moodboard-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "main-moodboard",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/main-moodboard-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail-edit",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-edit-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail-edit",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-edit-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail-edit",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-edit-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail-edit",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-edit-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bulk",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bulk-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bulk",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bulk-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bulk",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bulk-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bulk",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bulk-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "ai-drawer",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/ai-drawer-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "ai-drawer",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/ai-drawer-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "ai-drawer",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/ai-drawer-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "ai-drawer",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/ai-drawer-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bookmark-dialog",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bookmark-dialog-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bookmark-dialog",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bookmark-dialog-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bookmark-dialog",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bookmark-dialog-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "bookmark-dialog",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/bookmark-dialog-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "sidebar",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/sidebar-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "sidebar",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/sidebar-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "sidebar",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/sidebar-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "sidebar",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/sidebar-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "search-empty",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/search-empty-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "search-empty",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/search-empty-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "search-empty",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/search-empty-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "search-empty",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/search-empty-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-small-640.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-account",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-account-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#account",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-account",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-account-small-640.png",
+      "overflow": {
+        "path": "/settings.html#account",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-account",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-account-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#account",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-account",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-account-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#account",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-import",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-import-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#import",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-import",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-import-small-640.png",
+      "overflow": {
+        "path": "/settings.html#import",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-import",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-import-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#import",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-import",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-import-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#import",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-collab",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-collab-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#collab",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-collab",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-collab-small-640.png",
+      "overflow": {
+        "path": "/settings.html#collab",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-collab",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-collab-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#collab",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-collab",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-collab-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#collab",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-product",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-product-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#product",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-product",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-product-small-640.png",
+      "overflow": {
+        "path": "/settings.html#product",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-product",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-product-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#product",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-product",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-product-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#product",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-ai",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-ai-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#ai",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-ai",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-ai-small-640.png",
+      "overflow": {
+        "path": "/settings.html#ai",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-ai",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-ai-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#ai",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-ai",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-ai-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#ai",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-operations",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-operations-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#operations",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-operations",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-operations-small-640.png",
+      "overflow": {
+        "path": "/settings.html#operations",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-operations",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-operations-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#operations",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-operations",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-operations-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#operations",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-security",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-security-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#security",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-security",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-security-small-640.png",
+      "overflow": {
+        "path": "/settings.html#security",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-security",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-security-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#security",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "settings-security",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/settings-security-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#security",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/plugin-mobile-360.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/plugin-small-640.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/plugin-tablet-920.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "plugin",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/plugin-desktop-1280.png",
+      "overflow": {
+        "path": "/plugin.html",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/public-mobile-360.png",
+      "overflow": {
+        "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/public-small-640.png",
+      "overflow": {
+        "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/public-tablet-920.png",
+      "overflow": {
+        "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "public",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/public-desktop-1280.png",
+      "overflow": {
+        "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-main",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-main-mobile-360.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-main",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-main-small-640.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-main",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-main-tablet-920.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-main",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-main-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-settings",
+      "viewport": {
+        "name": "mobile",
+        "width": 360,
+        "height": 780
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-settings-mobile-360.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 360,
+        "scrollWidth": 360,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-settings",
+      "viewport": {
+        "name": "small",
+        "width": 640,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-settings-small-640.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 640,
+        "scrollWidth": 640,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-settings",
+      "viewport": {
+        "name": "tablet",
+        "width": 920,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-settings-tablet-920.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 920,
+        "scrollWidth": 920,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "dark-settings",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/dark-settings-desktop-1280.png",
+      "overflow": {
+        "path": "/settings.html#app",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "search-suggest",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/search-suggest-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "row-hover",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/row-hover-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "sort-menu",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/sort-menu-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "notifications-menu",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/notifications-menu-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    },
+    {
+      "state": "detail-edit",
+      "viewport": {
+        "name": "desktop",
+        "width": 1280,
+        "height": 900
+      },
+      "screenshot": "docs/screenshots/audit-2026-11-16/after/detail-edit-desktop-1280.png",
+      "overflow": {
+        "path": "/",
+        "clientWidth": 1280,
+        "scrollWidth": 1280,
+        "ok": true,
+        "offenders": []
+      },
+      "accessibility": []
+    }
+  ],
+  "overflow": [
+    {
+      "path": "/login.html",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/login.html",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/login.html",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#account",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#account",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#account",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#account",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#import",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#import",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#import",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#import",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#collab",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#collab",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#collab",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#collab",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#product",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#product",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#product",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#product",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#ai",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#ai",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#ai",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#ai",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#operations",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#operations",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#operations",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#operations",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#security",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#security",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#security",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#security",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/plugin.html",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/public/c/33ea45a6-9ed8-498a-a55a-fc8d71eed36d",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 360,
+      "scrollWidth": 360,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 640,
+      "scrollWidth": 640,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 920,
+      "scrollWidth": 920,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/settings.html#app",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    },
+    {
+      "path": "/",
+      "clientWidth": 1280,
+      "scrollWidth": 1280,
+      "ok": true,
+      "offenders": []
+    }
+  ],
+  "keyboard": {
+    "hasVisibleFocus": true,
+    "menuOpened": true,
+    "menuClosed": true,
+    "searchValue": "example",
+    "detailFocused": true,
+    "detailTabsRove": true,
+    "detailTabsState": {
+      "active": "detailPanelEditModeBtn",
+      "view": "false",
+      "edit": "true",
+      "detailClass": "detail"
+    },
+    "drawerInert": true,
+    "drawerRestoredFocus": true,
+    "dialogFocused": true,
+    "dialogRestoredFocus": true,
+    "focusTrail": [
+      {
+        "tag": "BUTTON",
+        "id": "mobileSidebarBtn",
+        "text": "☰"
+      },
+      {
+        "tag": "INPUT",
+        "id": "searchInput",
+        "text": ""
+      },
+      {
+        "tag": "BUTTON",
+        "id": "advancedSearchToggleBtn",
+        "text": "高级搜索▾高级搜索"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-1",
+        "text": "标签\n        例如 tag:AI\n      \n      tag:"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-2",
+        "text": "类型\n        例如 type:web / type:pdf\n      "
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-3",
+        "text": "创建日期\n        例如 created:2026-02\n      \n "
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-4",
+        "text": "在 URL\n        例如 link:example.com\n      "
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-5",
+        "text": "标题/描述\n        在标题或摘要中查找\n      \n      inf"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-6",
+        "text": "备注\n        仅显示有备注的条目\n      \n      note:t"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-7",
+        "text": "高亮\n        仅显示有高亮的条目\n      \n      highli"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-8",
+        "text": "没有标签\n        仅显示未打标签条目\n      \n      nota"
+      },
+      {
+        "tag": "BUTTON",
+        "id": "searchSuggestOption-10",
+        "text": "zzzz-no-matching-audit\n        最近使用的搜索"
+      }
+    ]
+  },
+  "largeSample": {
+    "initial": {
+      "folderCount": 153,
+      "treeVirtualized": true,
+      "visibleTagRows": 12,
+      "tagTotalText": "标签 (104)",
+      "tagsCollapsed": true,
+      "loadMoreVisible": true,
+      "listRows": 24,
+      "sidebarWidth": 300
+    },
+    "expandedTags": {
+      "tagsVirtualized": true,
+      "virtualCount": 104,
+      "visibleTagRows": 35,
+      "tagsCollapsed": false
+    },
+    "afterLoadMore": {
+      "listRows": 48,
+      "loadMoreVisible": true,
+      "loadMoreMeta": "已显示 48 / 99 条 · 已加载 2 页",
+      "pageOverflowOk": true
+    }
+  },
+  "zoomAndMotion": {
+    "reducedMotion": true,
+    "scrollOk": true,
+    "reachable": true,
+    "visibleControlCount": 89,
+    "effectiveLayoutViewportWidth": 640,
+    "focusTargetCount": 89,
+    "navigationMs": 1393,
+    "firstContentfulPaintMs": null,
+    "webVitals": {
+      "lcp": null,
+      "cls": 0,
+      "inp": null
+    },
+    "performance": {
+      "jsHeapUsedMb": 37.1,
+      "taskDurationSeconds": 0.193,
+      "layoutDurationSeconds": 0.012,
+      "scriptDurationSeconds": 0.004,
+      "throttle": "CPU 4x; network 3G profile (150ms, 1.6Mbps down)"
+    }
+  },
+  "console": [],
+  "networkErrors": []
+}

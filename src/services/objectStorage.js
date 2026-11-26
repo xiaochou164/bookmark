@@ -1,6 +1,8 @@
+const { fetchPublicWithPinnedDns } = require('../utils/nodePublicFetch');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { fetchPublicResource } = require('../utils/publicFetch');
 const { ensureUrlIsSafe } = require('../utils/url');
 const { readBodyWithLimit } = require('../utils/http');
 
@@ -82,20 +84,9 @@ class LocalObjectStorage {
   async fetchAndStore(bucket, sourceUrl, { keyPrefix = '', keyBase = '', timeoutMs = 10_000, maxBytes = 5 * 1024 * 1024 } = {}) {
     const url = String(sourceUrl || '').trim();
     if (!url) throw new Error('sourceUrl is required');
-    await ensureUrlIsSafe(url);
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-    let res;
-    try {
-      res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res.ok) throw new Error(`fetch failed: HTTP ${res.status}`);
-
-    const contentType = String(res.headers.get('content-type') || '');
-    const buf = await readBodyWithLimit(res, Number(maxBytes || 0) || 5 * 1024 * 1024);
+    const fetched = await fetchPublicResource(url, { timeoutMs, maxBytes, validate: ensureUrlIsSafe, fetchImpl: fetchPublicWithPinnedDns });
+    const contentType = String(fetched.response.headers.get('content-type') || '');
+    const buf = Buffer.from(fetched.bytes);
 
     const base = safeSegment(keyBase || `obj-${Date.now()}`, 'obj');
     const prefix = String(keyPrefix || '').replace(/^\/+|\/+$/g, '');
@@ -253,18 +244,9 @@ class S3ObjectStorage {
   async fetchAndStore(bucket, sourceUrl, { keyPrefix = '', keyBase = '', timeoutMs = 10_000, maxBytes = 5 * 1024 * 1024 } = {}) {
     const url = String(sourceUrl || '').trim();
     if (!url) throw new Error('sourceUrl is required');
-    await ensureUrlIsSafe(url);
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || 10_000));
-    let res;
-    try {
-      res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
-    } finally {
-      clearTimeout(timer);
-    }
-    if (!res.ok) throw new Error(`fetch failed: HTTP ${res.status}`);
-    const contentType = String(res.headers.get('content-type') || '');
-    const buf = await readBodyWithLimit(res, Number(maxBytes || 0) || 5 * 1024 * 1024);
+    const fetched = await fetchPublicResource(url, { timeoutMs, maxBytes, validate: ensureUrlIsSafe, fetchImpl: fetchPublicWithPinnedDns });
+    const contentType = String(fetched.response.headers.get('content-type') || '');
+    const buf = Buffer.from(fetched.bytes);
     const base = safeSegment(keyBase || `obj-${Date.now()}`, 'obj');
     const prefix = String(keyPrefix || '').replace(/^\/+|\/+$/g, '');
     const ext = extFromContentType(contentType);

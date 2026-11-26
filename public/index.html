@@ -304,7 +304,7 @@
                 <button type="button" class="header-menu-item" data-header-more-action="plugin"
                   role="menuitem">同步插件</button>
               </div>
-              <div id="realtimeNotificationsMenu" class="realtime-notifications-menu hidden" role="menu"
+              <div id="realtimeNotificationsMenu" class="realtime-notifications-menu hidden" role="region"
                 aria-label="实时通知"></div>
             </div>
             <button id="exportBtn" class="ghost header-tool-btn ra-export-btn" aria-label="导出书签"
@@ -319,7 +319,7 @@
             <button id="bulkArchiveBtn" class="ghost">归档</button>
             <button id="bulkAiTagBtn" class="ghost">AI 打标签</button>
             <button id="bulkDeleteBtn" class="ghost danger">删除</button>
-            <select id="bulkMoveSelect">
+            <select id="bulkMoveSelect" aria-label="批量移动到集合">
               <option value="">移动到...</option>
             </select>
           </div>
@@ -335,7 +335,7 @@
       <div class="pager" id="pager">
         <div class="pager-left muted" id="pagerMeta">0 条</div>
         <div class="pager-right">
-          <select id="pageSizeSelect">
+          <select id="pageSizeSelect" aria-label="每页书签数量">
             <option value="12">12 / 页</option>
             <option value="24" selected>24 / 页</option>
             <option value="48">48 / 页</option>
@@ -367,9 +367,9 @@
           </div>
           <div class="detail-panel-mode-switch" role="tablist" aria-label="详情模式">
             <button type="button" id="detailPanelViewModeBtn" class="ghost" role="tab" aria-selected="true"
-              aria-pressed="true">查看</button>
+              aria-controls="detailForm">查看</button>
             <button type="button" id="detailPanelEditModeBtn" class="ghost" role="tab" aria-selected="false"
-              aria-pressed="false">编辑</button>
+              aria-controls="detailForm" tabindex="-1">编辑</button>
           </div>
           <div class="detail-panel-preview-shortcuts" role="group" aria-label="预览模式">
             <button type="button" id="detailPanelWebBtn" class="ghost icon-action-btn" aria-label="网页预览"
@@ -571,7 +571,7 @@
     </aside>
 
     <button type="button" id="aiSideDrawerBackdrop" class="ai-side-drawer-backdrop hidden" aria-label="关闭 AI 抽屉"></button>
-    <aside id="aiSideDrawer" class="ai-side-drawer hidden" aria-label="AI 侧边抽屉" aria-hidden="true">
+    <aside id="aiSideDrawer" class="ai-side-drawer hidden" role="dialog" aria-modal="true" aria-label="AI 侧边抽屉" aria-hidden="true">
       <div class="ai-side-drawer-head">
         <div>
           <strong>询问 AI</strong>
@@ -621,7 +621,7 @@
     </aside>
   </div>
 
-  <dialog id="bookmarkDialog">
+  <dialog id="bookmarkDialog" aria-label="新建书签">
     <form method="dialog" id="bookmarkForm" class="dialog-form" novalidate>
       <div class="dialog-header">
         <h3 class="dialog-title">新建书签</h3>
@@ -644,7 +644,7 @@
     </form>
   </dialog>
 
-  <dialog id="collectionDialog">
+  <dialog id="collectionDialog" aria-label="新建集合">
     <form method="dialog" id="collectionForm" class="dialog-form" novalidate>
       <div class="dialog-header">
         <h3 id="collectionDialogTitle" class="dialog-title">新建集合</h3>
@@ -667,7 +667,7 @@
 
   <!-- Raindrop 同步插件已移至独立页面 /plugin.html -->
 
-  <dialog id="previewDialog">
+  <dialog id="previewDialog" aria-label="书签预览">
     <div class="dialog-form wide preview-shell">
       <div class="preview-toolbar">
         <div class="preview-toolbar-main">
@@ -712,7 +712,7 @@
     </div>
   </dialog>
 
-  <dialog id="aiQaDialog">
+  <dialog id="aiQaDialog" aria-label="书签操作">
     <div class="dialog-form wide ai-qa-shell">
       <div class="dialog-header">
         <h3 class="dialog-title">AI 书签问答</h3>
@@ -761,7 +761,7 @@
     </div>
   </dialog>
 
-  <dialog id="aiFolderSummaryDialog">
+  <dialog id="aiFolderSummaryDialog" aria-label="书签操作">
     <div class="dialog-form wide ai-folder-summary-shell">
       <div class="dialog-header">
         <h3 class="dialog-title">AI 集合知识摘要</h3>
@@ -786,7 +786,7 @@
     </div>
   </dialog>
 
-  <dialog id="tagManagerDialog">
+  <dialog id="tagManagerDialog" aria-label="书签操作">
     <form method="dialog" id="tagManagerForm" class="dialog-form">
       <div class="dialog-header">
         <h3 class="dialog-title">标签管理</h3>
@@ -824,7 +824,7 @@
     </form>
   </dialog>
 
-  <dialog id="importDialog">
+  <dialog id="importDialog" aria-label="书签操作">
     <div class="dialog-form compact">
       <div class="dialog-header">
         <h3 class="dialog-title">导入书签</h3>
@@ -867,7 +867,7 @@
     </div>
   </dialog>
 
-  <dialog id="exportDialog">
+  <dialog id="exportDialog" aria-label="书签操作">
     <div class="dialog-form compact">
       <div class="dialog-header">
         <h3 class="dialog-title">导出与任务管理</h3>
@@ -881,7 +881,7 @@
             <option value="export_html">书签 HTML</option>
           </select>
         </label>
-        <label class="form-field">到处范围
+        <label class="form-field">导出范围
           <select id="ioExportScope">
             <option value="all">全部（当前数据集）</option>
             <option value="currentFolder">仅当前集合</option>
@@ -907,7 +907,7 @@
     </div>
   </dialog>
 
-  <dialog id="authDialog">
+  <dialog id="authDialog" aria-label="账号与安全">
     <div class="dialog-form wide auth-dialog-shell">
       <div class="dialog-header">
         <h3 id="authDialogTitle" class="dialog-title">账号</h3>
@@ -916,7 +916,7 @@
       <div class="dialog-body auth-grid">
         <div class="auth-panel">
           <div id="authGuestPanel" class="auth-section">
-            <form onsubmit="event.preventDefault();">
+            <form data-auth-form="login">
               <label>邮箱<input id="authEmail" type="email" autocomplete="username" /></label>
               <label>密码<input id="authPassword" type="password" autocomplete="current-password" /></label>
               <div class="dialog-actions dialog-actions-start">
@@ -924,7 +924,7 @@
               </div>
             </form>
             <hr />
-            <form onsubmit="event.preventDefault();">
+            <form data-auth-form="register">
               <label>昵称<input id="authRegisterName" autocomplete="name" /></label>
               <label>邮箱<input id="authRegisterEmail" type="email" autocomplete="username" /></label>
               <label>密码<input id="authRegisterPassword" type="password" autocomplete="new-password" /></label>
@@ -975,7 +975,7 @@
     </div>
   </div>
 
-  <dialog id="actionDialog">
+  <dialog id="actionDialog" aria-label="确认操作">
     <div class="dialog-form compact action-dialog-shell">
       <div class="dialog-header">
         <h3 id="actionDialogTitle" class="dialog-title">确认操作</h3>

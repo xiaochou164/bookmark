@@ -16,7 +16,7 @@
 | 浏览器扩展 | `chrome-extension/` | Chrome 书签树与 Rainbow 云书签双向同步 |
 | Safari 产物 | `safari-extension/` | 由 Chrome 扩展源文件生成的 Safari Web Extension 源目录 |
 
-生产地址为 `https://bookmark.sundays.ink`，Worker 备用地址由 Wrangler 部署结果给出。
+生产 Worker 地址及配置由发布环境维护。本地审计只用隔离数据验证 Node/Docker 与 Wrangler local，不把生产地址作为测试目标。
 
 ## 2. 关键数据流
 
@@ -61,8 +61,9 @@ Raindrop UI 对齐证据位于：
 ## 4. 后端结构
 
 - `src/worker.mjs`：Cloudflare 生产主入口。
+- `src/worker/bookmarkTransfer.mjs`：JSON/CSV/书签 HTML 导入导出 codecs；保持无存储副作用，导入字段映射由 Worker 显式传入。
 - `src/routes/`：Express 兼容路由与业务拆分版本。
-- `src/services/`：同步、AI、鉴权、任务、对象存储和内容提取服务。
+- `src/services/`：同步、AI、书签检索/语义索引、鉴权、任务、对象存储和内容提取服务；`bookmarkSearch.js` 提供产品路由共享的 URL/文本/目录 helpers 与租户作用域语义索引维护。
 - `src/repositories/`：数据访问抽象。
 - `src/infra/`：队列、日志和指标。
 - `migrations/`：D1 schema migration。
@@ -87,14 +88,14 @@ Worker 与 Express 路径需要保持接口契约一致；新增接口时至少�
 
 ## 6. 当前已知限制
 
-- 浏览器扩展的“预览变更”当前不会修改 Chrome，但仍会调用具有写入行为的 `/api/chrome-sync`，因此 Chrome 新书签可能在预览阶段写入 Rainbow。修复前不得把它描述为完全无写入的 dry-run。
+- 浏览器扩展通过 `preview: true` 获取内存差异；Node 与 Worker 均有零持久化写入回归。服务端 provider 预览是另一条契约，Worker 当前只返回配置摘要。
 - `docs/openapi.json` 是人工维护的基线，不会自动从 Worker 生成；接口变更后必须同步更新。
 - `safari-extension/` 是生成产物。修改 `chrome-extension/` 后需重新运行 `npm run extension:safari:build`。
 - 生产部署依赖本机已登录 Wrangler，并要求现有 D1、R2、Queues、DLQ 和 Cron 绑定名称保持一致。
 
 ## 7. 发布流程
 
-推荐顺序：
+推荐顺序（以下部署命令须由维护者确认目标环境后单独执行；本地审计回归不包含部署）：
 
 ```bash
 npm test
@@ -109,4 +110,4 @@ npm run cf:smoke:remote -- https://bookmark.sundays.ink
 npm run extension:smoke:remote -- https://bookmark.sundays.ink
 ```
 
-扩展 smoke 当前会输出 `previewMutatedServer`，该字段用于显式暴露上述预览限制。
+扩展 smoke 显式断言 `previewMutatedServer === false`。Docker 使用 `npm run start:node`（3789）；`npm start` 保持本地 Worker（8787）。

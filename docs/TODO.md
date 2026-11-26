@@ -364,20 +364,75 @@
 - [x] `AI-904` Phase 4：`AI-601~AI-605` 评估治理与成本/健康体系
 
 
-## 2026-11-16 全项目代码与前端复核整改（新增，待执行）
+## 2026-11-16 全项目代码与前端复核整改（本轮已执行；BK-AUD-201 继续分阶段）
 
 具体证据、验收标准与实施边界见 [CODE_AUDIT_2026-11-16.md](./CODE_AUDIT_2026-11-16.md)。以下为与专项清单一一对应的工作项，旧条目 [x] 不代表本轮已验收。
 
-- [ ] **P0** `BK-AUD-001` 修复 Docker 启动与依赖/健康检查分歧
-- [ ] **P0** `BK-AUD-002` 核对扩展同步预览零写入契约及文档
-- [ ] **P0** `BK-AUD-003` 安全、权限、数据隔离专项复核
-- [ ] **P1** `BK-AUD-101` 列表操作区局部溢出
-- [ ] **P1** `BK-AUD-102` 详情栏/表单局部溢出
-- [ ] **P1** `BK-AUD-103` 主工作台布局、操作与响应式
-- [ ] **P1** `BK-AUD-104` 登录/设置/插件/公开页体验
-- [ ] **P1** `BK-AUD-105` 键盘、触控与无障碍
-- [ ] **P1** `BK-AUD-106` CSS legacy 样式治理
-- [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护
-- [ ] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁
-- [ ] **P2** `BK-AUD-203` 文档实现漂移治理
-- [ ] **P2** `BK-AUD-204` 设计系统细节收口
+- [x] **P0** `BK-AUD-001` 修复 Docker 启动与依赖/健康检查分歧
+- [x] **P0** `BK-AUD-002` 核对扩展同步预览零写入契约及文档
+- [x] **P0** `BK-AUD-003` 安全、权限、数据隔离专项复核
+- [x] **P1** `BK-AUD-101` 列表操作区局部溢出
+- [x] **P1** `BK-AUD-102` 详情栏/表单局部溢出
+- [x] **P1** `BK-AUD-103` 主工作台布局、操作与响应式
+- [x] **P1** `BK-AUD-104` 登录/设置/插件/公开页体验
+- [x] **P1** `BK-AUD-105` 键盘、触控与无障碍
+- [x] **P1** `BK-AUD-106` CSS legacy 样式治理
+- [x] **P1** `BK-AUD-107` CSV 导入导出 round-trip 字段损坏及 HTML 导出转义不足（CSV 导入按逗号无视引号拆分，导致自带逗号/引号/换行的标题和备注被切坏；HTML 导出对标题、URL、标签转义不完整。本轮已实现 quote-aware CSV codec 和完整 HTML escaping，并新增 3 项 codec 回归；本机 codec 测试 3/3、全套 `npm test` 39/39、Worker smoke、浏览器回归和 Docker 健康检查通过；最终 hosted CI run `44300423004` 16/16 通过，Docker run `44300423001` 通过且无 warning annotations）
+- [x] **P1** `BK-AUD-108` 搜索标签条件解析（“标签 AI”原正则先命中无捕获组的中文关键字，未设置标签过滤；解析逻辑已修复并抽取，新增 3 项回归；目标测试 3/3、全套本地门禁和 Docker 健康检查通过；hosted CI run `44302676562`（16/16）和 Docker PR build run `44302676439` 通过）
+- [ ] **P2** `BK-AUD-201` 大型文件拆分与测试保护（本轮将产品路由共享检索/语义索引及 Worker 导入导出 codecs 分别抽到 `src/services/bookmarkSearch.js`、`src/worker/bookmarkTransfer.mjs`、`src/worker/bookmarkIntelligence.mjs`、`src/worker/bookmarkPresentation.mjs`、`src/worker/publicShareHtml.mjs`、`src/worker/aiGovernance.mjs`；HTML/预览 helper 与 XSS 模板新增 3 项回归；Worker 主入口降至 6,514 行；Worker 搜索条件中文标签解析新增修复及 3 项回归。Node entitlement/subscription/quota、saved-search CRUD、backup CRUD、broken-link scan/task、duplicate scan 和 semantic dedupe handlers 分别迁出 `src/routes/productSubscriptionRoutes.js`、`src/routes/productSavedSearchRoutes.js`、`src/routes/productBackupRoutes.js`、`src/routes/productBrokenLinkRoutes.js`、`src/routes/productDuplicateScanRoutes.js`、`src/routes/productSemanticDedupeRoutes.js`、`src/routes/productDigestRoutes.js`、`src/routes/productAiSettingsRoutes.js`、`src/routes/productAiActionRoutes.js`；新增 Alice/Bob 隔离测试，覆盖 saved-search CRUD、备份列表/恢复、broken-link 历史、重复扫描和语义索引及 AI digest 成功/失败任务；`productRoutes.js` 当前 3,444 行。当前 `npm test` 53/53、`docs:check`、`ui:check`、CF smoke、扩展构建、UI 浏览器 101/8/16、Docker 镜像及健康检查通过；代码 head `6f18c51` 的 GitHub CI run `44310585890` 与 Docker PR build run `44310585793` 均通过。duplicate scan 代码 head `e2af39e` 的 GitHub CI run `44316388306`（16 步）和 Docker PR build run `44316388326` 均通过。语义去重代码 head `0c19c37` 的 GitHub CI run `44318376574`（16 步）和 Docker PR build run `44318376449` 均通过；文档 head `81d3640` 的 CI `44319013236` 与 Docker `44319013295` 均通过。AI digest 路由新增两项成功/失败租户隔离回归，`npm test` 53/53、`npm ci` 0 漏洞、docs/UI/CF/扩展门禁、浏览器 101/8/16 与 Docker healthy 检查通过；hosted CI run `44320680576`（16 步）与 Docker PR build run `44320680529` 均通过。AI settings 又新增两项配置/提示词/规则隔离及 secret masking 回归，当前 `npm test` 55/55，docs/UI/Worker/扩展门禁、Docker healthy 检查通过；`ui:check` 初次因旧静态断言定位到新模块后复跑成功。hosted CI run `44322630733`（16 步，含浏览器矩阵/扩展 parity）与 Docker PR build run `44322630665` 均通过。AI action routes 增加 15 路由默认参数/错误映射覆盖，目标 2/2、全套 npm test 57/57，docs/UI/Worker/扩展门禁和 Docker healthy 通过；hosted CI run `44324485032`（16 步，含浏览器矩阵/扩展/operations drill）与 Docker PR build run `44324485034` 均通过。Worker AI governance 又拆出 10 个纯 helper，新增 4 项策略/评估/公开指南回归，当前 npm test 61/61，docs/UI/CF/扩展及 Docker healthy 通过；hosted 验收待推送复验。`src/worker.mjs` 路由、`public/app.mjs` 其余渲染域和其他产品路由 handlers 仍需拆分，故保持未完成）
+- BK-AUD-201 最新增量（2026-11-24）：AI batch/backfill processors 已从 `src/worker.mjs` 抽至 `src/worker/aiTaskProcessors.mjs`，入口降至 5,956 行；新增 `tests/worker-ai-batch-processors.test.js` 2 项回归，覆盖租户 userId、缺失书签 partial 状态/进度和 summary 回填候选过滤。目标测试 2/2、`npm test` 72/72、docs/UI/CF/smoke/extension 门禁及 `ui:browser` 101/8/16 通过，截图已恢复基线；本轮 Docker 本地 build/start/healthy 通过，GitHub CI `45391499346` 16/16、Docker PR build `45391499363` 通过，BK-AUD-201 保持未完成。
+
+- BK-AUD-201 最新增量（2026-11-24）：Worker semantic dedupe task 已从 `src/worker.mjs` 抽至 `src/worker/aiTaskProcessors.mjs`，入口降至 5,826 行；新增 `tests/worker-semantic-dedupe-task.test.js` 1 项回归，覆盖租户 userId、exact-URL 聚类和 job 结果写回。目标测试 1/1、`npm test` 73/73、docs/UI/CF/smoke/extension 门禁及 Docker build/start/healthy 通过；GitHub CI `45393042687` 16/16、Docker PR build `45393043028` 通过，BK-AUD-201 保持未完成。
+
+- BK-AUD-201 最新增量（2026-11-25）：Worker IO task 已从 `src/worker.mjs` 抽至 `src/worker/taskProcessors.mjs`，入口降至 5,749 行；新增 `tests/worker-io-task-processors.test.js` 2 项回归，覆盖 JSON 导出、租户参数和跨租户备份对象拒绝。目标测试 2/2、`npm test` 75/75、docs/UI/CF/smoke/extension 门禁及 Docker build/start/healthy 通过；GitHub CI `45549199061` 16/16、Docker PR build `45549199052` 通过，BK-AUD-201 保持未完成。
+
+- BK-AUD-201 最新增量（2026-11-25）：导入/导出任务面板已从 `public/app.mjs` 抽至 `public/js/app/ioTasks.mjs`，入口降至 9,355 行；新增 `tests/io-task-ui.test.js` 1 项回归，覆盖选中范围导出和活动任务状态，并保留任务详情、下载、日志、重试、轮询和焦点反馈。目标测试 1/1、`npm test` 76/76、docs/UI/CF/smoke/extension 门禁、`ui:browser` 101/8/16 及 Docker build/start/healthy 通过，截图已恢复基线；hosted CI `45550791268` 16/16、Docker `45550791281` 通过，BK-AUD-201 保持未完成。
+
+- BK-AUD-201 最新增量（2026-11-25）：实时通知中心的 SSE/轮询 controller 已从 `public/app.mjs` 抽至 `public/js/app/realtimeNotifications.mjs`，入口降至 9,209 行（371.4KiB）；新增 `tests/realtime-notifications-ui.test.js` 1 项回归，覆盖任务摘要、快照去重和轮询通知；`npm test` 77/77、docs/UI/CF/smoke/extension 门禁、`ui:browser` 101/8/16 及 Docker build/start/healthy 通过，截图已恢复基线；hosted CI `45552355409` 16/16、Docker `45552355425` 通过，BK-AUD-201 保持未完成。
+
+- BK-AUD-201 最新增量（2026-11-25）：插件同步面板的任务轮询、配置、计划、历史、审计、设备和健康加载已从 `public/app.mjs` 抽至 `public/js/app/pluginSync.mjs`，入口降至 9,103 行（358.2KiB）；新增 `tests/plugin-sync-ui.test.js` 1 项回归，覆盖计划字段归一化、配置加载、任务列表和终态轮询刷新；`npm test` 78/78、docs/UI/CF/smoke/extension 门禁、`ui:browser` 101/8/16 及 Docker build/start/healthy 通过，截图已恢复基线；hosted CI `45553778576` 16/16、Docker `45553778536` 通过，BK-AUD-201 保持未完成。
+- BK-AUD-201 最新增量（2026-11-25）：详情页元数据抓取状态、历史、请求序列、轮询和重置逻辑已从 `public/app.mjs` 抽至 `public/js/app/metadataTasks.mjs`，入口降至 9,015 行（354.5KiB）；新增 `tests/metadata-tasks-ui.test.js` 1 项回归，覆盖当前书签隔离、失败重试显示、历史摘要和任务 ID 状态；`npm test` 79/79、`ui:check` 通过，最终代码头 hosted CI `45555814624` 16/16、Docker `45555814669` 通过，BK-AUD-201 保持未完成。
+- BK-AUD-201 最新增量（2026-11-25）：详情页高亮/注释列表、编辑/删除、注释 CRUD、内容 escaping、书签切换和请求序列已从 `public/app.mjs` 抽至 `public/js/app/highlights.mjs`，入口降至 8,850 行（347.1KiB）；新增 `tests/highlights-ui.test.js` 1 项回归，覆盖用户内容 escaping 和旧书签结果抑制；`npm test` 80/80、`ui:check`、`ui:browser` 101/8/16 通过，最终代码头 hosted CI `45557395256` 16/16、Docker `45557395165` 通过，BK-AUD-201 保持未完成。
+
+- BK-AUD-201 最新增量（2026-11-25）：搜索建议、token 插入、键盘 roving、最近搜索持久化与 blur 延迟关闭已从 `public/app.mjs` 抽至 `public/js/app/searchSuggest.mjs`，入口降至 8,618 行（338.8KiB）；新增 `tests/search-suggest-ui.test.js` 2 项回归，覆盖 escaping、ARIA active descendant、token 应用和最近搜索恢复；`npm test` 82/82、docs/UI/CF/smoke/extension 门禁及 `ui:browser` 101/8/16 通过，截图已恢复基线；Docker 本地 build/start/healthy、hosted Docker workflow `45559542765` 与 CI `45559542759`（16/16）均通过，BK-AUD-201 保持未完成。
+- BK-AUD-201 最新增量（2026-11-25）：预览/阅读模式、媒体安全降级、选区高亮锚点、正文提取刷新与预览状态反馈已从 `public/app.mjs` 抽至 `public/js/app/previewController.mjs`，入口降至 8,398 行（330.4KiB）；新增 `tests/preview-controller-ui.test.js` 3 项回归，覆盖安全媒体渲染、请求序列抑制、loading/ready 状态和选区锚点；`npm test` 85/85、docs/UI/CF/smoke/extension 门禁及 `ui:browser` 101/8/16 通过，截图已恢复基线；Docker 本地 build/start/healthy、hosted CI `45561713899`（16/16）与 Docker `45561713835` 均通过，BK-AUD-201 保持未完成。
+
+- BK-AUD-201 最新增量（2026-11-25）：详情页 AI 相关推荐状态、请求序列、结果渲染与书签切换已从 `public/app.mjs` 抽至 `public/js/app/relatedBookmarks.mjs`，入口降至 8,266 行（325.4KiB）；新增 `tests/related-bookmarks-ui.test.js` 2 项回归，覆盖 escaping、tenant-local state 和旧书签响应抑制；静态审计新增 RA-FE-013。`npm test` 87/87、docs/UI/CF/smoke/extension 门禁及 `ui:browser` 101/8/16 通过，Docker build/start/healthy 通过；代码 head `c15a9de`，最终文档头 `479343a` 的 hosted CI `45566651549`（16/16）与 Docker `45566651571` 均成功，BK-AUD-201 保持未完成。
+
+- [x] **P2** `BK-AUD-202` 浏览器 CI 与真实性能门禁（本机及 GitHub Actions 全项通过；首次 Actions 的 Chrome sandbox 故障已通过仅 CI 使用的启动参数修复；最终 CI run `44300423004` 与 Docker run `44300423001` 成功，无 warning annotations）
+- [x] **P2** `BK-AUD-203` 文档实现漂移治理
+- [x] **P2** `BK-AUD-204` 设计系统细节收口
+- [x] **P2** `BK-AUD-205` Node/Worker AI 默认评估样本漂移（Worker 原 fixture 缺 3 条 URL/note，已补齐并加入 parity test；本地 4/4、npm test 61/61、GitHub CI `44327200479`（16 步）与 Docker PR build `44327200197` 通过）
+
+BK-AUD-201 最新增量（2026-11-24）：Worker external resource helper 已抽到 `src/worker/externalResources.mjs`，入口降至 6,311 行；新增 2 项协议、错误分类、R2 和备份 payload 回归。目标 2/2、全套 `npm test` 65/65、docs/UI/CF/extension 本地门禁通过；GitHub CI `45383523713` 与 Docker PR build `45383514232` 通过，本地 Docker 因 `deb.debian.org` DNS 解析失败未完成重建，BK-AUD-201 仍未完成。
+
+BK-AUD-201 最新验收（2026-11-24）：GitHub CI `45383523713` 16/16 通过，Docker PR build `45383514232` 通过；本地 Colima Docker 因 `deb.debian.org` DNS 解析失败未完成重建，已记录为环境限制。BK-AUD-201 仍未完成。
+
+BK-AUD-201 最新增量（2026-11-24）：插件任务与元数据任务处理器已抽到 `src/worker/taskProcessors.mjs`，Worker 入口降至 6,259 行；目标测试 2/2、全套 `npm test` 67/67、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45386350505` 16/16、Docker PR build `45386350540` 通过，BK-AUD-201 仍未完成。
+
+BK-AUD-201 最新增量（2026-11-24）：broken-link scan processor 已并入 `src/worker/taskProcessors.mjs`，Worker 入口降至 6,216 行；目标测试 3/3、全套 `npm test` 68/68、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45388109218` 16/16、Docker PR build `45388109307` 通过，BK-AUD-201 仍未完成。
+
+BK-AUD-201 最新增量（2026-11-24）：AI rules processor 已抽到 `src/worker/aiTaskProcessors.mjs`，Worker 入口降至 6,119 行；目标测试 2/2、全套 `npm test` 70/70、docs/UI/CF/smoke/extension 门禁通过；GitHub CI `45389699468` 16/16、Docker PR build `45389699369` 通过，BK-AUD-201 仍未完成。
+
+BK-AUD-201 最新增量（2026-11-18）：Worker task health/realtime snapshot helper 已抽到 `src/worker/taskSummaries.mjs`，Worker 主入口降至 6,433 行；新增两项租户边界、DLQ 与提醒过滤测试。目标 2/2、全套 `npm test` 63/63，docs/UI/CF/extension 本地门禁通过；Docker 镜像启动后 `/api/health` 返回 200；GitHub CI run `44328101550`（16 步）与 Docker PR build run `44328102056` 均通过，BK-AUD-201 仍未完成。
+
+BK-AUD-201 最新增量（2026-11-25）：AI 集合摘要 dialog 的状态、结果渲染、复制/清理、请求和代表书签定位已从 `public/app.mjs` 抽至 `public/js/app/folderSummary.mjs`，入口降至 8,072 行（315.7KiB）；新增 `tests/folder-summary-ui.test.js` 3 项回归，覆盖 escaping、无集合提示和切换集合后的旧响应抑制；静态审计新增 RA-FE-014。`npm test` 90/90、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过，`ui:browser` 101/8/16 与 Docker build/start/healthy 通过；代码 head `92e3637` 的 hosted CI `45568954972`（16/16）与 Docker workflow `45568955075` 均成功，BK-AUD-201 保持未完成。
+
+BK-AUD-201 最新增量（2026-11-25）：AI 书签问答 dialog 的上下文、答案/出处渲染、请求和详情忙碌态已从 `public/app.mjs` 抽至 `public/js/app/aiQa.mjs`，入口降至 7,845 行（306.7KiB）；新增 `tests/ai-qa-ui.test.js` 3 项回归，覆盖答案/出处 escaping、切换书签后的旧响应抑制和空问题提示；静态审计新增 RA-FE-015。`npm test` 93/93、`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 和 `ui:browser` 101/8/16 通过，Docker build/start/healthy 通过；代码 head `0581c1f` 的 hosted CI `45570660662`（16/16）与 Docker workflow `45570660649` 均成功，BK-AUD-201 保持未完成。
+
+## 2026-11-26 本轮续作记录
+
+- **已完成**：继续完成前端 AI 交互域整改；新增 `public/js/app/folderSummary.mjs` 与 `public/js/app/aiQa.mjs`，分别拆分 AI 集合摘要和 AI 书签问答；新增 `RA-FE-014`、`RA-FE-015` 静态审计规则及 6 项 UI 单测。
+- **已验证**：`npm test` 93/93；`docs:check`、`ui:check`、`cf:check`、`cf:smoke`、`extension:check` 通过；`ui:browser` 101 张页面截图、8 项 E2E、16 张扩展截图通过；Docker build/start/healthy 通过；hosted CI `45571148122`、Docker `45571148109` 成功。
+- **提交**：`12b7589`、`5ca7ea3`、`92e3637`、`0f27d36`、`cff67f0`、`0581c1f`、`683a291`。
+- **未完成**：`BK-AUD-201` 仍保持 `[ ]`。剩余前端高耦合域包括设置页、搜索结果渲染、详情按钮/AI 操作装配，以及部分 `public/app.mjs` 大型入口；不得将本轮记录误解为全项目审计完成。
+- **继续要求**：新对话从当前分支和最新提交 `683a291` 继续，先读取本文件最新记录，再继续拆分并验证剩余前端域。
+
+## 2026-11-26 BK-AUD-201 前端续作：详情、搜索结果与设置任务域
+
+- **已完成**：详情页保存/编辑/删除/恢复、预览/阅读、详情 header 与 More 菜单、AI 自动标签/标题清洗/摘要/阅读摘要/高亮摘要/文件夹建议/问答/相关推荐及详情导航已抽至 `public/js/app/detailActions.mjs`；新增 `tests/detail-actions-ui.test.js` 3 项回归。
+- **已完成**：基础/高级搜索结果请求、分页与 load-more、元数据、loading/error、结果去重、活动书签/选择清理已抽至 `public/js/app/searchResults.mjs`；新增 `tests/search-results-ui.test.js` 3 项回归，并修复建议词控制器初始化时的 `loadBookmarks` TDZ。
+- **已完成**：设置页任务确认、进度、成功/失败输出、重试和 HTML escaping 已抽至 `public/js/settingsDialogs.mjs`；新增 `tests/settings-dialogs-ui.test.js` 3 项回归。
+- **验证**：本轮目标测试 9/9；全套 `npm test` 102/102；`npm run ui:check` 通过（入口 299.0KiB / 420KiB，CSS 176.2KiB，index DOM 730/750，settings DOM 556/560）；`npm run ui:browser` 通过（101/8/16）；Docker build/start/healthy 通过，隔离容器 `/api/health` 返回 `ok:true`；本轮 hosted CI `45784164584`（16/16）与 Docker workflow `45784164590` 均成功。浏览器审计生成的截图已恢复既有审阅基线。
+- **入口变化**：`public/app.mjs` 降至 7,589 行（306,216 bytes），`public/settings.mjs` 降至 1,678 行（70,483 bytes）；静态审计新增 `RA-FE-016`、`RA-FE-017`、`RA-FE-018`。
+- **未完成**：`BK-AUD-201` 继续保持 `[ ]`；设置页剩余主渲染/事件装配、搜索/详情残余入口耦合，以及 Worker/Node 其他大型入口仍需后续分阶段拆分。本轮不合并、不部署生产、不访问真实用户数据。

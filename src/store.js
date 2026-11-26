@@ -111,7 +111,11 @@ class JsonStore {
   }
 
   async _write(payload) {
-    await fs.writeFile(this.filePath, `${JSON.stringify(payload, null, 2)}\n`, 'utf8');
+    const temporary = `${this.filePath}.${crypto.randomUUID()}.tmp`;
+    try {
+      await fs.writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
+      await fs.rename(temporary, this.filePath);
+    } finally { await fs.rm(temporary, { force: true }); }
   }
 }
 
